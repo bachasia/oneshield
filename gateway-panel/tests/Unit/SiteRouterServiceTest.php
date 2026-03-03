@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\User;
 use App\Services\HmacService;
 use App\Services\SiteRouterService;
@@ -46,7 +46,7 @@ class SiteRouterServiceTest extends TestCase
     public function select_site_returns_an_active_site(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
 
         $result = $this->router->selectSite($user->id, 'stripe');
 
@@ -67,7 +67,7 @@ class SiteRouterServiceTest extends TestCase
     public function select_site_ignores_inactive_sites(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user, ['is_active' => false]);
+        $this->createShieldSite($user, ['is_active' => false]);
 
         $result = $this->router->selectSite($user->id, 'stripe');
 
@@ -78,7 +78,7 @@ class SiteRouterServiceTest extends TestCase
     public function select_site_ignores_sites_with_failure_count_at_or_above_threshold(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user, ['failure_count' => 5]);
+        $this->createShieldSite($user, ['failure_count' => 5]);
 
         $result = $this->router->selectSite($user->id, 'stripe');
 
@@ -90,7 +90,7 @@ class SiteRouterServiceTest extends TestCase
     {
         $user = $this->createUser();
         // Stripe-only, no PayPal
-        $this->createMeshSite($user, [
+        $this->createShieldSite($user, [
             'paypal_client_id' => null,
             'paypal_secret'    => null,
         ]);
@@ -107,8 +107,8 @@ class SiteRouterServiceTest extends TestCase
         $groupA = \App\Models\SiteGroup::create(['user_id' => $user->id, 'name' => 'A']);
         $groupB = \App\Models\SiteGroup::create(['user_id' => $user->id, 'name' => 'B']);
 
-        $siteA = $this->createMeshSite($user, ['group_id' => $groupA->id]);
-        $this->createMeshSite($user, [
+        $siteA = $this->createShieldSite($user, ['group_id' => $groupA->id]);
+        $this->createShieldSite($user, [
             'url'      => 'https://site-b.example.com',
             'group_id' => $groupB->id,
         ]);
@@ -124,7 +124,7 @@ class SiteRouterServiceTest extends TestCase
     {
         $user = $this->createUser();
         // Heartbeat 15 minutes ago — normally excluded, but fallback includes it
-        $site = $this->createMeshSite($user, [
+        $site = $this->createShieldSite($user, [
             'last_heartbeat_at' => now()->subMinutes(15),
         ]);
 
@@ -143,7 +143,7 @@ class SiteRouterServiceTest extends TestCase
     public function record_failure_increments_failure_count(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['failure_count' => 0]);
+        $site = $this->createShieldSite($user, ['failure_count' => 0]);
 
         $this->router->recordFailure($site);
 
@@ -157,7 +157,7 @@ class SiteRouterServiceTest extends TestCase
         config(['oneshield.circuit_breaker.failure_threshold' => 5]);
 
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['failure_count' => 4, 'is_active' => true]);
+        $site = $this->createShieldSite($user, ['failure_count' => 4, 'is_active' => true]);
 
         $this->router->recordFailure($site); // 4 → 5, should disable
 
@@ -173,7 +173,7 @@ class SiteRouterServiceTest extends TestCase
         config(['oneshield.circuit_breaker.failure_threshold' => 5]);
 
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['failure_count' => 4, 'is_active' => false]);
+        $site = $this->createShieldSite($user, ['failure_count' => 4, 'is_active' => false]);
 
         $this->router->recordFailure($site);
 
@@ -186,7 +186,7 @@ class SiteRouterServiceTest extends TestCase
     public function record_success_resets_failure_count_and_re_enables_site(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, [
+        $site = $this->createShieldSite($user, [
             'failure_count' => 3,
             'is_active'     => false,
             'disabled_at'   => now()->subHour(),
@@ -204,7 +204,7 @@ class SiteRouterServiceTest extends TestCase
     public function record_success_does_nothing_if_already_healthy(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['failure_count' => 0, 'is_active' => true]);
+        $site = $this->createShieldSite($user, ['failure_count' => 0, 'is_active' => true]);
 
         $this->router->recordSuccess($site);
 
@@ -224,13 +224,13 @@ class SiteRouterServiceTest extends TestCase
 
         $user = $this->createUser();
         // Disabled 40 minutes ago → should be re-enabled
-        $stale = $this->createMeshSite($user, [
+        $stale = $this->createShieldSite($user, [
             'is_active'     => false,
             'failure_count' => 5,
             'disabled_at'   => now()->subMinutes(40),
         ]);
         // Disabled 10 minutes ago → should NOT be re-enabled yet
-        $fresh = $this->createMeshSite($user, [
+        $fresh = $this->createShieldSite($user, [
             'url'           => 'https://fresh-disabled.example.com',
             'is_active'     => false,
             'failure_count' => 5,
@@ -255,7 +255,7 @@ class SiteRouterServiceTest extends TestCase
         config(['oneshield.circuit_breaker.reset_after_min' => 30]);
 
         $user = $this->createUser();
-        $this->createMeshSite($user, ['is_active' => true]);
+        $this->createShieldSite($user, ['is_active' => true]);
 
         $count = $this->router->resetStaleCircuitBreakers();
 
@@ -270,7 +270,7 @@ class SiteRouterServiceTest extends TestCase
     public function build_iframe_url_includes_all_parameters(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['url' => 'https://mesh.example.com/']);
+        $site = $this->createShieldSite($user, ['url' => 'https://mesh.example.com/']);
 
         $url = $this->router->buildIframeUrl($site, 'stripe', 'ORDER-42', 'token-abc');
 
@@ -285,7 +285,7 @@ class SiteRouterServiceTest extends TestCase
     public function build_iframe_url_strips_trailing_slash_from_site_url(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, ['url' => 'https://mesh.example.com/']);
+        $site = $this->createShieldSite($user, ['url' => 'https://mesh.example.com/']);
 
         $url = $this->router->buildIframeUrl($site, 'paypal', 'ORD-1', 'tok');
 

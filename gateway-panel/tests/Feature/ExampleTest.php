@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
+    use RefreshDatabase;
+
     /**
      * Root URL redirects to admin-setup on a fresh install (no users).
      * Once a user exists it redirects to /login instead.

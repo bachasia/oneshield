@@ -56,7 +56,7 @@
             <dd class="font-mono text-xs text-gray-600 break-all">{{ transaction.gateway_transaction_id ?? '—' }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Mesh Site</dt>
+            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Shield Site</dt>
             <dd class="text-sm text-gray-700 font-medium">{{ transaction.site?.name ?? '—' }}</dd>
           </div>
           <div>

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\OneShieldTestHelpers;
@@ -31,12 +31,12 @@ class ConnectApiTest extends TestCase
     // =========================================================================
 
     /** @test */
-    public function register_creates_a_new_mesh_site(): void
+    public function register_creates_a_new_shield_site(): void
     {
         $user    = $this->createUser();
         $payload = [
             'site_url'  => 'https://new-mesh-site.example.com',
-            'site_name' => 'My Mesh Site',
+            'site_name' => 'My Shield Site',
         ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
 
@@ -46,9 +46,9 @@ class ConnectApiTest extends TestCase
                  ->assertJsonFragment(['status' => 'registered'])
                  ->assertJsonStructure(['site_id', 'site_key', 'status']);
 
-        $this->assertDatabaseHas('mesh_sites', [
+        $this->assertDatabaseHas('shield_sites', [
             'user_id' => $user->id,
-            'name'    => 'My Mesh Site',
+            'name'    => 'My Shield Site',
             'url'     => 'https://new-mesh-site.example.com',
         ]);
     }
@@ -65,7 +65,7 @@ class ConnectApiTest extends TestCase
 
         $this->postJson('/api/connect/register', $payload, $headers)->assertStatus(201);
 
-        $this->assertDatabaseHas('mesh_sites', [
+        $this->assertDatabaseHas('shield_sites', [
             'url' => 'https://new-mesh-site.example.com',
         ]);
     }
@@ -74,7 +74,7 @@ class ConnectApiTest extends TestCase
     public function register_returns_already_registered_for_duplicate_url(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user, ['url' => 'https://existing.example.com']);
+        $this->createShieldSite($user, ['url' => 'https://existing.example.com']);
 
         $payload = [
             'site_url'  => 'https://existing.example.com',
@@ -121,7 +121,7 @@ class ConnectApiTest extends TestCase
     public function heartbeat_updates_last_heartbeat_at(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, [
+        $site = $this->createShieldSite($user, [
             'last_heartbeat_at' => now()->subHour(),
         ]);
 
@@ -142,7 +142,7 @@ class ConnectApiTest extends TestCase
     public function heartbeat_returns_gateway_config(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, [
+        $site = $this->createShieldSite($user, [
             'stripe_mode' => 'live',
             'paypal_mode' => 'live',
         ]);
@@ -163,7 +163,7 @@ class ConnectApiTest extends TestCase
     {
         $userA  = $this->createUser();
         $userB  = $this->createUser();
-        $site   = $this->createMeshSite($userB); // belongs to B
+        $site   = $this->createShieldSite($userB); // belongs to B
 
         $payload = ['site_id' => $site->id];
         $headers = $this->hmacHeaders($payload, $userA->token_secret);
@@ -190,7 +190,7 @@ class ConnectApiTest extends TestCase
     public function status_returns_site_info_and_gateway_capabilities(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
 
         $payload = [];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
@@ -213,7 +213,7 @@ class ConnectApiTest extends TestCase
     {
         $userA = $this->createUser();
         $userB = $this->createUser();
-        $site  = $this->createMeshSite($userB);
+        $site  = $this->createShieldSite($userB);
 
         $headers = $this->hmacHeaders([], $userA->token_secret);
 
@@ -224,7 +224,7 @@ class ConnectApiTest extends TestCase
     public function status_shows_site_without_gateway_as_unconfigured(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user, [
+        $site = $this->createShieldSite($user, [
             'stripe_public_key' => null,
             'stripe_secret_key' => null,
             'paypal_client_id'  => null,

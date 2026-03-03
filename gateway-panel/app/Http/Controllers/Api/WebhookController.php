@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\Transaction;
 use App\Services\SiteRouterService;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +23,7 @@ class WebhookController extends Controller
      */
     public function paypal(Request $request, int $siteId): JsonResponse
     {
-        $site    = MeshSite::findOrFail($siteId);
+        $site    = ShieldSite::findOrFail($siteId);
         $payload = $request->all();
         $rawBody = $request->getContent();
 
@@ -74,7 +74,7 @@ class WebhookController extends Controller
      */
     public function stripe(Request $request, int $siteId): JsonResponse
     {
-        $site    = MeshSite::findOrFail($siteId);
+        $site    = ShieldSite::findOrFail($siteId);
         $rawBody = $request->getContent();
         $sigHeader = $request->header('Stripe-Signature');
 

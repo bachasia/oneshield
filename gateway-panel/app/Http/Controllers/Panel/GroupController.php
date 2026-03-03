@@ -14,7 +14,7 @@ class GroupController extends Controller
     public function index(Request $request): Response
     {
         $groups = SiteGroup::where('user_id', $request->user()->id)
-            ->withCount('meshSites')
+            ->withCount('shieldSites')
             ->latest()
             ->get();
 

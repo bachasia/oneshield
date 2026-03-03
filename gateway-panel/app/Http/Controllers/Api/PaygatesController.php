@@ -17,7 +17,7 @@ class PaygatesController extends Controller
     ) {}
 
     /**
-     * Select an appropriate mesh site and return iframe URL.
+     * Select an appropriate shield site and return iframe URL.
      * POST /api/paygates/get-site
      */
     public function getSite(Request $request): JsonResponse
@@ -40,7 +40,7 @@ class PaygatesController extends Controller
 
         if (!$site) {
             return response()->json([
-                'error' => 'No active mesh site available for the requested gateway',
+                'error' => 'No active shield site available for the requested gateway',
             ], 503);
         }
 
@@ -129,7 +129,7 @@ class PaygatesController extends Controller
         );
 
         if (!$site) {
-            return response()->json(['error' => 'No active mesh site available'], 503);
+            return response()->json(['error' => 'No active shield site available'], 503);
         }
 
         $checkoutToken = $this->hmacService->sign(

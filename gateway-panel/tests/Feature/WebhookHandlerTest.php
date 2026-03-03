@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,7 +52,7 @@ class WebhookHandlerTest extends TestCase
     public function stripe_webhook_processes_payment_intent_succeeded(): void
     {
         $user        = $this->createUser();
-        $site        = $this->createMeshSite($user);
+        $site        = $this->createShieldSite($user);
         $transaction = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'WC-101',
@@ -80,7 +80,7 @@ class WebhookHandlerTest extends TestCase
     public function stripe_webhook_processes_charge_succeeded(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
         $tx   = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'WC-102',
@@ -105,7 +105,7 @@ class WebhookHandlerTest extends TestCase
     public function stripe_webhook_processes_payment_intent_failed(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
         $tx   = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'WC-103',
@@ -130,7 +130,7 @@ class WebhookHandlerTest extends TestCase
     public function stripe_webhook_ignores_unknown_order_id(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
 
         $payload = $this->buildStripeEvent('payment_intent.succeeded', 'pi_no_tx', 'NON-EXISTENT');
 
@@ -143,7 +143,7 @@ class WebhookHandlerTest extends TestCase
     {
         $webhookSecret = 'whsec_test_secret_key';
         $user          = $this->createUser();
-        $site          = $this->createMeshSite($user, [
+        $site          = $this->createShieldSite($user, [
             'stripe_webhook_secret' => $webhookSecret,
         ]);
         Transaction::create([
@@ -176,7 +176,7 @@ class WebhookHandlerTest extends TestCase
     {
         $webhookSecret = 'whsec_real_secret';
         $user          = $this->createUser();
-        $site          = $this->createMeshSite($user, [
+        $site          = $this->createShieldSite($user, [
             'stripe_webhook_secret' => $webhookSecret,
         ]);
 
@@ -201,7 +201,7 @@ class WebhookHandlerTest extends TestCase
     {
         $webhookSecret = 'whsec_stale_test';
         $user          = $this->createUser();
-        $site          = $this->createMeshSite($user, [
+        $site          = $this->createShieldSite($user, [
             'stripe_webhook_secret' => $webhookSecret,
         ]);
 
@@ -228,7 +228,7 @@ class WebhookHandlerTest extends TestCase
     public function paypal_webhook_processes_completed_payment(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
         $tx   = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'WC-PP-001',
@@ -265,7 +265,7 @@ class WebhookHandlerTest extends TestCase
     public function paypal_webhook_processes_refunded_payment(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
         $tx   = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'WC-PP-REF',
@@ -298,7 +298,7 @@ class WebhookHandlerTest extends TestCase
     public function paypal_webhook_returns_invalid_when_ipn_verification_fails(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
 
         // PayPal returns INVALID
         Http::fake([

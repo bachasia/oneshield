@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Services\HmacService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +14,7 @@ class ConnectController extends Controller
     public function __construct(private HmacService $hmacService) {}
 
     /**
-     * Register a new mesh site.
+     * Register a new shield site.
      * POST /api/connect/register
      *
      * Called by the oneshield-connect plugin on first setup.
@@ -29,7 +29,7 @@ class ConnectController extends Controller
         ]);
 
         // Check if this site URL is already registered for this user
-        $existing = MeshSite::where('user_id', $user->id)
+        $existing = ShieldSite::where('user_id', $user->id)
             ->where('url', $validated['site_url'])
             ->first();
 
@@ -41,7 +41,7 @@ class ConnectController extends Controller
             ]);
         }
 
-        $site = MeshSite::create([
+        $site = ShieldSite::create([
             'user_id'  => $user->id,
             'name'     => $validated['site_name'],
             'url'      => rtrim($validated['site_url'], '/'),
@@ -58,7 +58,7 @@ class ConnectController extends Controller
     }
 
     /**
-     * Heartbeat ping from mesh site.
+     * Heartbeat ping from shield site.
      * POST /api/connect/heartbeat
      */
     public function heartbeat(Request $request): JsonResponse
@@ -69,7 +69,7 @@ class ConnectController extends Controller
             'site_id' => 'required|integer',
         ]);
 
-        $site = MeshSite::where('id', $validated['site_id'])
+        $site = ShieldSite::where('id', $validated['site_id'])
             ->where('user_id', $user->id)
             ->firstOrFail();
 
@@ -93,7 +93,7 @@ class ConnectController extends Controller
     {
         $user = $request->user();
 
-        $site = MeshSite::where('id', $siteId)
+        $site = ShieldSite::where('id', $siteId)
             ->where('user_id', $user->id)
             ->with('group')
             ->firstOrFail();

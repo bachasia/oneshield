@@ -19,8 +19,8 @@ class SiteGroup extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function meshSites(): HasMany
+    public function shieldSites(): HasMany
     {
-        return $this->hasMany(MeshSite::class, 'group_id');
+        return $this->hasMany(ShieldSite::class, 'group_id');
     }
 }

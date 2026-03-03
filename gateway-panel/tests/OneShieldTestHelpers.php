@@ -3,7 +3,7 @@
 namespace Tests;
 
 use App\Models\GatewayToken;
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\SiteGroup;
 use App\Models\Transaction;
 use App\Models\User;
@@ -45,11 +45,11 @@ trait OneShieldTestHelpers
     }
 
     /**
-     * Create a MeshSite with Stripe credentials by default.
+     * Create a ShieldSite with Stripe credentials by default.
      */
-    protected function createMeshSite(User $user, array $overrides = []): MeshSite
+    protected function createShieldSite(User $user, array $overrides = []): ShieldSite
     {
-        return MeshSite::create(array_merge([
+        return ShieldSite::create(array_merge([
             'user_id'            => $user->id,
             'name'               => 'Test Site',
             'url'                => 'https://mesh-site.example.com',

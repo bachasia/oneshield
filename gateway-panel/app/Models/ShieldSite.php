@@ -8,8 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Crypt;
 
-class MeshSite extends Model
+class ShieldSite extends Model
 {
+    protected $table = 'shield_sites';
+
     protected $fillable = [
         'user_id',
         'group_id',

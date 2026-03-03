@@ -66,7 +66,7 @@ Route::middleware(ApiCors::class)->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Connect Plugin API (mesh site → gateway panel)
+| Connect Plugin API (shield site -> gateway panel)
 | Authentication: HMAC-SHA256 + per-token rate limiting
 |--------------------------------------------------------------------------
 */

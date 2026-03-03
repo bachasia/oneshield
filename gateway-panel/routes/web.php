@@ -3,7 +3,7 @@
 use App\Http\Controllers\Auth\AdminSetupController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Panel\DashboardController;
-use App\Http\Controllers\Panel\MeshSiteController;
+use App\Http\Controllers\Panel\ShieldSiteController;
 use App\Http\Controllers\Panel\GroupController;
 use App\Http\Controllers\Panel\TransactionController;
 use App\Http\Controllers\Panel\SettingsController;
@@ -33,10 +33,10 @@ Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Mesh Sites
-    Route::resource('sites', MeshSiteController::class);
-    Route::patch('sites/{site}/toggle', [MeshSiteController::class, 'toggle'])->name('sites.toggle');
-    Route::post('sites/{site}/check', [MeshSiteController::class, 'check'])->name('sites.check');
+    // Shield Sites
+    Route::resource('sites', ShieldSiteController::class);
+    Route::patch('sites/{site}/toggle', [ShieldSiteController::class, 'toggle'])->name('sites.toggle');
+    Route::post('sites/{site}/check', [ShieldSiteController::class, 'check'])->name('sites.check');
 
     // Groups
     Route::resource('groups', GroupController::class);

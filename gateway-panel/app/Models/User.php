@@ -35,9 +35,9 @@ class User extends Authenticatable
         ];
     }
 
-    public function meshSites(): HasMany
+    public function shieldSites(): HasMany
     {
-        return $this->hasMany(MeshSite::class);
+        return $this->hasMany(ShieldSite::class);
     }
 
     public function siteGroups(): HasMany
@@ -47,7 +47,7 @@ class User extends Authenticatable
 
     public function transactions(): HasManyThrough
     {
-        return $this->hasManyThrough(Transaction::class, MeshSite::class);
+        return $this->hasManyThrough(Transaction::class, ShieldSite::class);
     }
 
     public function gatewayTokens(): HasMany

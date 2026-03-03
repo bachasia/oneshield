@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Http\Controllers\Controller;
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\SiteGroup;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
@@ -11,13 +11,13 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class MeshSiteController extends Controller
+class ShieldSiteController extends Controller
 {
     public function index(Request $request): Response
     {
         $user = $request->user();
 
-        $sites = MeshSite::where('user_id', $user->id)
+        $sites = ShieldSite::where('user_id', $user->id)
             ->with('group')
             ->when($request->group_id, fn ($q) => $q->where('group_id', $request->group_id))
             ->when($request->status, fn ($q) => match($request->status) {
@@ -38,7 +38,7 @@ class MeshSiteController extends Controller
             ->get()
             ->groupBy('site_id');
 
-        $sites->getCollection()->transform(function (MeshSite $site) use ($grossByGateway) {
+        $sites->getCollection()->transform(function (ShieldSite $site) use ($grossByGateway) {
             $gateways = $grossByGateway->get($site->id, collect());
             $site->gross_paypal = (float) ($gateways->firstWhere('gateway', 'paypal')?->total ?? 0);
             $site->gross_stripe = (float) ($gateways->firstWhere('gateway', 'stripe')?->total ?? 0);
@@ -48,7 +48,7 @@ class MeshSiteController extends Controller
         $groups = SiteGroup::where('user_id', $user->id)->get(['id', 'name']);
 
         // Summary stats for header
-        $allSites = MeshSite::where('user_id', $user->id)->get();
+        $allSites = ShieldSite::where('user_id', $user->id)->get();
         $stats = [
             'live_paypal'    => $allSites->where('paypal_enabled', true)->where('paypal_mode', 'live')->count(),
             'live_stripe'    => $allSites->where('stripe_enabled', true)->where('stripe_mode', 'live')->count(),
@@ -77,12 +77,12 @@ class MeshSiteController extends Controller
         $validated['user_id'] = $user->id;
         $validated['site_key'] = bin2hex(random_bytes(32));
 
-        MeshSite::create($validated);
+        ShieldSite::create($validated);
 
         return redirect()->route('sites.index')->with('success', 'Mesh site added successfully.');
     }
 
-    public function update(Request $request, MeshSite $site): RedirectResponse
+    public function update(Request $request, ShieldSite $site): RedirectResponse
     {
         abort_if($site->user_id !== $request->user()->id, 403);
 
@@ -122,7 +122,7 @@ class MeshSiteController extends Controller
         return back()->with('success', 'Site settings updated.');
     }
 
-    public function destroy(Request $request, MeshSite $site): RedirectResponse
+    public function destroy(Request $request, ShieldSite $site): RedirectResponse
     {
         abort_if($site->user_id !== $request->user()->id, 403);
         $site->delete();
@@ -130,7 +130,7 @@ class MeshSiteController extends Controller
         return redirect()->route('sites.index')->with('success', 'Site removed.');
     }
 
-    public function toggle(Request $request, MeshSite $site): RedirectResponse
+    public function toggle(Request $request, ShieldSite $site): RedirectResponse
     {
         abort_if($site->user_id !== $request->user()->id, 403);
 
@@ -140,9 +140,9 @@ class MeshSiteController extends Controller
     }
 
     /**
-     * Check site connectivity (ping the mesh site URL).
+     * Check site connectivity (ping the shield site URL).
      */
-    public function check(Request $request, MeshSite $site): RedirectResponse
+    public function check(Request $request, ShieldSite $site): RedirectResponse
     {
         abort_if($site->user_id !== $request->user()->id, 403);
 

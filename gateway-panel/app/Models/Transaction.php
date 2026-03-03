@@ -26,6 +26,6 @@ class Transaction extends Model
 
     public function site(): BelongsTo
     {
-        return $this->belongsTo(MeshSite::class, 'site_id');
+        return $this->belongsTo(ShieldSite::class, 'site_id');
     }
 }

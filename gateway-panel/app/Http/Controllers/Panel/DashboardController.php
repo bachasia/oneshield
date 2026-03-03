@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Panel;
 
 use App\Http\Controllers\Controller;
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,8 +15,8 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        $totalSites  = MeshSite::where('user_id', $user->id)->count();
-        $activeSites = MeshSite::where('user_id', $user->id)->active()->count();
+        $totalSites  = ShieldSite::where('user_id', $user->id)->count();
+        $activeSites = ShieldSite::where('user_id', $user->id)->active()->count();
 
         $todayTransactions = Transaction::whereHas(
             'site', fn ($q) => $q->where('user_id', $user->id)

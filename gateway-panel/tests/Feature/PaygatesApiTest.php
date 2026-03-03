@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\MeshSite;
+use App\Models\ShieldSite;
 use App\Models\SiteGroup;
 use App\Models\Transaction;
 use App\Models\User;
@@ -36,7 +36,7 @@ class PaygatesApiTest extends TestCase
     public function get_site_returns_iframe_url_and_transaction_id(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user);
+        $this->createShieldSite($user);
 
         $payload = [
             'gateway'  => 'stripe',
@@ -65,7 +65,7 @@ class PaygatesApiTest extends TestCase
     public function get_site_iframe_url_contains_gateway_and_order_id(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user);
+        $this->createShieldSite($user);
 
         $payload = [
             'gateway'  => 'paypal',
@@ -89,7 +89,7 @@ class PaygatesApiTest extends TestCase
     {
         $user = $this->createUser();
         // Site is inactive
-        $this->createMeshSite($user, ['is_active' => false]);
+        $this->createShieldSite($user, ['is_active' => false]);
 
         $payload = [
             'gateway'  => 'stripe',
@@ -107,7 +107,7 @@ class PaygatesApiTest extends TestCase
     {
         $user = $this->createUser();
         // Stripe-only site, no PayPal keys
-        $this->createMeshSite($user, [
+        $this->createShieldSite($user, [
             'paypal_client_id' => null,
             'paypal_secret'    => null,
         ]);
@@ -131,8 +131,8 @@ class PaygatesApiTest extends TestCase
         $groupB = SiteGroup::create(['user_id' => $user->id, 'name' => 'Group B']);
 
         // One site in Group A, one in Group B
-        $siteA = $this->createMeshSite($user, ['group_id' => $groupA->id]);
-        $siteB = $this->createMeshSite($user, [
+        $siteA = $this->createShieldSite($user, ['group_id' => $groupA->id]);
+        $siteB = $this->createShieldSite($user, [
             'url'      => 'https://site-b.example.com',
             'group_id' => $groupB->id,
         ]);
@@ -190,7 +190,7 @@ class PaygatesApiTest extends TestCase
     public function confirm_marks_transaction_as_completed(): void
     {
         $user        = $this->createUser();
-        $site        = $this->createMeshSite($user);
+        $site        = $this->createShieldSite($user);
         $transaction = Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'ORD-CONFIRM',
@@ -226,7 +226,7 @@ class PaygatesApiTest extends TestCase
     public function confirm_marks_transaction_as_failed(): void
     {
         $user        = $this->createUser();
-        $site        = $this->createMeshSite($user);
+        $site        = $this->createShieldSite($user);
         Transaction::create([
             'site_id'           => $site->id,
             'order_id'          => 'ORD-FAIL',
@@ -254,7 +254,7 @@ class PaygatesApiTest extends TestCase
     public function confirm_returns_404_for_unknown_order(): void
     {
         $user    = $this->createUser();
-        $site    = $this->createMeshSite($user);
+        $site    = $this->createShieldSite($user);
         $payload = [
             'site_id'                => $site->id,
             'order_id'               => 'NON-EXISTENT',
@@ -270,7 +270,7 @@ class PaygatesApiTest extends TestCase
     public function confirm_cannot_update_already_completed_transaction(): void
     {
         $user = $this->createUser();
-        $site = $this->createMeshSite($user);
+        $site = $this->createShieldSite($user);
         Transaction::create([
             'site_id'                => $site->id,
             'order_id'               => 'ORD-DONE',
@@ -302,7 +302,7 @@ class PaygatesApiTest extends TestCase
     public function iframe_url_returns_url_for_active_site(): void
     {
         $user = $this->createUser();
-        $this->createMeshSite($user);
+        $this->createShieldSite($user);
 
         $payload = [
             'gateway'  => 'stripe',

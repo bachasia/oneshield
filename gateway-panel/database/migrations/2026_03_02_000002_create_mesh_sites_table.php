@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('group_id')->nullable()->constrained('site_groups')->onDelete('set null');
             $table->string('name');
             $table->string('url');
-            $table->string('site_key', 64)->unique()->comment('Unique key assigned to this mesh site for authentication');
+            $table->string('site_key', 64)->unique()->comment('Unique key assigned to this shield site for authentication');
 
             // PayPal credentials (AES-256 encrypted)
             $table->text('paypal_client_id')->nullable();

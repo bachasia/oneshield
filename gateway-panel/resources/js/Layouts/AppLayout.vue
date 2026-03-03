@@ -164,7 +164,7 @@ const icons = {
 
 const navigation = [
   { name: 'Dashboard',     href: '/dashboard',   icon: icons.dashboard },
-  { name: 'Payment Sites', href: '/sites',        icon: icons.sites },
+  { name: 'Shield Sites',  href: '/sites',        icon: icons.sites },
   { name: 'Groups',        href: '/groups',       icon: icons.groups },
   { name: 'Transactions',  href: '/transactions', icon: icons.tx },
   { name: 'Settings',      href: '/settings',     icon: icons.settings },
