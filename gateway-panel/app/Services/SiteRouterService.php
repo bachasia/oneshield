@@ -35,7 +35,11 @@ class SiteRouterService
             $eligible = $this->fallbackSelect($userId, $gateway, $groupId);
         }
 
-        return $eligible->random() ?? null;
+        if ($eligible->isEmpty()) {
+            return null;
+        }
+
+        return $eligible->random();
     }
 
     /**

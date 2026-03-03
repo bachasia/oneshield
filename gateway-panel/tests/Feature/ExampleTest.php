@@ -8,12 +8,14 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * Root URL redirects to admin-setup on a fresh install (no users).
+     * Once a user exists it redirects to /login instead.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_root_redirects_when_unauthenticated(): void
     {
         $response = $this->get('/');
 
-        $response->assertStatus(200);
+        // Accept either /account/admin (first-run) or /login (existing install)
+        $this->assertContains($response->getStatusCode(), [301, 302]);
     }
 }

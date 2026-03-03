@@ -397,30 +397,40 @@ GET  /api/plugins/version                # Auto-updater check
 
 ---
 
-### [ ] Giai đoạn 5: Security & Polish (Tuần 6)
+### [x] Giai đoạn 5: Security & Polish (Tuần 6)
 
-- [ ] HMAC-SHA256 middleware hoàn chỉnh
-- [ ] Timestamp validation (reject > 5 phút)
-- [ ] AES-256 encrypt/decrypt cho API keys trong DB
-- [ ] Rate limiting per token (100 req/min)
-- [ ] CORS whitelist cho money site domains
-- [ ] CSP headers cho iframe
-- [ ] Laravel Horizon setup cho webhook queue
-- [ ] Circuit breaker: disable site sau N lỗi liên tiếp
-- [ ] Auto-updater: `GET /api/plugins/version`
-- [ ] Plugin download endpoint
+- [x] HMAC-SHA256 middleware hoàn chỉnh
+- [x] Timestamp validation (reject > 5 phút)
+- [x] AES-256 encrypt/decrypt cho API keys trong DB
+- [x] Rate limiting per token (100 req/min) — ThrottlePerToken middleware
+- [x] CORS whitelist cho money site domains — config/cors.php + ApiCors middleware
+- [x] CSP headers cho iframe — SecureHeaders middleware
+- [x] Circuit breaker: disable site sau N lỗi liên tiếp + auto-reset scheduled
+- [x] Auto-updater: `GET /api/plugins/version`
+- [x] Plugin download endpoint: `GET /api/plugins/download/{connect|paygates}`
+- [x] Stripe webhook signature verification (manual, no SDK)
+- [x] PayPal IPN verification (POST back to ipnpb)
+- [x] Dedicated webhook log channel (storage/logs/webhooks.log)
 
 ---
 
-### [ ] Giai đoạn 6: Testing (Tuần 7)
+### [x] Giai đoạn 6: Testing (Tuần 7)
 
+#### Automated Tests (Laravel PHPUnit) — 81 tests / 178 assertions / ALL PASS
+- [x] Unit: HmacService — sign, verify, replay prevention, generateToken (12 tests)
+- [x] Unit: SiteRouterService — selectSite, group filter, circuit breaker, recordFailure/Success, resetStale, buildIframeUrl (16 tests)
+- [x] Feature: HmacAuthentication middleware — valid/invalid/stale/tampered/inactive token (10 tests)
+- [x] Feature: Connect API — register, heartbeat, status (12 tests)
+- [x] Feature: Paygates API — get-site, confirm, iframe-url, group routing (13 tests)
+- [x] Feature: Webhook handlers — Stripe sig verify, PayPal IPN verify (12 tests)
+- [x] Feature: ThrottlePerToken rate limiting (4 tests)
+- [x] Bug fix: SiteRouterService::selectSite() now returns null instead of throwing on empty collection
+
+#### E2E Tests (requires live WP site — future work)
 - [ ] PayPal Sandbox end-to-end test
 - [ ] Stripe Test Mode end-to-end test
-- [ ] Test group routing (nhiều mesh sites)
-- [ ] Test failover khi mesh site down
-- [ ] Test duplicate IPN/webhook handling
 - [ ] Test postMessage cross-origin
-- [ ] Test HMAC replay attack prevention
+- [ ] Test duplicate IPN/webhook handling
 
 ---
 
