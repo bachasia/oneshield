@@ -123,6 +123,14 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        // Dedicated channel for webhook/IPN logs
+        'webhooks' => [
+            'driver' => 'daily',
+            'path'   => storage_path('logs/webhooks.log'),
+            'level'  => 'info',
+            'days'   => 30,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],

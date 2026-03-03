@@ -22,17 +22,20 @@ class MeshSite extends Model
         'stripe_public_key',
         'stripe_secret_key',
         'stripe_mode',
+        'stripe_webhook_secret',
         'airwallex_client_id',
         'airwallex_api_key',
         'is_active',
+        'disabled_at',
         'failure_count',
         'last_heartbeat_at',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'         => 'boolean',
         'last_heartbeat_at' => 'datetime',
-        'failure_count' => 'integer',
+        'disabled_at'       => 'datetime',
+        'failure_count'     => 'integer',
     ];
 
     // Encrypted attributes
@@ -77,6 +80,14 @@ class MeshSite extends Model
     }
 
     protected function airwallexApiKey(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $value ? Crypt::decryptString($value) : null,
+            set: fn (?string $value) => $value ? Crypt::encryptString($value) : null,
+        );
+    }
+
+    protected function stripeWebhookSecret(): Attribute
     {
         return Attribute::make(
             get: fn (?string $value) => $value ? Crypt::decryptString($value) : null,

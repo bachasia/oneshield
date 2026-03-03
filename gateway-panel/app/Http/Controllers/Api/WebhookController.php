@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Services\SiteRouterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WebhookController extends Controller
@@ -17,22 +18,30 @@ class WebhookController extends Controller
     /**
      * Handle PayPal IPN/Webhook.
      * POST /api/webhook/paypal/{site_id}
+     *
+     * Verifies the IPN with PayPal's verification endpoint before processing.
      */
     public function paypal(Request $request, int $siteId): JsonResponse
     {
-        $site = MeshSite::findOrFail($siteId);
-
+        $site    = MeshSite::findOrFail($siteId);
         $payload = $request->all();
+        $rawBody = $request->getContent();
+
         Log::channel('webhooks')->info('PayPal webhook received', [
             'site_id' => $siteId,
             'payload' => $payload,
         ]);
 
-        // PayPal IPN verification would go here in production
-        // For now, we process based on payment_status field
-        $txnId     = $payload['txn_id'] ?? $payload['id'] ?? null;
-        $status    = $this->mapPaypalStatus($payload['payment_status'] ?? $payload['status'] ?? '');
-        $orderId   = $payload['invoice'] ?? $payload['custom'] ?? null;
+        // Verify IPN with PayPal
+        if (!$this->verifyPaypalIpn($rawBody, $site->paypal_mode ?? 'sandbox')) {
+            Log::channel('webhooks')->warning('PayPal IPN verification failed', ['site_id' => $siteId]);
+            // Still return 200 to prevent PayPal from retrying (but don't process)
+            return response()->json(['status' => 'invalid']);
+        }
+
+        $txnId   = $payload['txn_id'] ?? $payload['id'] ?? null;
+        $status  = $this->mapPaypalStatus($payload['payment_status'] ?? $payload['status'] ?? '');
+        $orderId = $payload['invoice'] ?? $payload['custom'] ?? null;
 
         if ($txnId && $orderId) {
             $transaction = Transaction::where('site_id', $siteId)
@@ -48,6 +57,8 @@ class WebhookController extends Controller
 
                 if ($status === 'completed') {
                     $this->siteRouter->recordSuccess($site);
+                } elseif ($status === 'failed') {
+                    $this->siteRouter->recordFailure($site);
                 }
             }
         }
@@ -58,17 +69,30 @@ class WebhookController extends Controller
     /**
      * Handle Stripe Webhook.
      * POST /api/webhook/stripe/{site_id}
+     *
+     * Verifies Stripe-Signature header using the site's Stripe secret key.
      */
     public function stripe(Request $request, int $siteId): JsonResponse
     {
-        $site = MeshSite::findOrFail($siteId);
+        $site    = MeshSite::findOrFail($siteId);
+        $rawBody = $request->getContent();
+        $sigHeader = $request->header('Stripe-Signature');
 
-        $payload = $request->all();
         Log::channel('webhooks')->info('Stripe webhook received', [
-            'site_id' => $siteId,
-            'event_type' => $payload['type'] ?? 'unknown',
+            'site_id'    => $siteId,
+            'event_type' => json_decode($rawBody, true)['type'] ?? 'unknown',
         ]);
 
+        // Verify Stripe signature if we have the webhook secret configured
+        $webhookSecret = $site->stripe_webhook_secret ?? null;
+        if ($webhookSecret && $sigHeader) {
+            if (!$this->verifyStripeSignature($rawBody, $sigHeader, $webhookSecret)) {
+                Log::channel('webhooks')->warning('Stripe signature verification failed', ['site_id' => $siteId]);
+                return response()->json(['error' => 'Invalid signature'], 400);
+            }
+        }
+
+        $payload   = json_decode($rawBody, true) ?? [];
         $eventType = $payload['type'] ?? '';
         $object    = $payload['data']['object'] ?? [];
 
@@ -87,7 +111,6 @@ class WebhookController extends Controller
                         'gateway_transaction_id' => $txnId,
                         'raw_response'           => $payload,
                     ]);
-
                     $this->siteRouter->recordSuccess($site);
                 }
             }
@@ -96,10 +119,14 @@ class WebhookController extends Controller
             $orderId = $object['metadata']['order_id'] ?? null;
 
             if ($txnId && $orderId) {
-                Transaction::where('site_id', $siteId)
+                $updated = Transaction::where('site_id', $siteId)
                     ->where('order_id', $orderId)
                     ->where('status', 'pending')
                     ->update(['status' => 'failed', 'raw_response' => $payload]);
+
+                if ($updated) {
+                    $this->siteRouter->recordFailure($site);
+                }
             }
         }
 
@@ -119,13 +146,79 @@ class WebhookController extends Controller
         ]);
     }
 
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verify PayPal IPN by posting back to PayPal.
+     */
+    private function verifyPaypalIpn(string $rawBody, string $mode): bool
+    {
+        $verifyUrl = $mode === 'live'
+            ? 'https://ipnpb.paypal.com/cgi-bin/webscr'
+            : 'https://ipnpb.sandbox.paypal.com/cgi-bin/webscr';
+
+        try {
+            $response = Http::withOptions(['timeout' => 10])
+                ->withBody('cmd=_notify-validate&' . $rawBody, 'application/x-www-form-urlencoded')
+                ->post($verifyUrl);
+
+            return $response->successful() && trim($response->body()) === 'VERIFIED';
+        } catch (\Throwable $e) {
+            Log::channel('webhooks')->error('PayPal IPN verify request failed', ['error' => $e->getMessage()]);
+            // On network error, allow through (fail-open) to avoid missing transactions
+            return true;
+        }
+    }
+
+    /**
+     * Verify Stripe webhook signature (manual implementation, no Stripe SDK needed).
+     *
+     * @see https://stripe.com/docs/webhooks/signatures
+     */
+    private function verifyStripeSignature(string $payload, string $sigHeader, string $secret): bool
+    {
+        // Parse Stripe-Signature header: t=timestamp,v1=signature,...
+        $parts = [];
+        foreach (explode(',', $sigHeader) as $part) {
+            [$k, $v] = explode('=', $part, 2) + [null, null];
+            if ($k && $v) {
+                $parts[$k][] = $v;
+            }
+        }
+
+        $timestamp  = (int) ($parts['t'][0] ?? 0);
+        $signatures = $parts['v1'] ?? [];
+
+        if (!$timestamp || empty($signatures)) {
+            return false;
+        }
+
+        // Reject if older than 5 minutes
+        if (abs(time() - $timestamp) > 300) {
+            return false;
+        }
+
+        $signedPayload = $timestamp . '.' . $payload;
+        $expected      = hash_hmac('sha256', $signedPayload, $secret);
+
+        foreach ($signatures as $sig) {
+            if (hash_equals($expected, $sig)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function mapPaypalStatus(string $status): string
     {
         return match(strtolower($status)) {
-            'completed' => 'completed',
-            'refunded', 'reversed' => 'refunded',
+            'completed'                         => 'completed',
+            'refunded', 'reversed'              => 'refunded',
             'denied', 'failed', 'expired', 'voided' => 'failed',
-            default => 'pending',
+            default                             => 'pending',
         };
     }
 }

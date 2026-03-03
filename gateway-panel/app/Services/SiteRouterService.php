@@ -72,10 +72,16 @@ class SiteRouterService
      */
     public function recordFailure(MeshSite $site): void
     {
-        $site->increment('failure_count');
+        $threshold = (int) config('oneshield.circuit_breaker.failure_threshold', 5);
 
-        if ($site->failure_count >= 5) {
-            $site->update(['is_active' => false]);
+        $site->increment('failure_count');
+        $site->refresh();
+
+        if ($site->failure_count >= $threshold && $site->is_active) {
+            $site->update([
+                'is_active'   => false,
+                'disabled_at' => now(),
+            ]);
         }
     }
 
@@ -84,8 +90,30 @@ class SiteRouterService
      */
     public function recordSuccess(MeshSite $site): void
     {
-        if ($site->failure_count > 0) {
-            $site->update(['failure_count' => 0]);
+        if ($site->failure_count > 0 || !$site->is_active) {
+            $site->update([
+                'failure_count' => 0,
+                'is_active'     => true,
+                'disabled_at'   => null,
+            ]);
         }
+    }
+
+    /**
+     * Auto-reset circuit breaker for sites that have been disabled for long enough.
+     * Called from a scheduled command.
+     */
+    public function resetStaleCircuitBreakers(): int
+    {
+        $resetAfter = (int) config('oneshield.circuit_breaker.reset_after_min', 30);
+
+        return MeshSite::where('is_active', false)
+            ->whereNotNull('disabled_at')
+            ->where('disabled_at', '<=', now()->subMinutes($resetAfter))
+            ->update([
+                'is_active'     => true,
+                'failure_count' => 0,
+                'disabled_at'   => null,
+            ]);
     }
 }
