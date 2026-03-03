@@ -1,0 +1,95 @@
+<?php
+/**
+ * Plugin Name: OneShield Paygates
+ * Plugin URI: https://oneshield.io
+ * Description: WooCommerce payment gateways that route payments through the OneShield Gateway Panel to mesh sites.
+ * Version: 1.0.0
+ * Author: OneShield
+ * License: GPL-2.0+
+ * Text Domain: oneshield-paygates
+ * WC requires at least: 7.0
+ * WC tested up to: 9.0
+ */
+
+defined('ABSPATH') || exit;
+
+define('OSP_VERSION', '1.0.0');
+define('OSP_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('OSP_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+// WooCommerce HPOS compatibility
+add_action('before_woocommerce_init', function () {
+    if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+    }
+});
+
+// Load after WooCommerce is loaded
+add_action('plugins_loaded', 'osp_init_gateways');
+function osp_init_gateways(): void {
+    if (!class_exists('WC_Payment_Gateway')) {
+        return;
+    }
+
+    require_once OSP_PLUGIN_DIR . 'includes/class-os-payment-base.php';
+    require_once OSP_PLUGIN_DIR . 'includes/class-os-stripe.php';
+    require_once OSP_PLUGIN_DIR . 'includes/class-os-paypal.php';
+    require_once OSP_PLUGIN_DIR . 'includes/class-os-request.php';
+    require_once OSP_PLUGIN_DIR . 'includes/class-os-ipn-handler.php';
+    require_once OSP_PLUGIN_DIR . 'includes/functions.php';
+
+    // Register payment gateways
+    add_filter('woocommerce_payment_gateways', 'osp_add_gateways');
+}
+
+function osp_add_gateways(array $gateways): array {
+    $gateways[] = 'OS_Stripe_Gateway';
+    $gateways[] = 'OS_PayPal_Gateway';
+    return $gateways;
+}
+
+// AJAX handler for iframe checkout postMessage confirm
+add_action('wp_ajax_nopriv_osp_confirm_payment', 'osp_ajax_confirm_payment');
+add_action('wp_ajax_osp_confirm_payment', 'osp_ajax_confirm_payment');
+
+function osp_ajax_confirm_payment(): void {
+    check_ajax_referer('osp_confirm_nonce', 'nonce');
+
+    $order_id           = absint($_POST['wc_order_id'] ?? 0);
+    $gateway_tx_id      = sanitize_text_field($_POST['transaction_id'] ?? '');
+    $gateway            = sanitize_text_field($_POST['gateway'] ?? '');
+    $os_transaction_id  = absint($_POST['os_transaction_id'] ?? 0);
+
+    $order = wc_get_order($order_id);
+    if (!$order || $order->get_status() !== 'pending') {
+        wp_send_json_error('Invalid order');
+    }
+
+    // Confirm with Gateway Panel
+    $gateway_class = osp_get_gateway_instance($gateway);
+    if ($gateway_class) {
+        $confirmed = $gateway_class->confirm_with_panel($os_transaction_id, $order_id, $gateway_tx_id);
+        if (!$confirmed) {
+            wp_send_json_error('Panel confirmation failed');
+        }
+    }
+
+    // Complete WC order
+    $order->payment_complete($gateway_tx_id);
+    $order->add_order_note(sprintf(
+        'OneShield: Payment completed via %s. Gateway TX: %s',
+        strtoupper($gateway),
+        $gateway_tx_id
+    ));
+
+    wp_send_json_success([
+        'redirect' => $order->get_checkout_order_received_url(),
+    ]);
+}
+
+function osp_get_gateway_instance(string $gateway): ?OS_Payment_Base {
+    $instances = WC()->payment_gateways()->payment_gateways();
+    $map = ['stripe' => 'os_stripe', 'paypal' => 'os_paypal'];
+    $key = $map[$gateway] ?? null;
+    return $key ? ($instances[$key] ?? null) : null;
+}

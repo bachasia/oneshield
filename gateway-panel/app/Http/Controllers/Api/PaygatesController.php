@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Transaction;
+use App\Services\HmacService;
+use App\Services\SiteRouterService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class PaygatesController extends Controller
+{
+    public function __construct(
+        private SiteRouterService $siteRouter,
+        private HmacService $hmacService,
+    ) {}
+
+    /**
+     * Select an appropriate mesh site and return iframe URL.
+     * POST /api/paygates/get-site
+     */
+    public function getSite(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'gateway'   => 'required|in:paypal,stripe,airwallex',
+            'order_id'  => 'required|string|max:255',
+            'amount'    => 'required|numeric|min:0.01',
+            'currency'  => 'required|string|size:3',
+            'group_id'  => 'nullable|integer|exists:site_groups,id',
+        ]);
+
+        $site = $this->siteRouter->selectSite(
+            $user->id,
+            $validated['gateway'],
+            $validated['group_id'] ?? null
+        );
+
+        if (!$site) {
+            return response()->json([
+                'error' => 'No active mesh site available for the requested gateway',
+            ], 503);
+        }
+
+        // Create a pending transaction record
+        $transaction = Transaction::create([
+            'site_id'            => $site->id,
+            'order_id'           => $validated['order_id'],
+            'amount'             => $validated['amount'],
+            'currency'           => strtoupper($validated['currency']),
+            'gateway'            => $validated['gateway'],
+            'status'             => 'pending',
+            'money_site_domain'  => parse_url($request->header('Origin', ''), PHP_URL_HOST) ?? 'unknown',
+        ]);
+
+        // One-time token for this checkout session (signed with site_key)
+        $checkoutToken = $this->hmacService->sign(
+            ['transaction_id' => $transaction->id, 'order_id' => $validated['order_id']],
+            $site->site_key
+        );
+
+        $iframeUrl = $this->siteRouter->buildIframeUrl(
+            $site,
+            $validated['gateway'],
+            $validated['order_id'],
+            $checkoutToken
+        );
+
+        return response()->json([
+            'site_id'        => $site->id,
+            'transaction_id' => $transaction->id,
+            'iframe_url'     => $iframeUrl,
+            'token'          => $checkoutToken,
+        ]);
+    }
+
+    /**
+     * Confirm a completed payment.
+     * POST /api/paygates/confirm
+     */
+    public function confirm(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'site_id'               => 'required|integer',
+            'order_id'              => 'required|string',
+            'gateway_transaction_id' => 'required|string',
+            'status'                => 'required|in:completed,failed',
+        ]);
+
+        $transaction = Transaction::whereHas('site', fn ($q) => $q->where('user_id', $user->id))
+            ->where('order_id', $validated['order_id'])
+            ->where('status', 'pending')
+            ->firstOrFail();
+
+        $transaction->update([
+            'status'                 => $validated['status'],
+            'gateway_transaction_id' => $validated['gateway_transaction_id'],
+        ]);
+
+        return response()->json([
+            'success'        => true,
+            'transaction_id' => $transaction->id,
+            'status'         => $transaction->status,
+        ]);
+    }
+
+    /**
+     * Get iframe URL directly (GET variant).
+     * GET /api/paygates/iframe-url
+     */
+    public function iframeUrl(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'gateway'  => 'required|in:paypal,stripe,airwallex',
+            'order_id' => 'required|string',
+            'group_id' => 'nullable|integer|exists:site_groups,id',
+        ]);
+
+        $site = $this->siteRouter->selectSite(
+            $user->id,
+            $validated['gateway'],
+            $validated['group_id'] ?? null
+        );
+
+        if (!$site) {
+            return response()->json(['error' => 'No active mesh site available'], 503);
+        }
+
+        $checkoutToken = $this->hmacService->sign(
+            ['order_id' => $validated['order_id']],
+            $site->site_key
+        );
+
+        return response()->json([
+            'iframe_url' => $this->siteRouter->buildIframeUrl(
+                $site,
+                $validated['gateway'],
+                $validated['order_id'],
+                $checkoutToken
+            ),
+        ]);
+    }
+}
