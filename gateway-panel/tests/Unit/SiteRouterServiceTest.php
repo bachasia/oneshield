@@ -270,11 +270,11 @@ class SiteRouterServiceTest extends TestCase
     public function build_iframe_url_includes_all_parameters(): void
     {
         $user = $this->createUser();
-        $site = $this->createShieldSite($user, ['url' => 'https://mesh.example.com/']);
+        $site = $this->createShieldSite($user, ['url' => 'https://shield.example.com/']);
 
         $url = $this->router->buildIframeUrl($site, 'stripe', 'ORDER-42', 'token-abc');
 
-        $this->assertStringStartsWith('https://mesh.example.com/', $url);
+        $this->assertStringStartsWith('https://shield.example.com/', $url);
         $this->assertStringContainsString('fe-checkout=1', $url);
         $this->assertStringContainsString('gateway=stripe', $url);
         $this->assertStringContainsString('order_id=ORDER-42', $url);
@@ -285,7 +285,7 @@ class SiteRouterServiceTest extends TestCase
     public function build_iframe_url_strips_trailing_slash_from_site_url(): void
     {
         $user = $this->createUser();
-        $site = $this->createShieldSite($user, ['url' => 'https://mesh.example.com/']);
+        $site = $this->createShieldSite($user, ['url' => 'https://shield.example.com/']);
 
         $url = $this->router->buildIframeUrl($site, 'paypal', 'ORD-1', 'tok');
 

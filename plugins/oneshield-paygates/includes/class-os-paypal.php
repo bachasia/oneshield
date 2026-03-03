@@ -12,7 +12,7 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     public function __construct() {
         $this->id                 = 'os_paypal';
         $this->method_title       = __('OneShield PayPal', 'oneshield-paygates');
-        $this->method_description = __('Accept PayPal payments via OneShield mesh sites.', 'oneshield-paygates');
+        $this->method_description = __('Accept PayPal payments via OneShield Shield Sites.', 'oneshield-paygates');
         $this->has_fields         = true;
         $this->supports           = ['products'];
 

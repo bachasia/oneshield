@@ -3,7 +3,7 @@
  * 
  * Handles:
  * 1. Rendering iframe after process_payment() returns success
- * 2. Listening for postMessage from mesh site
+ * 2. Listening for postMessage from Shield Site
  * 3. Confirming payment with Gateway Panel via AJAX
  * 4. Redirecting to thank-you page
  */
@@ -118,7 +118,7 @@
         }
     }
 
-    // Listen for postMessage from mesh site iframe
+    // Listen for postMessage from Shield Site iframe
     window.addEventListener('message', function (event) {
         if (!event.data || event.data.source !== 'oneshield-connect') {
             return;

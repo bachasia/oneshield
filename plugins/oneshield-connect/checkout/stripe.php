@@ -1,6 +1,6 @@
 <?php
 /**
- * Render Stripe Elements checkout page (inside iframe on mesh site).
+ * Render Stripe Elements checkout page (inside iframe on Shield Site).
  */
 
 defined('ABSPATH') || exit;
@@ -11,7 +11,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
     $mode = $site_config['mode'] ?? 'test';
 
     if (empty($publishable_key)) {
-        wp_die('Stripe is not configured on this mesh site.', 'Payment Error', ['response' => 503]);
+        wp_die('Stripe is not configured on this Shield Site.', 'Payment Error', ['response' => 503]);
     }
 
     $amount   = (float) ($_GET['amount'] ?? 0);

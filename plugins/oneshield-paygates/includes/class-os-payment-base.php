@@ -42,7 +42,7 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'group_id' => [
                 'title'       => __('Group ID', 'oneshield-paygates'),
                 'type'        => 'text',
-                'description' => __('Optional. Route payments to a specific group of mesh sites.', 'oneshield-paygates'),
+                'description' => __('Optional. Route payments to a specific group of Shield Sites.', 'oneshield-paygates'),
                 'default'     => '',
             ],
             'debug' => [

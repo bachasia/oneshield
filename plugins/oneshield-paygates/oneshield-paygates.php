@@ -2,7 +2,7 @@
 /**
  * Plugin Name: OneShield Paygates
  * Plugin URI: https://oneshield.io
- * Description: WooCommerce payment gateways that route payments through the OneShield Gateway Panel to mesh sites.
+ * Description: WooCommerce payment gateways that route payments through the OneShield Gateway Panel to Shield Sites.
  * Version: 1.0.0
  * Author: OneShield
  * License: GPL-2.0+

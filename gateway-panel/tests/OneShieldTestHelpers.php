@@ -52,7 +52,7 @@ trait OneShieldTestHelpers
         return ShieldSite::create(array_merge([
             'user_id'            => $user->id,
             'name'               => 'Test Site',
-            'url'                => 'https://mesh-site.example.com',
+            'url'                => 'https://shield-site.example.com',
             'site_key'           => bin2hex(random_bytes(32)),
             'stripe_public_key'  => 'pk_test_xxx',
             'stripe_secret_key'  => 'sk_test_xxx',

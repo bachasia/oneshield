@@ -1,13 +1,13 @@
 <?php
 /**
- * WooCommerce order helpers for mesh site.
- * Creates a lightweight WC order to track payment on the mesh site side.
+ * WooCommerce order helpers for Shield Site.
+ * Creates a lightweight WC order to track payment on the Shield Site side.
  */
 
 defined('ABSPATH') || exit;
 
 /**
- * Create a tracking order on the mesh site (minimal WC order).
+ * Create a tracking order on the Shield Site (minimal WC order).
  * This is used to associate Stripe/PayPal payment with the original order_id.
  */
 function osc_create_tracking_order(string $order_id, float $amount, string $currency, string $gateway): int {

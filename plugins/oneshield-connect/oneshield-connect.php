@@ -2,7 +2,7 @@
 /**
  * Plugin Name: OneShield Connect
  * Plugin URI: https://oneshield.io
- * Description: Connects this mesh site to the OneShield Gateway Panel. Handles payment iframes for PayPal and Stripe.
+ * Description: Connects this Shield Site to the OneShield Gateway Panel. Handles payment iframes for PayPal and Stripe.
  * Version: 1.0.0
  * Author: OneShield
  * License: GPL-2.0+

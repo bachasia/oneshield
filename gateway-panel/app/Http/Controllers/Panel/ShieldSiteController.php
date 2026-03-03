@@ -79,7 +79,7 @@ class ShieldSiteController extends Controller
 
         ShieldSite::create($validated);
 
-        return redirect()->route('sites.index')->with('success', 'Mesh site added successfully.');
+        return redirect()->route('sites.index')->with('success', 'Shield Site added successfully.');
     }
 
     public function update(Request $request, ShieldSite $site): RedirectResponse

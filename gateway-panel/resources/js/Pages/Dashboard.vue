@@ -25,7 +25,7 @@
         <div>
           <p class="text-xs text-gray-500 font-medium">Total Sites</p>
           <p class="text-2xl font-bold text-gray-900 mt-0.5">{{ stats.total_sites }}</p>
-          <p class="text-xs text-gray-400 mt-0.5">Mesh payment sites</p>
+          <p class="text-xs text-gray-400 mt-0.5">Shield payment sites</p>
         </div>
       </div>
 

@@ -35,7 +35,7 @@ class ConnectApiTest extends TestCase
     {
         $user    = $this->createUser();
         $payload = [
-            'site_url'  => 'https://new-mesh-site.example.com',
+            'site_url'  => 'https://new-shield-site.example.com',
             'site_name' => 'My Shield Site',
         ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
@@ -49,7 +49,7 @@ class ConnectApiTest extends TestCase
         $this->assertDatabaseHas('shield_sites', [
             'user_id' => $user->id,
             'name'    => 'My Shield Site',
-            'url'     => 'https://new-mesh-site.example.com',
+            'url'     => 'https://new-shield-site.example.com',
         ]);
     }
 
@@ -58,7 +58,7 @@ class ConnectApiTest extends TestCase
     {
         $user    = $this->createUser();
         $payload = [
-            'site_url'  => 'https://new-mesh-site.example.com/',
+            'site_url'  => 'https://new-shield-site.example.com/',
             'site_name' => 'My Site',
         ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
@@ -66,7 +66,7 @@ class ConnectApiTest extends TestCase
         $this->postJson('/api/connect/register', $payload, $headers)->assertStatus(201);
 
         $this->assertDatabaseHas('shield_sites', [
-            'url' => 'https://new-mesh-site.example.com',
+            'url' => 'https://new-shield-site.example.com',
         ]);
     }
 

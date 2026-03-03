@@ -1,6 +1,6 @@
 <?php
 /**
- * Render PayPal checkout page (inside iframe on mesh site).
+ * Render PayPal checkout page (inside iframe on Shield Site).
  */
 
 defined('ABSPATH') || exit;
@@ -11,7 +11,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
     $mode = $config['mode'] ?? 'sandbox';
 
     if (empty($client_id)) {
-        wp_die('PayPal is not configured on this mesh site.', 'Payment Error', ['response' => 503]);
+        wp_die('PayPal is not configured on this Shield Site.', 'Payment Error', ['response' => 503]);
     }
 
     $amount   = (float) ($_GET['amount'] ?? 0);

@@ -12,7 +12,7 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
     public function __construct() {
         $this->id                 = 'os_stripe';
         $this->method_title       = __('OneShield Stripe', 'oneshield-paygates');
-        $this->method_description = __('Accept Stripe payments via OneShield mesh sites.', 'oneshield-paygates');
+        $this->method_description = __('Accept Stripe payments via OneShield Shield Sites.', 'oneshield-paygates');
         $this->has_fields         = true;
         $this->supports           = ['products'];
 
