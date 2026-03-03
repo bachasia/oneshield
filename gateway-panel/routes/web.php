@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
     // Mesh Sites
     Route::resource('sites', MeshSiteController::class);
     Route::patch('sites/{site}/toggle', [MeshSiteController::class, 'toggle'])->name('sites.toggle');
+    Route::post('sites/{site}/check', [MeshSiteController::class, 'check'])->name('sites.check');
 
     // Groups
     Route::resource('groups', GroupController::class);

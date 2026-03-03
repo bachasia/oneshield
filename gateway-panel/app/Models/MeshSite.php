@@ -19,12 +19,19 @@ class MeshSite extends Model
         'paypal_client_id',
         'paypal_secret',
         'paypal_mode',
+        'paypal_enabled',
         'stripe_public_key',
         'stripe_secret_key',
         'stripe_mode',
+        'stripe_enabled',
         'stripe_webhook_secret',
         'airwallex_client_id',
         'airwallex_api_key',
+        'receive_cycle',
+        'paypal_income_limit',
+        'paypal_max_per_order',
+        'stripe_income_limit',
+        'stripe_max_per_order',
         'is_active',
         'disabled_at',
         'failure_count',
@@ -32,10 +39,16 @@ class MeshSite extends Model
     ];
 
     protected $casts = [
-        'is_active'         => 'boolean',
-        'last_heartbeat_at' => 'datetime',
-        'disabled_at'       => 'datetime',
-        'failure_count'     => 'integer',
+        'is_active'            => 'boolean',
+        'paypal_enabled'       => 'boolean',
+        'stripe_enabled'       => 'boolean',
+        'last_heartbeat_at'    => 'datetime',
+        'disabled_at'          => 'datetime',
+        'failure_count'        => 'integer',
+        'paypal_income_limit'  => 'float',
+        'paypal_max_per_order' => 'float',
+        'stripe_income_limit'  => 'float',
+        'stripe_max_per_order' => 'float',
     ];
 
     // Encrypted attributes
@@ -116,10 +129,23 @@ class MeshSite extends Model
     public function supportsGateway(string $gateway): bool
     {
         return match($gateway) {
-            'paypal' => !empty($this->paypal_client_id) && !empty($this->paypal_secret),
-            'stripe' => !empty($this->stripe_public_key) && !empty($this->stripe_secret_key),
+            'paypal'    => !empty($this->paypal_client_id) && !empty($this->paypal_secret) && $this->paypal_enabled,
+            'stripe'    => !empty($this->stripe_public_key) && !empty($this->stripe_secret_key) && $this->stripe_enabled,
             'airwallex' => !empty($this->airwallex_client_id) && !empty($this->airwallex_api_key),
-            default => false,
+            default     => false,
+        };
+    }
+
+    /**
+     * Check if gateway credentials are configured (regardless of enabled flag).
+     */
+    public function hasGatewayCredentials(string $gateway): bool
+    {
+        return match($gateway) {
+            'paypal'    => !empty($this->paypal_client_id) && !empty($this->paypal_secret),
+            'stripe'    => !empty($this->stripe_public_key) && !empty($this->stripe_secret_key),
+            'airwallex' => !empty($this->airwallex_client_id) && !empty($this->airwallex_api_key),
+            default     => false,
         };
     }
 
