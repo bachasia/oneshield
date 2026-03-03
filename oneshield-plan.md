@@ -28,12 +28,12 @@
 │   WooCommerce + oneshield-paygates plugin                    │
 │   → Kết nối Gateway Panel qua Token Secret                   │
 └─────────────────────┬───────────────────────────────────────┘
-                      │ API Request (chọn mesh site)
+                      │ API Request (chọn shield site)
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  GATEWAY PANEL (SaaS Core)                   │
 │   Laravel 11 + Vue 3 + Inertia.js                            │
-│   - Quản lý Mesh Sites, Groups, Tokens                       │
+│   - Quản lý Shield Sites, Groups, Tokens                     │
 │   - Routing logic: chọn site phụ để xử lý payment           │
 │   - Dashboard thống kê giao dịch                             │
 │   - Multi-tenant: {tenant}.oneshield.io                      │
@@ -41,7 +41,7 @@
                       │ Iframe URL / postMessage
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                MESH SITE (Site Phụ - "Sạch")                 │
+│               SHIELD SITE (Site Phụ - "Sạch")                │
 │   WooCommerce + oneshield-connect plugin                     │
 │   → Lưu PayPal/Stripe API keys (encrypted)                   │
 │   → Render iframe thanh toán thực tế                         │
@@ -66,7 +66,7 @@ oneshield/
 │   │   │   │   │   └── WebhookController.php
 │   │   │   │   └── Panel/
 │   │   │   │       ├── DashboardController.php
-│   │   │   │       ├── MeshSiteController.php
+│   │   │   │       ├── ShieldSiteController.php
 │   │   │   │       ├── GroupController.php
 │   │   │   │       └── TransactionController.php
 │   │   │   └── Middleware/
@@ -74,7 +74,7 @@ oneshield/
 │   │   │       └── ResolveTenant.php
 │   │   ├── Models/
 │   │   │   ├── User.php
-│   │   │   ├── MeshSite.php
+│   │   │   ├── ShieldSite.php
 │   │   │   ├── SiteGroup.php
 │   │   │   ├── Transaction.php
 │   │   │   └── GatewayToken.php
@@ -121,7 +121,7 @@ CREATE TABLE users (
     created_at, updated_at
 );
 
--- site_groups: Phân loại mesh sites
+-- site_groups: Phân loại shield sites
 CREATE TABLE site_groups (
     id BIGINT PRIMARY KEY,
     user_id BIGINT,
@@ -130,8 +130,8 @@ CREATE TABLE site_groups (
     created_at, updated_at
 );
 
--- mesh_sites: Site phụ đã connect
-CREATE TABLE mesh_sites (
+-- shield_sites: Shield Site đã connect
+CREATE TABLE shield_sites (
     id BIGINT PRIMARY KEY,
     user_id BIGINT,
     group_id BIGINT NULL,
@@ -247,8 +247,8 @@ GET  /api/plugins/version                # Auto-updater check
    { gateway: "stripe", group_id: 1, order_id: "123", amount: 99.00 }
    
 3. Gateway Panel:
-   → Chọn mesh site active trong group (random load balancing)
-   → Tạo iframe_url: https://{mesh_site}/checkout?token=xxx&order=123
+   → Chọn shield site active trong group (random load balancing)
+   → Tạo iframe_url: https://{shield_site}/checkout?token=xxx&order=123
    → Trả về iframe_url
    
 4. Plugin render <iframe src="{iframe_url}"> trong checkout page
@@ -256,7 +256,7 @@ GET  /api/plugins/version                # Auto-updater check
 5. Khách nhập thông tin thanh toán trong iframe
    → Stripe/PayPal xử lý payment
 
-6. Mesh site gửi postMessage:
+6. Shield Site gửi postMessage:
    { status: "success", transaction_id: "ch_xxx", order_id: "123" }
 
 7. oneshield-paygates nhận postMessage
@@ -292,7 +292,7 @@ GET  /api/plugins/version                # Auto-updater check
 #### 1.3 Database Migrations
 - [x] Migration: `users` (thêm tenant_id, token_secret)
 - [x] Migration: `site_groups`
-- [x] Migration: `mesh_sites` (credentials encrypted)
+- [x] Migration: `mesh_sites` (legacy name, later renamed safely to `shield_sites`)
 - [x] Migration: `transactions`
 - [x] Migration: `gateway_tokens`
 
@@ -303,10 +303,10 @@ GET  /api/plugins/version                # Auto-updater check
 - [x] Token Secret hiển thị ở sidebar + Settings page
 
 #### 1.5 Models & Services
-- [x] Model `MeshSite` với encrypted casting (AES-256 via Laravel Crypt)
+- [x] Model `ShieldSite` với encrypted casting (AES-256 via Laravel Crypt)
 - [x] Model `Transaction`, `SiteGroup`, `GatewayToken`
 - [x] Service `HmacService` (sign + verify + generate token)
-- [x] Service `SiteRouterService` (chọn mesh site + circuit breaker)
+- [x] Service `SiteRouterService` (chọn shield site + circuit breaker)
 - [x] Middleware `HmacAuthentication`
 
 #### 1.6 API - Connect Plugin
@@ -331,8 +331,8 @@ GET  /api/plugins/version                # Auto-updater check
 
 #### 2.1 Layout
 - [x] `AppLayout.vue` - sidebar + header
-- [x] Sidebar: Dashboard, Sites, Groups, Transactions, Settings
-- [x] Header: dark mode toggle, user info, logout
+- [x] Sidebar: Dashboard, Shield Sites, Groups, Transactions, Settings
+- [x] Header: user info, logout
 - [x] Token Secret display + copy button ở sidebar footer
 - [x] Flash message display
 
@@ -340,8 +340,8 @@ GET  /api/plugins/version                # Auto-updater check
 - [x] Stats cards: total sites, active sites, transactions today, total revenue
 - [x] Recent transactions table
 
-#### 2.3 Trang Sites (Payment Sites)
-- [x] `Sites/Index.vue` - danh sách mesh sites với filter
+#### 2.3 Trang Sites (Shield Sites)
+- [x] `Sites/Index.vue` - danh sách shield sites với filter
 - [x] Columns: Name+URL, Group, Gateways, Status toggle, Last Active, Actions
 - [x] Filter: by group, by status
 - [x] Toggle Enable/Disable site
@@ -352,7 +352,7 @@ GET  /api/plugins/version                # Auto-updater check
 #### 2.4 Trang Groups
 - [x] `Groups/Index.vue` - danh sách groups dạng cards
 - [x] Create / Edit / Delete group modal
-- [x] Hiển thị số sites trong group + Group ID
+- [x] Hiển thị số Shield Sites trong group + Group ID
 
 #### 2.5 Trang Transactions
 - [x] `Transactions/Index.vue` - bảng log với filter
@@ -425,6 +425,7 @@ GET  /api/plugins/version                # Auto-updater check
 - [x] Feature: Webhook handlers — Stripe sig verify, PayPal IPN verify (12 tests)
 - [x] Feature: ThrottlePerToken rate limiting (4 tests)
 - [x] Bug fix: SiteRouterService::selectSite() now returns null instead of throwing on empty collection
+- [x] Safe refactor: backend naming migrated from `MeshSite` / `mesh_sites` to `ShieldSite` / `shield_sites` via forward rename migration
 
 #### E2E Tests (requires live WP site — future work)
 - [ ] PayPal Sandbox end-to-end test
@@ -436,7 +437,7 @@ GET  /api/plugins/version                # Auto-updater check
 
 ### [ ] Giai đoạn 7: Performance & Deploy (Tuần 8)
 
-- [ ] Redis cache cho danh sách active mesh sites
+- [ ] Redis cache cho danh sách active shield sites
 - [ ] Database indexing (transactions.site_id, transactions.created_at)
 - [ ] CDN cho static assets plugins
 - [ ] Production Docker config (Nginx + PHP-FPM optimized)
@@ -467,11 +468,11 @@ Gateway Panel verify:
 
 ## Pricing Model (tham khảo)
 
-- **Free Trial:** 100 transactions/tháng, 2 mesh sites
-- **Basic:** 1,000 transactions/tháng, 10 mesh sites
+- **Free Trial:** 100 transactions/tháng, 2 shield sites
+- **Basic:** 1,000 transactions/tháng, 10 shield sites
 - **Pro:** Unlimited, priority support, Airwallex
 - **Billing:** Stripe Subscription tích hợp vào Gateway Panel
 
 ---
 
-*Cập nhật: 2026-03-02 | Dựa trên kế hoạch MeshCheckout gốc*
+*Cập nhật: 2026-03-03 | Đã refactor naming MeshSite -> ShieldSite an toàn qua migration chuyển tiếp*
