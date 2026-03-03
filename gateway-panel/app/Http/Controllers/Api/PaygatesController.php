@@ -35,7 +35,8 @@ class PaygatesController extends Controller
         $site = $this->siteRouter->selectSite(
             $user->id,
             $validated['gateway'],
-            $validated['group_id'] ?? null
+            $validated['group_id'] ?? null,
+            (float) $validated['amount']
         );
 
         if (!$site) {

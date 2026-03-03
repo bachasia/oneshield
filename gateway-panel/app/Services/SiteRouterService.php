@@ -3,36 +3,43 @@
 namespace App\Services;
 
 use App\Models\ShieldSite;
+use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class SiteRouterService
 {
     /**
-     * Select an active shield site for the given gateway and optional group.
+     * Select an active shield site for the given gateway, optional group, and order amount.
      *
      * Selection strategy: random from active sites that support the gateway.
-     * Circuit breaker: skip sites with failure_count >= 5.
+     * Circuit breaker: skip sites with failure_count >= threshold.
+     * Spin limits: skip sites that have exceeded income_limit or max_per_order.
      */
-    public function selectSite(int $userId, string $gateway, ?int $groupId = null): ?ShieldSite
+    public function selectSite(int $userId, string $gateway, ?int $groupId = null, float $amount = 0.0): ?ShieldSite
     {
-        $query = ShieldSite::where('user_id', $userId)
-            ->active()
-            ->where('failure_count', '<', 5) // circuit breaker threshold
-            ->whereNotNull('last_heartbeat_at')
-            ->where('last_heartbeat_at', '>=', now()->subMinutes(10)); // heartbeat within 10 min
+        $threshold = (int) config('oneshield.circuit_breaker.failure_threshold', 5);
 
-        if ($groupId !== null) {
-            $query->where('group_id', $groupId);
-        }
+        // Load active sites from cache (heartbeat-filtered list)
+        $sites = $this->getCachedActiveSites($userId, $groupId);
 
-        $sites = $query->get();
+        // Filter in-memory: circuit breaker + heartbeat freshness
+        $sites = $sites->filter(
+            fn (ShieldSite $site) => $site->failure_count < $threshold
+                && $site->last_heartbeat_at !== null
+                && $site->last_heartbeat_at->gte(now()->subMinutes(10))
+        );
 
-        // Filter by gateway support
-        $eligible = $sites->filter(fn (ShieldSite $site) => $site->supportsGateway($gateway));
+        // Filter by gateway support + spin limits
+        $eligible = $sites->filter(
+            fn (ShieldSite $site) => $site->supportsGateway($gateway)
+                && $this->passesSpinLimits($site, $gateway, $amount)
+        );
 
         if ($eligible->isEmpty()) {
-            // Fallback: try without heartbeat requirement if no eligible sites
-            $eligible = $this->fallbackSelect($userId, $gateway, $groupId);
+            // Fallback: try without heartbeat requirement (uses same cache, relaxed filter)
+            $eligible = $this->fallbackSelect($userId, $gateway, $groupId, $amount);
         }
 
         if ($eligible->isEmpty()) {
@@ -43,19 +50,113 @@ class SiteRouterService
     }
 
     /**
-     * Fallback: select from active sites ignoring heartbeat (site might have stale heartbeat).
+     * Return active shield sites for a user from Redis cache.
+     * Cache key is per-user (+ optional group) and expires after configured TTL.
+     * Invalidated explicitly by recordFailure() / recordSuccess().
      */
-    private function fallbackSelect(int $userId, string $gateway, ?int $groupId): Collection
+    public function getCachedActiveSites(int $userId, ?int $groupId = null): Collection
     {
-        $query = ShieldSite::where('user_id', $userId)
-            ->active()
-            ->where('failure_count', '<', 5);
+        $ttl      = (int) config('oneshield.cache.active_sites_ttl', 60);
+        $cacheKey = $this->sitesCacheKey($userId, $groupId);
 
+        return Cache::remember($cacheKey, $ttl, function () use ($userId, $groupId) {
+            $query = ShieldSite::where('user_id', $userId)->active();
+
+            if ($groupId !== null) {
+                $query->where('group_id', $groupId);
+            }
+
+            return $query->get();
+        });
+    }
+
+    /**
+     * Invalidate the active-sites cache for a given user.
+     * Called whenever a site's active/failure state changes.
+     */
+    public function invalidateSitesCache(int $userId, ?int $groupId = null): void
+    {
+        Cache::forget($this->sitesCacheKey($userId, $groupId));
+
+        // Also forget the group-less key if a group key was given (and vice versa)
         if ($groupId !== null) {
-            $query->where('group_id', $groupId);
+            Cache::forget($this->sitesCacheKey($userId, null));
+        }
+    }
+
+    private function sitesCacheKey(int $userId, ?int $groupId): string
+    {
+        return sprintf('oneshield:active_sites:u%d:g%s', $userId, $groupId ?? '0');
+    }
+
+    /**
+     * Check whether a site passes the spin/income limit rules for the given gateway and order amount.
+     *
+     * Rules checked:
+     *  1. max_per_order  — single order amount must not exceed the configured cap (0 = unlimited)
+     *  2. income_limit   — total completed revenue in the current receive_cycle must not exceed cap (0 = unlimited)
+     *
+     * Note: Airwallex does not yet have per-gateway limits in the DB schema (Phase 2).
+     * Until those columns are added, Airwallex routes bypass spin limits entirely.
+     */
+    public function passesSpinLimits(ShieldSite $site, string $gateway, float $amount): bool
+    {
+        // Airwallex: no spin-limit columns in DB yet — no restrictions applied
+        if ($gateway === 'airwallex') {
+            return true;
         }
 
-        return $query->get()->filter(fn (ShieldSite $site) => $site->supportsGateway($gateway));
+        $maxPerOrder  = (float) ($gateway === 'paypal' ? $site->paypal_max_per_order : $site->stripe_max_per_order);
+        $incomeLimit  = (float) ($gateway === 'paypal' ? $site->paypal_income_limit  : $site->stripe_income_limit);
+
+        // 1. Per-order cap
+        if ($maxPerOrder > 0 && $amount > $maxPerOrder) {
+            return false;
+        }
+
+        // 2. Income limit within cycle
+        if ($incomeLimit > 0) {
+            $cycleStart  = $this->getCycleStart($site->receive_cycle);
+            $totalEarned = Transaction::where('site_id', $site->id)
+                ->where('gateway', $gateway)
+                ->where('status', 'completed')
+                ->where('created_at', '>=', $cycleStart)
+                ->sum('amount');
+
+            if ((float) $totalEarned >= $incomeLimit) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Return the start of the current receive cycle as a Carbon instance.
+     */
+    private function getCycleStart(string $cycle): Carbon
+    {
+        return match ($cycle) {
+            'daily'    => now()->startOfDay(),
+            'weekly'   => now()->startOfWeek(),
+            'monthly'  => now()->startOfMonth(),
+            default    => Carbon::createFromTimestamp(0), // 'lifetime' → epoch = no restriction by date
+        };
+    }
+
+    /**
+     * Fallback: select from active sites ignoring heartbeat (site might have stale heartbeat).
+     * Uses the same cache but without heartbeat filter.
+     */
+    private function fallbackSelect(int $userId, string $gateway, ?int $groupId, float $amount = 0.0): Collection
+    {
+        $threshold = (int) config('oneshield.circuit_breaker.failure_threshold', 5);
+
+        return $this->getCachedActiveSites($userId, $groupId)->filter(
+            fn (ShieldSite $site) => $site->failure_count < $threshold
+                && $site->supportsGateway($gateway)
+                && $this->passesSpinLimits($site, $gateway, $amount)
+        );
     }
 
     /**
@@ -87,6 +188,9 @@ class SiteRouterService
                 'disabled_at' => now(),
             ]);
         }
+
+        // Invalidate cache so next routing skips this site immediately
+        $this->invalidateSitesCache($site->user_id, $site->group_id);
     }
 
     /**
@@ -100,6 +204,9 @@ class SiteRouterService
                 'is_active'     => true,
                 'disabled_at'   => null,
             ]);
+
+            // Re-populate cache so site becomes available immediately
+            $this->invalidateSitesCache($site->user_id, $site->group_id);
         }
     }
 

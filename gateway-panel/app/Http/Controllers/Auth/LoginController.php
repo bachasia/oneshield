@@ -22,7 +22,7 @@ class LoginController extends Controller
         }
 
         if (Auth::check()) {
-            return redirect('/dashboard');
+            return redirect(Auth::user()->is_super_admin ? '/admin' : '/dashboard');
         }
 
         return Inertia::render('Auth/Login');
@@ -45,7 +45,7 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect('/dashboard');
+        return redirect($request->user()->is_super_admin ? '/admin' : '/dashboard');
     }
 
     /**

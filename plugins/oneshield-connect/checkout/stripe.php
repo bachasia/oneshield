@@ -105,6 +105,18 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
             }
 
             if (paymentIntent && paymentIntent.status === 'succeeded') {
+                // Notify the tracking order handler before postMessage
+                await fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        action: 'osc_complete_tracking',
+                        transaction_id: paymentIntent.id,
+                        order_id: orderData.order_id,
+                        nonce: '<?php echo esc_js(wp_create_nonce('osc_tracking_nonce')); ?>',
+                    }),
+                }).catch(() => {}); // Non-blocking; tracking failure must not block payment confirmation
+
                 window.parent.postMessage({
                     source: 'oneshield-connect',
                     status: 'success',

@@ -38,6 +38,7 @@ class ShieldSite extends Model
         'disabled_at',
         'failure_count',
         'last_heartbeat_at',
+        'sort_order',
     ];
 
     protected $casts = [

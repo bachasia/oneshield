@@ -88,6 +88,18 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 const result = await resp.json();
 
                 if (result.success) {
+                    // Notify tracking order handler before postMessage
+                    await fetch(orderData.ajax_url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            action: 'osc_complete_tracking',
+                            transaction_id: result.data.capture_id,
+                            order_id: orderData.order_id,
+                            nonce: orderData.nonce,
+                        }),
+                    }).catch(() => {}); // Non-blocking; tracking failure must not block payment confirmation
+
                     window.parent.postMessage({
                         source: 'oneshield-connect',
                         status: 'success',

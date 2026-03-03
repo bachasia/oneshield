@@ -75,6 +75,25 @@ class ConnectController extends Controller
 
         $site->update(['last_heartbeat_at' => now()]);
 
+        // Build credentials payload — only include keys when gateway is enabled & configured
+        $credentials = [];
+
+        if ($site->stripe_enabled && $site->hasGatewayCredentials('stripe')) {
+            $credentials['stripe'] = [
+                'public_key'  => $site->stripe_public_key,
+                'secret_key'  => $site->stripe_secret_key,
+                'mode'        => $site->stripe_mode,
+            ];
+        }
+
+        if ($site->paypal_enabled && $site->hasGatewayCredentials('paypal')) {
+            $credentials['paypal'] = [
+                'client_id'     => $site->paypal_client_id,
+                'client_secret' => $site->paypal_secret,
+                'mode'          => $site->paypal_mode,
+            ];
+        }
+
         return response()->json([
             'status' => 'ok',
             'config' => [
@@ -82,6 +101,7 @@ class ConnectController extends Controller
                 'stripe_mode'  => $site->stripe_mode,
                 'is_active'    => $site->is_active,
             ],
+            'credentials' => $credentials,
         ]);
     }
 

@@ -1,13 +1,21 @@
 <template>
   <div class="min-h-screen bg-gray-50 flex items-center justify-center p-4">
     <div class="w-full max-w-md">
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-indigo-600">OneShield</h1>
-        <p class="text-gray-500 mt-2">Create your admin account</p>
+        <div class="text-center mb-8">
+        <div class="flex justify-center mb-4">
+          <div class="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+            <svg class="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+            </svg>
+          </div>
+        </div>
+        <h1 class="text-2xl font-bold text-gray-900">OneShield</h1>
+        <p class="text-gray-500 mt-1 text-sm">Create your super admin account</p>
       </div>
 
       <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-        <h2 class="text-xl font-semibold text-gray-900 mb-6">Initial Setup</h2>
+        <h2 class="text-base font-semibold text-gray-900 mb-1">Initial Setup</h2>
+        <p class="text-xs text-gray-400 mb-6">This account will have full admin access to manage all tenants.</p>
 
         <form @submit.prevent="submit">
           <div class="space-y-4">
@@ -31,23 +39,6 @@
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <p v-if="form.errors.email" class="text-red-500 text-xs mt-1">{{ form.errors.email }}</p>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Tenant ID
-                <span class="text-gray-400 font-normal">(subdomain, e.g. "acme")</span>
-              </label>
-              <div class="flex">
-                <input
-                  v-model="form.tenant_id"
-                  type="text"
-                  placeholder="acme"
-                  class="flex-1 px-3 py-2 border border-r-0 border-gray-300 rounded-l-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <span class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-r-lg text-sm text-gray-500">.oneshield.io</span>
-              </div>
-              <p v-if="form.errors.tenant_id" class="text-red-500 text-xs mt-1">{{ form.errors.tenant_id }}</p>
             </div>
 
             <div>
@@ -77,7 +68,7 @@
             :disabled="form.processing"
             class="mt-6 w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-2.5 px-4 rounded-lg text-sm font-medium transition-colors"
           >
-            {{ form.processing ? 'Creating...' : 'Create Admin Account' }}
+            {{ form.processing ? 'Creating...' : 'Create Super Admin Account' }}
           </button>
         </form>
       </div>
@@ -91,7 +82,6 @@ import { useForm } from '@inertiajs/vue3';
 const form = useForm({
   name: '',
   email: '',
-  tenant_id: '',
   password: '',
   password_confirmation: '',
 });

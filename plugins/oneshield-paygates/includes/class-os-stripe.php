@@ -52,10 +52,12 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
 
         // Return the iframe URL for JS to pick up
         return [
-            'result'    => 'success',
-            'iframe_url' => $result['iframe_url'],
+            'result'            => 'success',
+            'iframe_url'        => $result['iframe_url'],
             'os_transaction_id' => $result['transaction_id'],
-            'nonce' => wp_create_nonce('osp_confirm_nonce'),
+            'wc_order_id'       => $order->get_id(),
+            'gateway'           => $this->gateway_name,
+            'nonce'             => wp_create_nonce('osp_confirm_nonce'),
         ];
     }
 }

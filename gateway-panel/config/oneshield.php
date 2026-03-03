@@ -55,6 +55,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cache TTLs (seconds)
+    |--------------------------------------------------------------------------
+    | active_sites  — how long to cache the active shield sites list per user.
+    |                 Must be shorter than heartbeat interval (10 min) so stale
+    |                 sites are evicted promptly. Default: 60 seconds.
+    */
+    'cache' => [
+        'active_sites_ttl' => env('ONESHIELD_CACHE_SITES_TTL', 60),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | CORS — Allowed Origins for API routes
     |--------------------------------------------------------------------------
     | '*' = allow all (development only).

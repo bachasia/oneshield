@@ -25,7 +25,8 @@ class ShieldSiteController extends Controller
                 'inactive' => $q->where('is_active', false),
                 default    => $q,
             })
-            ->latest()
+            ->orderBy('sort_order')
+            ->orderBy('id')
             ->paginate(20)
             ->withQueryString();
 
@@ -68,13 +69,18 @@ class ShieldSiteController extends Controller
     {
         $user = $request->user();
 
+        // Enforce plan limit
+        if (! $user->canCreateShieldSite()) {
+            return back()->with('error', $user->shieldSiteLimitMessage());
+        }
+
         $validated = $request->validate([
             'name'     => 'required|string|max:255',
             'url'      => 'required|url|max:500',
             'group_id' => 'nullable|integer|exists:site_groups,id',
         ]);
 
-        $validated['user_id'] = $user->id;
+        $validated['user_id']  = $user->id;
         $validated['site_key'] = bin2hex(random_bytes(32));
 
         ShieldSite::create($validated);
@@ -137,6 +143,37 @@ class ShieldSiteController extends Controller
         $site->update(['is_active' => !$site->is_active, 'failure_count' => 0]);
 
         return back()->with('success', 'Site status updated.');
+    }
+
+    /**
+     * Persist drag-to-reorder result.
+     * PATCH /sites/reorder
+     * Body: { ordered_ids: [3, 1, 5, 2, ...] }
+     */
+    public function reorder(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'ordered_ids'   => 'required|array|min:1',
+            'ordered_ids.*' => 'integer',
+        ]);
+
+        // Verify all IDs belong to this user before touching the DB
+        $ids = $validated['ordered_ids'];
+        $ownedCount = ShieldSite::where('user_id', $user->id)
+            ->whereIn('id', $ids)
+            ->count();
+
+        if ($ownedCount !== count($ids)) {
+            abort(403, 'One or more sites do not belong to you.');
+        }
+
+        foreach ($ids as $position => $id) {
+            ShieldSite::where('id', $id)->update(['sort_order' => $position]);
+        }
+
+        return response()->json(['success' => true]);
     }
 
     /**

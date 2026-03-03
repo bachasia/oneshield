@@ -159,6 +159,104 @@ class ConnectApiTest extends TestCase
     }
 
     /** @test */
+    public function heartbeat_returns_credentials_when_gateway_is_enabled_and_configured(): void
+    {
+        $user = $this->createUser();
+        $site = $this->createShieldSite($user, [
+            'stripe_public_key' => 'pk_test_abc123',
+            'stripe_secret_key' => 'sk_test_abc123',
+            'stripe_mode'       => 'test',
+            'stripe_enabled'    => true,
+            'paypal_client_id'  => 'paypal-client-id',
+            'paypal_secret'     => 'paypal-secret',
+            'paypal_mode'       => 'sandbox',
+            'paypal_enabled'    => true,
+        ]);
+
+        $payload = ['site_id' => $site->id];
+        $headers = $this->hmacHeaders($payload, $user->token_secret);
+
+        $response = $this->postJson('/api/connect/heartbeat', $payload, $headers);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure([
+                     'credentials' => [
+                         'stripe' => ['public_key', 'secret_key', 'mode'],
+                         'paypal' => ['client_id', 'client_secret', 'mode'],
+                     ],
+                 ])
+                 ->assertJsonPath('credentials.stripe.public_key', 'pk_test_abc123')
+                 ->assertJsonPath('credentials.stripe.mode', 'test')
+                 ->assertJsonPath('credentials.paypal.mode', 'sandbox');
+    }
+
+    /** @test */
+    public function heartbeat_omits_credentials_when_gateway_is_disabled(): void
+    {
+        $user = $this->createUser();
+        $site = $this->createShieldSite($user, [
+            'stripe_enabled' => false,
+            'paypal_enabled' => false,
+        ]);
+
+        $payload = ['site_id' => $site->id];
+        $headers = $this->hmacHeaders($payload, $user->token_secret);
+
+        $response = $this->postJson('/api/connect/heartbeat', $payload, $headers);
+
+        $response->assertStatus(200)
+                 ->assertJsonPath('credentials', []);
+    }
+
+    /** @test */
+    public function heartbeat_omits_credentials_when_gateway_keys_are_missing(): void
+    {
+        $user = $this->createUser();
+        $site = $this->createShieldSite($user, [
+            'stripe_public_key' => null,
+            'stripe_secret_key' => null,
+            'stripe_enabled'    => true,
+            'paypal_client_id'  => null,
+            'paypal_secret'     => null,
+            'paypal_enabled'    => true,
+        ]);
+
+        $payload = ['site_id' => $site->id];
+        $headers = $this->hmacHeaders($payload, $user->token_secret);
+
+        $response = $this->postJson('/api/connect/heartbeat', $payload, $headers);
+
+        $response->assertStatus(200)
+                 ->assertJsonPath('credentials', []);
+    }
+
+    /** @test */
+    public function heartbeat_returns_only_configured_gateways_in_credentials(): void
+    {
+        $user = $this->createUser();
+        // Only Stripe configured & enabled, PayPal disabled
+        $site = $this->createShieldSite($user, [
+            'stripe_public_key' => 'pk_live_xyz',
+            'stripe_secret_key' => 'sk_live_xyz',
+            'stripe_mode'       => 'live',
+            'stripe_enabled'    => true,
+            'paypal_client_id'  => null,
+            'paypal_secret'     => null,
+            'paypal_enabled'    => false,
+        ]);
+
+        $payload = ['site_id' => $site->id];
+        $headers = $this->hmacHeaders($payload, $user->token_secret);
+
+        $response = $this->postJson('/api/connect/heartbeat', $payload, $headers);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure(['credentials' => ['stripe']])
+                 ->assertJsonMissingPath('credentials.paypal')
+                 ->assertJsonPath('credentials.stripe.mode', 'live');
+    }
+
+    /** @test */
     public function heartbeat_rejects_site_belonging_to_another_user(): void
     {
         $userA  = $this->createUser();

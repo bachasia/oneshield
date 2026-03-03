@@ -41,6 +41,58 @@
         </Link>
       </nav>
 
+      <!-- Impersonation Notice -->
+      <div v-if="impersonating" class="mx-3 mt-3 mb-2 p-3 bg-amber-50 rounded-xl border border-amber-200">
+        <div class="flex items-start gap-2">
+          <div class="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+            </svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">Admin impersonation</p>
+            <p class="text-[11px] text-amber-800 mt-0.5">You are viewing this tenant as super admin.</p>
+            <Link
+              href="/admin/impersonate"
+              method="delete"
+              as="button"
+              class="mt-2 inline-flex items-center text-[11px] font-semibold text-amber-700 hover:text-amber-900 transition-colors"
+            >
+              Stop impersonating
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subscription Plan Badge -->
+      <div v-if="subscription" class="mx-3 mb-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Plan</span>
+          <span
+            class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+            :class="{
+              'bg-indigo-100 text-indigo-700': subscription.plan?.name === 'pro',
+              'bg-amber-100 text-amber-700':   subscription.plan?.name === 'start',
+              'bg-purple-100 text-purple-700': subscription.plan?.name === 'enterprise',
+              'bg-gray-100 text-gray-600':     subscription.plan?.name === 'trial',
+            }"
+          >{{ subscription.plan?.label ?? 'Free' }}</span>
+        </div>
+        <!-- Shield sites usage bar -->
+        <div class="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+          <span>Shield Sites</span>
+          <span>{{ subscription.sites_used }} / {{ subscription.sites_limit >= 999 ? '∞' : subscription.sites_limit }}</span>
+        </div>
+        <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            class="h-full rounded-full transition-all"
+            :class="usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 80 ? 'bg-amber-400' : 'bg-indigo-500'"
+            :style="{ width: Math.min(usagePercent, 100) + '%' }"
+          />
+        </div>
+        <p v-if="usagePercent >= 100" class="text-[10px] text-red-600 font-medium mt-1">Limit reached — upgrade to add more</p>
+      </div>
+
       <!-- Token Secret -->
       <div class="mx-3 mb-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
         <div class="flex items-center gap-1.5 mb-1.5">
@@ -100,6 +152,10 @@
 
         <!-- Right: docs link + notifications placeholder -->
         <div class="flex items-center gap-3">
+          <div v-if="impersonating" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-semibold">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Impersonating tenant
+          </div>
           <a href="https://github.com/bachasia/oneshield" target="_blank" class="text-gray-400 hover:text-gray-600 transition-colors" title="Documentation">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>
           </a>
@@ -145,9 +201,17 @@
 import { ref, computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 
-const page  = usePage();
-const auth  = computed(() => page.props.auth);
-const flash = computed(() => page.props.flash);
+const page         = usePage();
+const auth         = computed(() => page.props.auth);
+const flash        = computed(() => page.props.flash);
+const subscription = computed(() => page.props.subscription);
+const impersonating = computed(() => page.props.impersonating);
+const usagePercent = computed(() => {
+  const s = subscription.value;
+  if (!s || s.sites_limit === 0) return 0;
+  if (s.sites_limit >= 999) return 0;
+  return Math.round((s.sites_used / s.sites_limit) * 100);
+});
 
 defineProps({ title: { type: String, default: '' } });
 

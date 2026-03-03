@@ -114,13 +114,17 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
 
     /**
      * Confirm payment with Gateway Panel after postMessage received.
+     *
+     * @param int    $os_site_id    ShieldSite ID (stored as _os_site_id on WC order)
+     * @param int    $wc_order_id   WooCommerce order ID (used as order_id in Gateway Panel)
+     * @param string $gateway_tx_id Gateway transaction ID (PayPal capture ID / Stripe PI ID)
      */
-    public function confirm_with_panel(int $os_transaction_id, int $wc_order_id, string $gateway_tx_id): bool {
+    public function confirm_with_panel(int $os_site_id, int $wc_order_id, string $gateway_tx_id): bool {
         $payload = [
-            'site_id'               => $os_transaction_id,
-            'order_id'              => (string) $wc_order_id,
+            'site_id'                => $os_site_id,
+            'order_id'               => (string) $wc_order_id,
             'gateway_transaction_id' => $gateway_tx_id,
-            'status'                => 'completed',
+            'status'                 => 'completed',
         ];
 
         $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/confirm', [

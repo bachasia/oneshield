@@ -37,9 +37,25 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
             ],
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
+                'success'   => fn () => $request->session()->get('success'),
+                'error'     => fn () => $request->session()->get('error'),
+                'new_token' => fn () => $request->session()->get('new_token'),
             ],
+            'subscription' => fn () => $request->user() && ! $request->user()->is_super_admin
+                ? (function () use ($request) {
+                    $user = $request->user();
+                    $sub  = $user->activeSubscription;
+                    return [
+                        'plan'        => $sub?->plan?->only(['name', 'label', 'max_shield_sites', 'price_usd']),
+                        'status'      => $sub?->status,
+                        'expires_at'  => $sub?->expires_at?->toDateString(),
+                        'sites_used'  => $user->shieldSites()->count(),
+                        'sites_limit' => $user->shieldSiteLimit(),
+                    ];
+                })()
+                : null,
+            'is_super_admin' => fn () => (bool) $request->user()?->is_super_admin,
+            'impersonating'  => fn () => $request->session()->has('impersonating_user_id'),
             'ziggy' => fn () => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),

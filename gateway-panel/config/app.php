@@ -52,7 +52,8 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url'  => env('APP_URL', 'http://localhost'),
+    'host' => env('APP_HOST', 'oneshieldx.com'),  // base domain for subdomain resolution
 
     /*
     |--------------------------------------------------------------------------

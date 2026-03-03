@@ -166,9 +166,10 @@ class WebhookController extends Controller
 
             return $response->successful() && trim($response->body()) === 'VERIFIED';
         } catch (\Throwable $e) {
-            Log::channel('webhooks')->error('PayPal IPN verify request failed', ['error' => $e->getMessage()]);
-            // On network error, allow through (fail-open) to avoid missing transactions
-            return true;
+            Log::channel('webhooks')->error('PayPal IPN verify request failed — rejecting (fail-closed)', ['error' => $e->getMessage()]);
+            // Fail-closed: reject unverifiable IPN to prevent spoofed webhooks from completing transactions.
+            // PayPal will retry unacknowledged IPNs, so legitimate payments will not be permanently lost.
+            return false;
         }
     }
 

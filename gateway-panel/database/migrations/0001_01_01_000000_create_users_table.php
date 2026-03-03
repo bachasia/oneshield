@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->string('tenant_id')->unique()->nullable()->comment('Subdomain identifier, e.g. acme for acme.oneshield.io');
+            $table->string('tenant_id')->unique()->nullable()->comment('Subdomain identifier, e.g. acme for acme.oneshieldx.com');
             $table->string('token_secret', 64)->nullable()->comment('HMAC-SHA256 signing key for API authentication');
             $table->rememberToken();
             $table->timestamps();

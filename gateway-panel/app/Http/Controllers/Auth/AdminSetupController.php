@@ -42,25 +42,19 @@ class AdminSetupController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|max:255',
             'password' => 'required|string|min:8|confirmed',
-            'tenant_id' => 'required|string|alpha_dash|max:50|unique:users,tenant_id',
         ]);
 
         $user = User::create([
-            'name'         => $validated['name'],
-            'email'        => $validated['email'],
-            'password'     => Hash::make($validated['password']),
-            'tenant_id'    => strtolower($validated['tenant_id']),
-            'token_secret' => $this->hmacService->generateToken(64),
-        ]);
-
-        // Also create a named gateway token for convenience
-        $user->gatewayTokens()->create([
-            'name'  => 'Default Token',
-            'token' => $this->hmacService->generateToken(64),
+            'name'           => $validated['name'],
+            'email'          => $validated['email'],
+            'password'       => Hash::make($validated['password']),
+            'tenant_id'      => 'admin',
+            'token_secret'   => $this->hmacService->generateToken(64),
+            'is_super_admin' => true,
         ]);
 
         Auth::login($user);
 
-        return redirect('/dashboard')->with('success', 'Admin account created successfully.');
+        return redirect('/admin')->with('success', 'Super admin account created successfully.');
     }
 }

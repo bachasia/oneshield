@@ -85,5 +85,44 @@ function osc_run_heartbeat(): void {
     if (($body['status'] ?? '') === 'ok') {
         osc_update_option('last_heartbeat', time());
         osc_log('Heartbeat OK', ['config' => $body['config'] ?? []]);
+
+        // Persist credentials pushed from Gateway Panel
+        osc_sync_credentials($body['credentials'] ?? []);
+    }
+}
+
+/**
+ * Save gateway credentials received from the Gateway Panel heartbeat response.
+ * Credentials are only written when present — missing keys are left unchanged.
+ *
+ * @param array $credentials  e.g. ['stripe' => [...], 'paypal' => [...]]
+ */
+function osc_sync_credentials(array $credentials): void {
+    if (!empty($credentials['stripe'])) {
+        $stripe = $credentials['stripe'];
+        if (!empty($stripe['public_key'])) {
+            osc_update_option('stripe_public_key', sanitize_text_field($stripe['public_key']));
+        }
+        if (!empty($stripe['secret_key'])) {
+            osc_update_option('stripe_secret_key', sanitize_text_field($stripe['secret_key']));
+        }
+        if (!empty($stripe['mode'])) {
+            osc_update_option('stripe_mode', sanitize_text_field($stripe['mode']));
+        }
+        osc_log('Stripe credentials synced from Panel');
+    }
+
+    if (!empty($credentials['paypal'])) {
+        $paypal = $credentials['paypal'];
+        if (!empty($paypal['client_id'])) {
+            osc_update_option('paypal_client_id', sanitize_text_field($paypal['client_id']));
+        }
+        if (!empty($paypal['client_secret'])) {
+            osc_update_option('paypal_secret', sanitize_text_field($paypal['client_secret']));
+        }
+        if (!empty($paypal['mode'])) {
+            osc_update_option('paypal_mode', sanitize_text_field($paypal['mode']));
+        }
+        osc_log('PayPal credentials synced from Panel');
     }
 }

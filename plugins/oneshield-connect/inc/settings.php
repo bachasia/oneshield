@@ -21,6 +21,9 @@ function osc_register_settings(): void {
     register_setting('oneshield_connect', 'oneshield_connect_gateway_url', [
         'sanitize_callback' => 'esc_url_raw',
     ]);
+    register_setting('oneshield_connect', 'oneshield_connect_token_secret', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
 }
 
 function osc_settings_page(): void {
@@ -31,9 +34,11 @@ function osc_settings_page(): void {
 
     // Handle "Connect Now" action
     if (isset($_POST['osc_connect']) && check_admin_referer('osc_connect_action')) {
-        $new_url = esc_url_raw($_POST['gateway_url'] ?? '');
-        if ($new_url) {
+        $new_url    = esc_url_raw($_POST['gateway_url'] ?? '');
+        $new_secret = sanitize_text_field($_POST['token_secret'] ?? '');
+        if ($new_url && $new_secret) {
             osc_update_option('gateway_url', $new_url);
+            osc_update_option('token_secret', $new_secret);
             $result = osc_register_site();
             if (is_wp_error($result)) {
                 $notice = '<div class="notice notice-error"><p>' . esc_html($result->get_error_message()) . '</p></div>';
@@ -43,6 +48,10 @@ function osc_settings_page(): void {
                 $gateway_url  = $new_url;
                 $site_id      = $result['site_id'];
             }
+        } elseif (empty($new_url)) {
+            $notice = '<div class="notice notice-error"><p>Please enter the Gateway Panel URL.</p></div>';
+        } elseif (empty($new_secret)) {
+            $notice = '<div class="notice notice-error"><p>Please enter the Token Secret from your Gateway Panel Settings page.</p></div>';
         }
     }
 
@@ -93,6 +102,24 @@ function osc_settings_page(): void {
                                 <p class="description">Enter the URL of your OneShield Gateway Panel.</p>
                             </td>
                         </tr>
+                        <tr>
+                            <th><label for="token_secret">Token Secret</label></th>
+                            <td>
+                                <input
+                                    type="password"
+                                    id="token_secret"
+                                    name="token_secret"
+                                    value=""
+                                    placeholder="Paste your Token Secret here"
+                                    class="regular-text"
+                                    autocomplete="new-password"
+                                />
+                                <p class="description">
+                                    Found in your Gateway Panel under <strong>Settings &rarr; Token Secret</strong>.
+                                    This is used to authenticate this site with the Gateway Panel.
+                                </p>
+                            </td>
+                        </tr>
                     </table>
                     <input type="submit" name="osc_connect" class="button button-primary" value="Connect Now" />
                 </form>
@@ -106,7 +133,26 @@ function osc_settings_page(): void {
                 <tr><th>Plugin Version</th><td><?php echo esc_html(OSC_VERSION); ?></td></tr>
                 <tr><th>Site URL</th><td><?php echo esc_html(get_site_url()); ?></td></tr>
                 <tr><th>Site ID</th><td><code><?php echo esc_html($site_id); ?></code></td></tr>
-                <tr><th>Last Heartbeat</th><td id="osc-last-heartbeat">checking...</td></tr>
+                <tr>
+                    <th>Last Heartbeat</th>
+                    <td id="osc-last-heartbeat">
+                        <?php
+                        $last = (int) osc_get_option('last_heartbeat', 0);
+                        if ($last > 0) {
+                            $diff = time() - $last;
+                            if ($diff < 60) {
+                                echo '<span style="color:green;">&#10003; Just now (' . esc_html($diff) . 's ago)</span>';
+                            } elseif ($diff < 600) {
+                                echo '<span style="color:green;">&#10003; ' . esc_html(human_time_diff($last)) . ' ago</span>';
+                            } else {
+                                echo '<span style="color:#d63638;">&#9888; ' . esc_html(human_time_diff($last)) . ' ago — site may be offline</span>';
+                            }
+                        } else {
+                            echo '<span style="color:#d63638;">&#9888; No heartbeat received yet</span>';
+                        }
+                        ?>
+                    </td>
+                </tr>
             </table>
         </div>
         <?php endif; ?>

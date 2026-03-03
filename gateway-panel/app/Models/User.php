@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -19,6 +20,7 @@ class User extends Authenticatable
         'password',
         'tenant_id',
         'token_secret',
+        'is_super_admin',
     ];
 
     protected $hidden = [
@@ -27,11 +29,16 @@ class User extends Authenticatable
         'token_secret',
     ];
 
+    protected $casts = [
+        'is_super_admin' => 'boolean',
+    ];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'is_super_admin'    => 'boolean',
         ];
     }
 
@@ -53,5 +60,56 @@ class User extends Authenticatable
     public function gatewayTokens(): HasMany
     {
         return $this->hasMany(GatewayToken::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
+     * The current active subscription (latest active/trial).
+     */
+    public function activeSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class)
+                    ->whereIn('status', ['active', 'trial'])
+                    ->where(fn ($q) => $q->whereNull('expires_at')
+                                         ->orWhere('expires_at', '>', now()))
+                    ->latestOfMany();
+    }
+
+    /**
+     * Can this tenant create another shield site?
+     */
+    public function canCreateShieldSite(): bool
+    {
+        $sub = $this->activeSubscription;
+        if (! $sub) return false;
+
+        $max     = $sub->plan->max_shield_sites ?? 0;
+        $current = $this->shieldSites()->count();
+
+        return $current < $max;
+    }
+
+    /**
+     * Human-readable message when shield site limit is reached.
+     */
+    public function shieldSiteLimitMessage(): string
+    {
+        $sub  = $this->activeSubscription;
+        $plan = $sub?->plan?->label ?? 'Free';
+        $max  = $sub?->plan?->max_shield_sites ?? 0;
+
+        return "Your {$plan} plan allows {$max} shield site(s). Please upgrade to add more.";
+    }
+
+    /**
+     * How many shield sites the active plan allows.
+     */
+    public function shieldSiteLimit(): int
+    {
+        return $this->activeSubscription?->plan?->max_shield_sites ?? 0;
     }
 }

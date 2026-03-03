@@ -1,6 +1,19 @@
 <template>
   <AppLayout title="Shield Sites">
 
+    <!-- Copy toast -->
+    <transition name="toast">
+      <div
+        v-if="copyToast"
+        class="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg"
+      >
+        <svg class="w-4 h-4 text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+        </svg>
+        {{ copyToast }}
+      </div>
+    </transition>
+
     <!-- Page Header -->
     <div class="mb-1">
       <h1 class="text-xl font-semibold text-gray-800">Shield Sites</h1>
@@ -79,6 +92,7 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="bg-gray-50 border-b border-gray-200 text-left">
+            <th class="px-3 py-3.5 w-8"></th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Site Name</th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">URL</th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Gross Received</th>
@@ -90,11 +104,31 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
           <tr v-if="filteredSites.length === 0">
-            <td colspan="7" class="px-5 py-14 text-center text-gray-400 text-sm">
+            <td colspan="8" class="px-5 py-14 text-center text-gray-400 text-sm">
               No shield sites found. Click "Add Site" to get started.
             </td>
           </tr>
-          <tr v-for="site in filteredSites" :key="site.id" class="hover:bg-gray-50/70 align-top transition-colors">
+          <tr
+            v-for="(site, idx) in filteredSites"
+            :key="site.id"
+            draggable="true"
+            @dragstart="onDragStart($event, site)"
+            @dragover="onDragOver($event, idx)"
+            @dragleave="onDragLeave"
+            @drop="onDrop($event, idx)"
+            @dragend="onDragEnd"
+            class="hover:bg-gray-50/70 align-top transition-colors"
+            :class="{
+              'opacity-50': dragState.draggingId === site.id,
+              'border-t-2 border-indigo-400': dragState.overIndex === idx && dragState.draggingId !== site.id,
+            }"
+          >
+            <!-- Drag Handle -->
+            <td class="px-3 py-4 cursor-grab active:cursor-grabbing">
+              <svg class="w-4 h-4 text-gray-300 hover:text-gray-500 transition-colors" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M7 2a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4zM7 8a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4zM7 14a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z"/>
+              </svg>
+            </td>
 
             <!-- Site Name -->
             <td class="px-5 py-4">
@@ -211,8 +245,7 @@
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                   Check
                 </button>
-                <!-- Drag handle -->
-                <span class="cursor-grab text-gray-300 hover:text-gray-500 ml-1 select-none text-base">⊕</span>
+                <!-- Drag-to-reorder: reserved for Phase 2 (sortable not yet implemented) -->
               </div>
             </td>
 
@@ -232,6 +265,29 @@
             ? 'bg-indigo-600 text-white'
             : link.url ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'"
         />
+      </div>
+    </div>
+
+    <!-- =========================================================== -->
+    <!-- Upgrade Plan Modal -->
+    <!-- =========================================================== -->
+    <div v-if="showUpgradeModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-7 border border-gray-100 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-7 h-7 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/>
+          </svg>
+        </div>
+        <h3 class="text-base font-semibold text-gray-900 mb-2">Shield Site Limit Reached</h3>
+        <p class="text-sm text-gray-500 mb-1">
+          Your <span class="font-semibold text-gray-700">{{ subscription?.plan?.label }}</span> plan allows
+          <span class="font-semibold text-gray-700">{{ subscription?.sites_limit }}</span> shield site(s).
+        </p>
+        <p class="text-sm text-gray-500 mb-5">Contact your administrator to upgrade your plan.</p>
+        <button
+          @click="showUpgradeModal = false"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
+        >Got it</button>
       </div>
     </div>
 
@@ -526,8 +582,8 @@
 
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link, useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { ref, computed, reactive } from 'vue';
 
 const props = defineProps({
   sites:   Object,
@@ -563,10 +619,23 @@ const gatewayTabs = [
 const activeGateway = ref('paypal');
 
 // ── Add Site ─────────────────────────────────────────────────────────────
-const showAddModal = ref(false);
+const page            = usePage();
+const subscription    = computed(() => page.props.subscription);
+const atLimit         = computed(() => {
+  const s = subscription.value;
+  if (!s) return false;
+  if (s.sites_limit >= 999) return false;
+  return s.sites_used >= s.sites_limit;
+});
+const showUpgradeModal = ref(false);
+const showAddModal     = ref(false);
 const addForm = useForm({ name: '', url: '', group_id: null });
 
 function addSite() {
+  if (atLimit.value) {
+    showUpgradeModal.value = true;
+    return;
+  }
   addForm.reset();
   showAddModal.value = true;
 }
@@ -651,6 +720,77 @@ function confirmDelete(site) {
   }
 }
 
+// ── Drag-to-reorder ───────────────────────────────────────────────────────
+// Local mutable copy of the site list (just ids + display order) for drag state
+const dragState = reactive({
+  draggingId: null,
+  overIndex:  null,
+  // local ordered id list — rebuilt from filteredSites on each page load
+  orderedIds: [],
+});
+
+// Keep orderedIds in sync with filteredSites
+function initDragOrder() {
+  dragState.orderedIds = filteredSites.value.map(s => s.id);
+}
+initDragOrder();
+
+function onDragStart(event, site) {
+  dragState.draggingId = site.id;
+  event.dataTransfer.effectAllowed = 'move';
+  // Use site id as payload (same page, so we don't need cross-origin safety)
+  event.dataTransfer.setData('text/plain', String(site.id));
+}
+
+function onDragOver(event, index) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  dragState.overIndex = index;
+}
+
+function onDragLeave() {
+  dragState.overIndex = null;
+}
+
+function onDrop(event, targetIndex) {
+  event.preventDefault();
+  dragState.overIndex = null;
+
+  const sourceId = parseInt(event.dataTransfer.getData('text/plain'), 10);
+  const ids = [...dragState.orderedIds];
+  const sourceIndex = ids.indexOf(sourceId);
+  if (sourceIndex === -1 || sourceIndex === targetIndex) {
+    dragState.draggingId = null;
+    return;
+  }
+
+  // Reorder local array
+  ids.splice(sourceIndex, 1);
+  ids.splice(targetIndex, 0, sourceId);
+  dragState.orderedIds = ids;
+  dragState.draggingId = null;
+
+  // Persist to server
+  fetch('/sites/reorder', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+    },
+    body: JSON.stringify({ ordered_ids: ids }),
+  }).then(res => {
+    if (!res.ok) {
+      // Revert on server error
+      initDragOrder();
+    }
+  }).catch(() => initDragOrder());
+}
+
+function onDragEnd() {
+  dragState.draggingId = null;
+  dragState.overIndex  = null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 function heartbeatClass(site) {
   if (!site.last_heartbeat_at) return 'bg-gray-100 text-gray-500';
@@ -681,12 +821,24 @@ function webhookUrl(gateway) {
   return `${base}/api/webhook/${gateway}/${settingsSite.value?.id ?? '{site_id}'}`;
 }
 
+const copyToast  = ref('');
+let   toastTimer = null;
+
+function showCopyFeedback(label = 'Copied!') {
+  copyToast.value = label;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { copyToast.value = ''; }, 2000);
+}
+
 function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).catch(() => {});
+  navigator.clipboard.writeText(text).then(() => showCopyFeedback('Copied!')).catch(() => {});
 }
 </script>
 
 <style scoped>
+.toast-enter-active, .toast-leave-active { transition: opacity 0.2s, transform 0.2s; }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(8px); }
+
 .slideover-enter-active,
 .slideover-leave-active {
   transition: opacity 0.2s ease;

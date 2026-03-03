@@ -55,20 +55,25 @@ add_action('wp_ajax_osp_confirm_payment', 'osp_ajax_confirm_payment');
 function osp_ajax_confirm_payment(): void {
     check_ajax_referer('osp_confirm_nonce', 'nonce');
 
-    $order_id           = absint($_POST['wc_order_id'] ?? 0);
-    $gateway_tx_id      = sanitize_text_field($_POST['transaction_id'] ?? '');
-    $gateway            = sanitize_text_field($_POST['gateway'] ?? '');
-    $os_transaction_id  = absint($_POST['os_transaction_id'] ?? 0);
+    $order_id      = absint($_POST['wc_order_id'] ?? 0);
+    $gateway_tx_id = sanitize_text_field($_POST['transaction_id'] ?? '');
+    $gateway       = sanitize_text_field($_POST['gateway'] ?? '');
 
     $order = wc_get_order($order_id);
     if (!$order || $order->get_status() !== 'pending') {
         wp_send_json_error('Invalid order');
     }
 
-    // Confirm with Gateway Panel
+    // Retrieve the ShieldSite ID stored on the order during process_payment()
+    $os_site_id = absint($order->get_meta('_os_site_id'));
+    if (!$os_site_id) {
+        wp_send_json_error('Missing Shield Site ID on order — cannot confirm');
+    }
+
+    // Confirm with Gateway Panel using the correct site_id
     $gateway_class = osp_get_gateway_instance($gateway);
     if ($gateway_class) {
-        $confirmed = $gateway_class->confirm_with_panel($os_transaction_id, $order_id, $gateway_tx_id);
+        $confirmed = $gateway_class->confirm_with_panel($os_site_id, $order_id, $gateway_tx_id);
         if (!$confirmed) {
             wp_send_json_error('Panel confirmation failed');
         }

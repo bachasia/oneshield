@@ -15,6 +15,7 @@
     let osCurrentGateway = null;
     let osTransactionId = null;
     let osOrderId = null;
+    let osConfirmNonce = null;
 
     // Intercept WooCommerce checkout response
     $(document).on('checkout_place_order_success', function (e, response) {
@@ -43,11 +44,11 @@
     });
 
     function showIframeModal(data) {
-        osCurrentGateway  = data.gateway || 'unknown';
+        // Gateway and order ID come directly from process_payment() response
+        osCurrentGateway  = data.gateway;
         osTransactionId   = data.os_transaction_id;
-
-        // Extract WC order ID from URL if available
-        osOrderId = getOrderIdFromCheckout();
+        osOrderId         = data.wc_order_id;
+        osConfirmNonce    = data.nonce;
 
         // Create modal overlay
         const modal = $('<div>', {
@@ -141,10 +142,10 @@
             method: 'POST',
             data: {
                 action: 'osp_confirm_payment',
-                nonce: osp_data.nonce,
+                nonce: osConfirmNonce,
                 wc_order_id: osOrderId,
                 transaction_id: msg.transaction_id,
-                gateway: msg.gateway,
+                gateway: osCurrentGateway,
                 os_transaction_id: osTransactionId,
             },
             success: function (response) {
@@ -171,11 +172,5 @@
         }
     }
 
-    function getOrderIdFromCheckout() {
-        // Try to get from hidden field or WC state
-        return $('input[name="wc_order_id"]').val()
-            || window.wc_checkout_params?.order_id
-            || 0;
-    }
 
 })(jQuery);

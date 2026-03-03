@@ -53,6 +53,8 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'result'            => 'success',
             'iframe_url'        => $result['iframe_url'],
             'os_transaction_id' => $result['transaction_id'],
+            'wc_order_id'       => $order->get_id(),
+            'gateway'           => $this->gateway_name,
             'nonce'             => wp_create_nonce('osp_confirm_nonce'),
         ];
     }
