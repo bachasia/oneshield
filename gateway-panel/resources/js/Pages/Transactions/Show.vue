@@ -1,52 +1,76 @@
 <template>
   <AppLayout :title="`Transaction #${transaction.id}`">
     <div class="max-w-2xl">
-      <Link href="/transactions" class="text-sm text-indigo-600 hover:text-indigo-700 mb-6 inline-block">
-        &larr; Back to Transactions
+
+      <!-- Back button -->
+      <Link
+        href="/transactions"
+        class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 mb-5 transition-colors group"
+      >
+        <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"/>
+        </svg>
+        Back to Transactions
       </Link>
 
-      <div class="bg-white rounded-2xl border border-gray-200 p-6">
-        <div class="flex items-start justify-between mb-6">
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+
+        <!-- Card header -->
+        <div class="flex items-start justify-between px-6 py-5 border-b border-gray-100">
           <div>
-            <h2 class="text-xl font-semibold text-gray-900">Transaction #{{ transaction.id }}</h2>
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Transaction</p>
+            <h2 class="text-xl font-bold text-gray-900">#{{ transaction.id }}</h2>
             <p class="text-sm text-gray-500 mt-1">{{ formatDate(transaction.created_at) }}</p>
           </div>
-          <span :class="statusClass(transaction.status)" class="px-3 py-1 rounded-full text-sm font-medium capitalize">
-            {{ transaction.status }}
-          </span>
+          <div class="flex items-center gap-2 mt-1">
+            <!-- Gateway badge -->
+            <span :class="gatewayClass(transaction.gateway)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold">
+              <span class="w-1.5 h-1.5 rounded-full" :class="gatewayDot(transaction.gateway)"></span>
+              {{ transaction.gateway }}
+            </span>
+            <!-- Status badge -->
+            <span :class="statusClass(transaction.status)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold capitalize">
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusDot(transaction.status)"></span>
+              {{ transaction.status }}
+            </span>
+          </div>
         </div>
 
-        <dl class="grid grid-cols-2 gap-4">
+        <!-- Amount highlight -->
+        <div class="px-6 py-4 bg-gray-50/60 border-b border-gray-100">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Amount</p>
+          <p class="text-3xl font-bold text-gray-900">
+            {{ transaction.currency }}
+            <span class="tabular-nums">{{ Number(transaction.amount).toFixed(2) }}</span>
+          </p>
+        </div>
+
+        <!-- Details grid -->
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-5 px-6 py-5">
           <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Order ID</dt>
-            <dd class="mt-1 font-mono text-sm text-gray-900">{{ transaction.order_id }}</dd>
+            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Order ID</dt>
+            <dd class="font-mono text-sm text-gray-900 break-all">{{ transaction.order_id }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Amount</dt>
-            <dd class="mt-1 font-semibold text-gray-900">{{ transaction.currency }} {{ Number(transaction.amount).toFixed(2) }}</dd>
+            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Gateway Transaction ID</dt>
+            <dd class="font-mono text-xs text-gray-600 break-all">{{ transaction.gateway_transaction_id ?? '—' }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Gateway</dt>
-            <dd class="mt-1 capitalize text-gray-700">{{ transaction.gateway }}</dd>
+            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Mesh Site</dt>
+            <dd class="text-sm text-gray-700 font-medium">{{ transaction.site?.name ?? '—' }}</dd>
           </div>
           <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Gateway Transaction ID</dt>
-            <dd class="mt-1 font-mono text-xs text-gray-600">{{ transaction.gateway_transaction_id ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Mesh Site</dt>
-            <dd class="mt-1 text-gray-700">{{ transaction.site?.name }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500 font-medium uppercase tracking-wide">Money Site</dt>
-            <dd class="mt-1 text-sm text-gray-700">{{ transaction.money_site_domain }}</dd>
+            <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Money Site</dt>
+            <dd class="text-sm text-gray-700">{{ transaction.money_site_domain ?? '—' }}</dd>
           </div>
         </dl>
 
-        <div v-if="transaction.raw_response" class="mt-6">
-          <h3 class="text-sm font-medium text-gray-700 mb-2">Raw Response</h3>
-          <pre class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs overflow-auto max-h-48 text-gray-600">{{ JSON.stringify(transaction.raw_response, null, 2) }}</pre>
+        <!-- Raw response -->
+        <div v-if="transaction.raw_response" class="px-6 pb-6">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Raw Response</p>
+          <pre class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs overflow-auto max-h-52 text-gray-600 font-mono leading-relaxed">{{ JSON.stringify(transaction.raw_response, null, 2) }}</pre>
         </div>
+
       </div>
     </div>
   </AppLayout>
@@ -64,12 +88,36 @@ function statusClass(status) {
     completed: 'bg-green-100 text-green-700',
     failed:    'bg-red-100 text-red-700',
     refunded:  'bg-gray-100 text-gray-600',
-  }[status] || 'bg-gray-100 text-gray-600';
+  }[status] ?? 'bg-gray-100 text-gray-600';
+}
+
+function statusDot(status) {
+  return {
+    pending:   'bg-yellow-500',
+    completed: 'bg-green-500',
+    failed:    'bg-red-500',
+    refunded:  'bg-gray-400',
+  }[status] ?? 'bg-gray-400';
+}
+
+function gatewayClass(gateway) {
+  return {
+    paypal: 'bg-blue-100 text-blue-700',
+    stripe: 'bg-violet-100 text-violet-700',
+  }[gateway] ?? 'bg-gray-100 text-gray-600';
+}
+
+function gatewayDot(gateway) {
+  return {
+    paypal: 'bg-blue-500',
+    stripe: 'bg-violet-500',
+  }[gateway] ?? 'bg-gray-400';
 }
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleString('en-US', {
-    dateStyle: 'long', timeStyle: 'short',
+    dateStyle: 'long',
+    timeStyle: 'short',
   });
 }
 </script>
