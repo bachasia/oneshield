@@ -11,9 +11,17 @@ services:
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
       - oneshield
+    healthcheck:
+      test: ["CMD-SHELL", "php -v >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
@@ -27,7 +35,8 @@ services:
     networks:
       - oneshield
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   db:
     image: mysql:8.0
@@ -44,6 +53,12 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - oneshield
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_ROOT_PASSWORD:-root_secret}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
@@ -53,6 +68,12 @@ services:
       - "6379:6379"
     networks:
       - oneshield
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   horizon:
     build:
@@ -67,8 +88,12 @@ services:
     networks:
       - oneshield
     depends_on:
-      - db
-      - redis
+      app:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 networks:
   oneshield:

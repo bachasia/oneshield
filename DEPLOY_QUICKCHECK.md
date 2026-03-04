@@ -22,10 +22,21 @@ npm ci
 npm run build
 ```
 
-## 4) Rebuild/restart services
+## 4) Rebuild/restart services (tranh 502 do app IP thay doi)
 
 ```bash
-docker compose up -d --build app nginx horizon
+# Khong restart app + nginx dong thoi trong production
+# Lam theo thu tu: app -> nginx -> horizon
+docker compose up -d --build --force-recreate app
+
+# Cho app san sang
+until [ "$(docker inspect -f '{{.State.Health.Status}}' oneshield_app 2>/dev/null)" = "healthy" ]; do
+  sleep 2
+done
+
+docker compose up -d --force-recreate nginx
+docker compose up -d --build --force-recreate horizon
+
 docker compose ps
 ```
 
@@ -42,6 +53,7 @@ docker exec oneshield_app php artisan view:cache
 ## 6) Smoke test
 
 ```bash
+curl -I http://127.0.0.1:8080
 curl -I https://admin.oneshieldx.com/
 docker exec oneshield_app php artisan tinker --execute="dump(url('/admin'));"
 docker compose logs app --tail=80
@@ -51,6 +63,7 @@ docker compose logs nginx --tail=80
 Ket qua mong doi:
 
 - `curl -I` tra ve `200` hoac `302` hop le.
+- `curl -I http://127.0.0.1:8080` phai khong con `502`.
 - `url('/admin')` phai la `https://admin.oneshieldx.com/admin`.
 - Khong co loi `500` moi trong logs.
 
@@ -58,8 +71,16 @@ Ket qua mong doi:
 
 ```bash
 docker exec oneshield_app php artisan optimize:clear
-docker compose restart app nginx
+
+# 502 thuong do nginx giu upstream app IP cu
+docker compose up -d --force-recreate app
+until [ "$(docker inspect -f '{{.State.Health.Status}}' oneshield_app 2>/dev/null)" = "healthy" ]; do
+  sleep 2
+done
+docker compose up -d --force-recreate nginx
+
 docker compose logs app --tail=200
+docker compose logs nginx --tail=200
 ```
 
 ## 8) Security quick checks
