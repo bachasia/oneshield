@@ -682,7 +682,7 @@ function closeSettings() {
 }
 
 function saveSettings() {
-  settingsForm.patch(`/sites/${settingsSite.value.id}`, {
+  settingsForm.put(`/sites/${settingsSite.value.id}`, {
     onSuccess: closeSettings,
   });
 }

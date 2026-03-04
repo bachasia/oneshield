@@ -1,149 +1,346 @@
-# OneShield — Hướng dẫn Deploy VPS & Setup Shield Site
+# OneShield - Runbook Deploy VPS (Audit + Quy trinh chuan)
 
-> Stack: Laravel 12 + Inertia/Vue 3 · MySQL 8 · Redis 7 · Nginx · Docker Compose  
-> Yêu cầu VPS: Ubuntu 22.04+, 2 vCPU / 2 GB RAM tối thiểu, domain đã trỏ A-record
+> Muc tieu: deploy lai tren VPS muot hon, tranh lap lai cac loi da gap.
+> Stack: Laravel 12 + Inertia/Vue 3 + MySQL 8 + Redis 7 + Nginx + Docker Compose
 
 ---
 
-## Phần 1 — Deploy Gateway Panel lên VPS
+## 0) Audit nhanh: da gap gi va da fix gi
 
-### 1.1 Chuẩn bị VPS
+### Loi da gap trong lan deploy vua roi
+
+- `vendor/autoload.php` missing khi chay `php artisan key:generate`
+  - Nguyen nhan: bind mount `.:/var/www` de len container nhung host chua co `vendor/`.
+  - Cach fix: chay `composer install` trong project truoc khi khoi tao Laravel.
+
+- `npm run build` loi Vite `module.enableCompileCache?.()`
+  - Nguyen nhan: Node qua cu (Node 12).
+  - Cach fix: nang cap Node 20 LTS.
+
+- Frontend/axios goi `http://admin...` trong khi site dang `https://...`
+  - Hien tuong: CSP chan request, login/create tenant fail (`AxiosError: Network Error`).
+  - Nguyen nhan: chuoi proxy 2 lop (host nginx -> nginx container -> php-fpm) lam mat thong tin `https`.
+  - Cach fix:
+    - `.env`: `APP_URL` + `ASSET_URL` dung `https`.
+    - Host Nginx gui `X-Forwarded-Proto https`, `X-Forwarded-Port 443`.
+    - Nginx container truyen lai vao fastcgi: `HTTP_X_FORWARDED_PROTO`, `HTTP_X_FORWARDED_PORT`, `HTTPS on`.
+    - Laravel force https trong production (AppServiceProvider).
+
+- Certbot `--nginx` bao plugin khong ton tai
+  - Nguyen nhan: thieu plugin certbot nginx.
+  - Cach fix: cai `python3-certbot-nginx` hoac dung DNS challenge (Cloudflare) cho wildcard.
+
+- CSP canh bao `static.cloudflareinsights.com/beacon...`
+  - Khong pha flow app. Do Cloudflare Browser Insights bi chan boi CSP strict.
+  - Cach xu ly: tat Browser Insights hoac whitelisting them domain cloudflareinsights trong CSP.
+
+### Viec can lam ngay sau audit
+
+- Doi lai mat khau DB neu da lo trong log/chat.
+- Khong expose `3306`, `6379` ra public neu khong can debug tu xa.
+
+---
+
+## 1) Chuan bi VPS
 
 ```bash
-# Đăng nhập VPS
 ssh root@YOUR_VPS_IP
-
-# Cập nhật hệ thống
 apt update && apt upgrade -y
+apt install -y git curl ca-certificates gnupg lsb-release unzip
 
-# Cài Docker + Docker Compose
+# Docker + compose plugin
 curl -fsSL https://get.docker.com | sh
-apt install -y docker-compose-plugin git
+apt install -y docker-compose-plugin
 
-# Kiểm tra
 docker --version
 docker compose version
 ```
 
-### 1.2 Upload code lên VPS
+---
 
-**Cách A — Git clone (khuyến nghị):**
+## 2) Lay code va tao .env
+
 ```bash
 cd /var/www
 git clone https://github.com/YOUR_ORG/oneshield.git
-cd oneshield/gateway-panel
-```
-
-**Cách B — Upload trực tiếp:**
-```bash
-# Từ máy local
-scp -r ./gateway-panel root@YOUR_VPS_IP:/var/www/oneshield/gateway-panel
-```
-
-### 1.3 Tạo file `.env`
-
-```bash
 cd /var/www/oneshield/gateway-panel
+
 cp .env.example .env
 nano .env
 ```
 
-Chỉnh sửa các giá trị sau (bắt buộc):
+Mau bien quan trong cho production:
 
 ```dotenv
 APP_NAME=OneShield
 APP_ENV=production
-APP_KEY=                          # sẽ generate ở bước sau
+APP_KEY=
 APP_DEBUG=false
 APP_URL=https://admin.oneshieldx.com
+ASSET_URL=https://admin.oneshieldx.com
 APP_HOST=oneshieldx.com
 
 LOG_CHANNEL=stack
 LOG_LEVEL=error
 
-# Database — dùng MySQL trong Docker
 DB_CONNECTION=mysql
 DB_HOST=db
 DB_PORT=3306
 DB_DATABASE=oneshield
 DB_USERNAME=oneshield
-DB_PASSWORD=STRONG_DB_PASSWORD_HERE
-DB_ROOT_PASSWORD=STRONG_ROOT_PASSWORD_HERE
+DB_PASSWORD=STRONG_DB_PASSWORD
+DB_ROOT_PASSWORD=STRONG_ROOT_PASSWORD
 
-# Session
 SESSION_DRIVER=redis
 SESSION_LIFETIME=120
 SESSION_DOMAIN=.oneshieldx.com
+SESSION_SECURE_COOKIE=true
 
-# Queue
 QUEUE_CONNECTION=redis
-
-# Cache
 CACHE_STORE=redis
 
-# Redis (container tên 'redis')
 REDIS_CLIENT=phpredis
 REDIS_HOST=redis
 REDIS_PASSWORD=null
 REDIS_PORT=6379
 
-# OneShield — CORS: liệt kê domain money sites, ngăn cách bởi dấu phẩy
+# Khong de * o production
 ONESHIELD_CORS_ORIGINS=https://shop1.com,https://shop2.com
-
-# Plugin versions
-ONESHIELD_CONNECT_VERSION=1.0.0
-ONESHIELD_PAYGATES_VERSION=1.0.0
 ```
 
-> **Lưu ý:** `DB_ROOT_PASSWORD` không có trong `.env.example` mặc định —  
-> `docker-compose.yml` đọc biến này để tạo MySQL root password.  
-> Thêm dòng này vào `.env` của bạn.
+---
 
-### 1.4 Build và khởi động containers
+## 3) Node 20 + build frontend
+
+> Vite can Node 20+.
 
 ```bash
-# Build frontend assets TRƯỚC khi build Docker image
-# (cần Node 20+ trên VPS hoặc build local rồi copy)
+# Neu VPS dang co Node cu, remove de tranh conflict
+apt remove -y libnode-dev nodejs npm || true
+apt autoremove -y
 
-# Option A: Build trên VPS
-apt install -y nodejs npm
+# Cai Node 20 LTS
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+node -v
+npm -v
+
+cd /var/www/oneshield/gateway-panel
 npm ci
 npm run build
-
-# Option B: Build trên máy local, copy dist lên
-# (từ máy local)
-npm run build
-scp -r public/build root@YOUR_VPS_IP:/var/www/oneshield/gateway-panel/public/
-
-# Khởi động containers
-docker compose up -d --build
 ```
 
-### 1.5 Khởi tạo ứng dụng
+Kiem tra build:
 
 ```bash
-# Generate APP_KEY
+ls -lah /var/www/oneshield/gateway-panel/public/build
+```
+
+---
+
+## 4) Composer + chay containers
+
+```bash
+cd /var/www/oneshield/gateway-panel
+
+# Quan trong voi bind mount: host phai co vendor/
+docker compose run --rm app composer install --no-dev --optimize-autoloader
+
+docker compose up -d --build
+docker compose ps
+```
+
+---
+
+## 5) Khoi tao Laravel
+
+```bash
+cd /var/www/oneshield/gateway-panel
+
 docker exec oneshield_app php artisan key:generate --force
-
-# Chạy migrations
 docker exec oneshield_app php artisan migrate --force
-
-# Tạo symlink storage
+docker exec oneshield_app php artisan db:seed --force
 docker exec oneshield_app php artisan storage:link
 
-# Cache config/routes cho production
+docker exec oneshield_app php artisan optimize:clear
 docker exec oneshield_app php artisan config:cache
 docker exec oneshield_app php artisan route:cache
 docker exec oneshield_app php artisan view:cache
 ```
 
-### 1.6 Tạo tài khoản Super Admin
+---
+
+## 6) Sửa cac diem bat buoc de tranh HTTP/HTTPS mismatch
+
+### 6.1 AppServiceProvider force https o production
+
+File: `gateway-panel/app/Providers/AppServiceProvider.php`
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        //
+    }
+
+    public function boot(): void
+    {
+        if (app()->environment('production')) {
+            URL::forceRootUrl(config('app.url'));
+            URL::forceScheme('https');
+        }
+    }
+}
+```
+
+### 6.2 Nginx trong container: pass dung forwarded proto vao PHP
+
+File: `gateway-panel/docker/nginx/default.conf`
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+    root /var/www/public;
+
+    index index.php;
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass app:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+
+        # Giu scheme tu host nginx
+        fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+        fastcgi_param HTTP_X_FORWARDED_PORT  $http_x_forwarded_port;
+        fastcgi_param HTTPS on;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+Apply lai:
+
+```bash
+cd /var/www/oneshield/gateway-panel
+docker compose up -d --build app nginx
+docker exec oneshield_app php artisan optimize:clear
+docker exec oneshield_app php artisan config:cache
+```
+
+---
+
+## 7) Nginx host + SSL (Cloudflare)
+
+### 7.1 DNS Cloudflare
+
+- Tao `A` record:
+  - `admin` -> `YOUR_VPS_IP`
+  - `*` -> `YOUR_VPS_IP` (neu dung wildcard subdomain)
+
+### 7.2 Nginx host reverse proxy
+
+File: `/etc/nginx/sites-available/oneshield`
+
+```nginx
+server {
+    listen 80;
+    server_name admin.oneshieldx.com *.oneshieldx.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name admin.oneshieldx.com *.oneshieldx.com;
+
+    ssl_certificate     /etc/letsencrypt/live/oneshieldx.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/oneshieldx.com/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        proxy_set_header   X-Forwarded-Port 443;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+```bash
+apt install -y nginx certbot python3-certbot-dns-cloudflare
+ln -sf /etc/nginx/sites-available/oneshield /etc/nginx/sites-enabled/oneshield
+nginx -t && systemctl reload nginx
+```
+
+### 7.3 Wildcard cert bang Cloudflare DNS challenge
+
+```bash
+mkdir -p /root/.secrets/certbot
+nano /root/.secrets/certbot/cloudflare.ini
+```
+
+Noi dung:
+
+```ini
+dns_cloudflare_api_token = YOUR_CLOUDFLARE_API_TOKEN
+```
+
+```bash
+chmod 600 /root/.secrets/certbot/cloudflare.ini
+
+certbot certonly \
+  --dns-cloudflare \
+  --dns-cloudflare-credentials /root/.secrets/certbot/cloudflare.ini \
+  -d oneshieldx.com \
+  -d "*.oneshieldx.com"
+
+nginx -t && systemctl reload nginx
+certbot renew --dry-run
+```
+
+Cloudflare SSL/TLS mode: dat `Full (strict)`.
+
+---
+
+## 8) Tao super admin + upload plugins
+
+### 8.1 Tao super admin
 
 ```bash
 docker exec oneshield_app php artisan tinker --execute="
 \App\Models\User::create([
     'name'           => 'Admin',
-    'email'          => 'admin@yourdomain.com',
+    'email'          => 'admin@oneshieldx.com',
     'password'       => bcrypt('YOUR_STRONG_PASSWORD'),
     'tenant_id'      => 'admin',
     'token_secret'   => bin2hex(random_bytes(32)),
@@ -152,331 +349,70 @@ docker exec oneshield_app php artisan tinker --execute="
 "
 ```
 
-Hoặc truy cập `https://admin.oneshieldx.com/account/admin` lần đầu tiên để setup qua UI.
-
-### 1.7 Cấu hình Nginx reverse proxy (nếu VPS đã có Nginx host)
-
-Nếu bạn muốn dùng domain thay vì port 8080, cài Nginx trên host và proxy vào container:
+### 8.2 Dong goi plugin
 
 ```bash
-apt install -y nginx certbot python3-certbot-nginx
-
-nano /etc/nginx/sites-available/oneshield
-```
-
-```nginx
-server {
-    listen 80;
-    server_name admin.oneshieldx.com *.oneshieldx.com;
-
-    location / {
-        proxy_pass         http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-        proxy_read_timeout 120s;
-    }
-}
-```
-
-```bash
-ln -s /etc/nginx/sites-available/oneshield /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-
-# Cài SSL wildcard (khuyến nghị dùng DNS challenge)
-certbot --nginx -d admin.oneshieldx.com -d oneshieldx.com
-```
-
-Sau khi có SSL, cập nhật `.env`:
-```dotenv
-APP_URL=https://admin.oneshieldx.com
-APP_HOST=oneshieldx.com
-SESSION_DOMAIN=.oneshieldx.com
-```
-Rồi chạy lại:
-```bash
-docker exec oneshield_app php artisan config:cache
-```
-
-### 1.8 Kiểm tra deployment
-
-```bash
-# Kiểm tra containers đang chạy
-docker compose ps
-
-# Xem logs nếu có lỗi
-docker compose logs app --tail=50
-docker compose logs nginx --tail=20
-
-# Test endpoint
-curl -I https://admin.oneshieldx.com/
-```
-
-Truy cập `https://admin.oneshieldx.com` — login với tài khoản super admin vừa tạo.
-
----
-
-## Phần 2 — Đóng gói Plugin để upload
-
-Trước khi setup Shield Site và Money Site, cần đóng gói 2 plugin WordPress thành file `.zip`.
-
-```bash
-# Từ thư mục gốc project (máy local)
-cd plugins
-
-# Plugin cho Shield Site
+cd /var/www/oneshield/plugins
+apt install -y zip
 zip -r oneshield-connect.zip oneshield-connect/
-
-# Plugin cho Money Site (WooCommerce)
 zip -r oneshield-paygates.zip oneshield-paygates/
 ```
 
-Hoặc download trực tiếp từ Gateway Panel:  
-**Settings → Download Plugins** — sau khi upload `.zip` vào `gateway-panel/storage/plugins/`.
-
-### Upload plugin vào Gateway Panel storage
+### 8.3 Upload vao storage/plugins
 
 ```bash
-# Tạo thư mục storage/plugins nếu chưa có
+cd /var/www/oneshield/gateway-panel
 docker exec oneshield_app mkdir -p /var/www/storage/plugins
-
-# Copy từ ngoài vào container
-docker cp plugins/oneshield-connect.zip oneshield_app:/var/www/storage/plugins/
-docker cp plugins/oneshield-paygates.zip oneshield_app:/var/www/storage/plugins/
+docker cp ../plugins/oneshield-connect.zip oneshield_app:/var/www/storage/plugins/
+docker cp ../plugins/oneshield-paygates.zip oneshield_app:/var/www/storage/plugins/
+docker exec oneshield_app ls -lah /var/www/storage/plugins
 ```
 
 ---
 
-## Phần 3 — Setup Shield Site
+## 9) Verify sau deploy
 
-**Shield Site** là WordPress site xử lý thanh toán thực tế (PayPal/Stripe). Mỗi shield site cần cài plugin **OneShield Connect**.
+```bash
+curl -I https://admin.oneshieldx.com/
+docker compose ps
+docker compose logs app --tail=100
+docker compose logs nginx --tail=100
+```
 
-### 3.1 Yêu cầu Shield Site
+Kiem tra HTTPS generate URL trong app:
 
-- WordPress 6.0+
-- PHP 8.0+
-- SSL (HTTPS) bắt buộc — PayPal/Stripe không chấp nhận HTTP
-- WooCommerce **không** cần trên shield site
-- Tên miền riêng (không dùng subdirectory)
+```bash
+docker exec oneshield_app php artisan tinker --execute="dump(url('/admin'));"
+```
 
-### 3.2 Thêm Shield Site vào Gateway Panel
-
-1. Đăng nhập Gateway Panel → **Shield Sites**
-2. Click **Add Site**
-3. Điền **Site Name** (vd: `Shield Site 1`) và **Site URL** (vd: `https://shield1.yourdomain.com`)
-4. Click **Add Site** → site xuất hiện trong danh sách với **Site ID** và **Authorize Key**
-
-### 3.3 Cài plugin OneShield Connect trên Shield Site
-
-1. Vào WordPress Admin của shield site → **Plugins → Add New → Upload Plugin**
-2. Upload file `oneshield-connect.zip`
-3. **Activate** plugin
-4. Vào **Settings → OneShield Connect**
-
-Điền vào form:
-
-| Field | Giá trị |
-|-------|---------|
-| **Gateway Panel URL** | `https://admin.oneshieldx.com` |
-| **Token Secret** | Copy từ Gateway Panel → **Settings → Token Secret** |
-
-5. Click **Connect Now**
-6. Thành công sẽ hiện: `Connected successfully! Site ID: X`
-
-### 3.4 Cấu hình Payment Credentials trên Gateway Panel
-
-Sau khi connect, quay lại Gateway Panel → **Shield Sites** → click **Settings** trên site vừa thêm.
-
-#### Tab PayPal
-
-| Field | Giá trị |
-|-------|---------|
-| PayPal Client ID | Client ID từ PayPal Developer Dashboard |
-| PayPal Client Secret | Client Secret từ PayPal Developer Dashboard |
-| PayPal Mode | `live` (production) hoặc `sandbox` (test) |
-| Activation | `Yes` |
-| Income Limit | Tổng tiền tối đa nhận trong chu kỳ (0 = không giới hạn) |
-| Max Amount Per Order | Số tiền tối đa 1 đơn hàng (0 = không giới hạn) |
-
-#### Tab Stripe
-
-| Field | Giá trị |
-|-------|---------|
-| Stripe Public Key | `pk_live_...` từ Stripe Dashboard |
-| Stripe Secret Key | `sk_live_...` từ Stripe Dashboard |
-| Stripe Mode | `live` |
-| Activation | `Yes` |
-| Stripe Webhook Signing Secret | `whsec_...` (xem bước 3.5) |
-| Webhook URL | Copy URL hiển thị trong panel |
-
-#### Spin Settings (chung cho cả PayPal và Stripe)
-
-| Field | Giá trị |
-|-------|---------|
-| Receive Cycle | `monthly` — reset limit mỗi tháng |
-
-Click **Save Settings**.
-
-### 3.5 Đăng ký Webhook trên Stripe Dashboard
-
-1. Vào [dashboard.stripe.com](https://dashboard.stripe.com) → **Developers → Webhooks → Add endpoint**
-2. Endpoint URL: copy từ Gateway Panel Settings tab Stripe → **Webhook URL**  
-   Format: `https://admin.oneshieldx.com/api/webhook/stripe/{site_id}`  
-   Thay `{site_id}` bằng ID số của shield site (xem trong URL khi mở Settings)
-3. Events cần lắng nghe:
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `charge.refunded`
-4. Sau khi tạo, copy **Signing secret** (`whsec_...`) → paste vào trường **Stripe Webhook Signing Secret** trên Gateway Panel
-
-### 3.6 Đăng ký Webhook trên PayPal Dashboard
-
-1. Vào [developer.paypal.com](https://developer.paypal.com) → **Apps & Credentials → chọn app → Webhooks**
-2. Webhook URL: `https://admin.oneshieldx.com/api/webhook/paypal/{site_id}`
-3. Events cần chọn:
-   - `PAYMENT.CAPTURE.COMPLETED`
-   - `PAYMENT.CAPTURE.DENIED`
-   - `PAYMENT.ORDER.CANCELLED`
-
-### 3.7 Kiểm tra kết nối Shield Site
-
-Trên Gateway Panel → **Shield Sites** → click **Check** bên cạnh site.  
-Nếu heartbeat hiện màu xanh → site đang hoạt động bình thường.
+Ket qua phai la `https://admin.oneshieldx.com/admin`.
 
 ---
 
-## Phần 4 — Setup Money Site (WooCommerce)
-
-**Money Site** là WooCommerce store của bạn — nơi khách hàng mua hàng.
-
-### 4.1 Yêu cầu Money Site
-
-- WordPress 6.0+
-- WooCommerce 7.0+
-- PHP 8.0+
-
-### 4.2 Cài plugin OneShield Paygates
-
-1. WordPress Admin → **Plugins → Add New → Upload Plugin**
-2. Upload `oneshield-paygates.zip`
-3. **Activate** plugin
-
-### 4.3 Lấy Gateway Token
-
-Trên Gateway Panel → **Settings → Gateway Tokens**:
-- Nếu chưa có token, click **Create Token**, đặt tên (vd: `My WooCommerce Store`)
-- Copy token xuất hiện trong banner xanh (chỉ hiện một lần)
-
-### 4.4 Cấu hình Payment Gateway trong WooCommerce
-
-1. WordPress Admin → **WooCommerce → Settings → Payments**
-2. Bật **OneShield PayPal** và/hoặc **OneShield Stripe**
-3. Click **Manage** trên từng gateway, điền:
-
-| Field | Giá trị |
-|-------|---------|
-| **Gateway Panel URL** | `https://admin.oneshieldx.com` |
-| **Gateway Token** | Token vừa copy ở bước 4.3 |
-| **Group ID** *(tuỳ chọn)* | ID nhóm Shield Sites nếu dùng nhiều nhóm |
-
-4. Lưu settings
-
-### 4.5 Test luồng thanh toán
-
-1. Tạo đơn hàng test trên WooCommerce (dùng PayPal sandbox / Stripe test card)
-2. Chọn OneShield PayPal hoặc OneShield Stripe
-3. Iframe thanh toán xuất hiện → điền thông tin test
-4. Sau khi thanh toán → kiểm tra:
-   - WooCommerce order status = `Processing`
-   - Gateway Panel → **Transactions** → có bản ghi mới với status `completed`
-   - Shield site heartbeat vẫn xanh
-
-**Stripe test card:** `4242 4242 4242 4242` · Any future exp · Any CVC  
-**PayPal sandbox:** dùng tài khoản sandbox từ developer.paypal.com
-
----
-
-## Phần 5 — Vận hành & Bảo trì
-
-### Cập nhật code
+## 10) Runbook update cho lan sau (bind mount mode)
 
 ```bash
 cd /var/www/oneshield/gateway-panel
 git pull
 
-# Rebuild nếu có thay đổi PHP
-docker compose up -d --build app
+# Neu composer.lock thay doi
+docker compose run --rm app composer install --no-dev --optimize-autoloader
 
-# Rebuild frontend nếu có thay đổi Vue/CSS
+# Neu frontend thay doi
+npm ci
 npm run build
-docker compose restart nginx
 
-# Chạy migration mới nếu có
+docker compose up -d --build app nginx horizon
 docker exec oneshield_app php artisan migrate --force
-
-# Clear cache sau update
+docker exec oneshield_app php artisan optimize:clear
 docker exec oneshield_app php artisan config:cache
-docker exec oneshield_app php artisan route:cache
-docker exec oneshield_app php artisan view:cache
-```
-
-### Backup database
-
-```bash
-docker exec oneshield_db mysqldump \
-  -u oneshield -pSTRONG_DB_PASSWORD_HERE \
-  oneshield > backup_$(date +%Y%m%d).sql
-```
-
-### Xem logs
-
-```bash
-# App logs (Laravel)
-docker exec oneshield_app tail -f /var/www/storage/logs/laravel.log
-
-# Queue worker logs
-docker compose logs horizon --tail=100 -f
-
-# Nginx access logs
-docker compose logs nginx --tail=50
-```
-
-### Restart services
-
-```bash
-# Restart tất cả
-docker compose restart
-
-# Restart chỉ app
-docker compose restart app
-
-# Restart queue worker
-docker compose restart horizon
 ```
 
 ---
 
-## Tóm tắt luồng hoạt động
+## 11) Hardening khuyen nghi
 
-```
-Khách hàng checkout
-       ↓
-Money Site (WooCommerce + Paygates plugin)
-       ↓  POST /api/paygates/get-site  [token auth]
-Gateway Panel (Laravel)
-       ↓  chọn shield site phù hợp (spin limits, group, gateway)
-       ↓  trả về iframe_url
-Money Site
-       ↓  render iframe trỏ đến Shield Site
-Shield Site (WordPress + Connect plugin)
-       ↓  thanh toán PayPal / Stripe trực tiếp
-       ↓  postMessage kết quả về Money Site
-Money Site
-       ↓  POST /api/paygates/confirm  [token auth]
-Gateway Panel
-       ↓  ghi transaction = completed
-       ↓  webhook từ PayPal/Stripe xác nhận lại
-WooCommerce order = Processing ✓
-```
+- Dong port public cho DB/Redis (`3306`, `6379`) neu khong can.
+- Ban Cloudflare/WAF rule co ban cho bot scan.
+- Khong de `ONESHIELD_CORS_ORIGINS=*` tren production.
+- Rotate secrets dinh ky: DB password, token secret, API keys.
