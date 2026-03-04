@@ -35,7 +35,7 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
         echo '<p class="os-loading" style="text-align:center;color:#888;">' . esc_html__('Loading secure payment form...', 'oneshield-paygates') . '</p>';
     }
 
-    public function process_payment(int $order_id): array {
+    public function process_payment($order_id) {
         $order = wc_get_order($order_id);
 
         $result = $this->get_iframe_url($order);
