@@ -34,6 +34,20 @@ function osc_site_id(): string {
 }
 
 /**
+ * Site ID entered from Gateway Panel for first-time connect.
+ */
+function osc_register_site_id(): string {
+    return (string) osc_get_option('register_site_id', '');
+}
+
+/**
+ * Authorize key entered from Gateway Panel for first-time connect.
+ */
+function osc_authorize_key(): string {
+    return (string) osc_get_option('authorize_key', '');
+}
+
+/**
  * Get this site's token secret (received from Gateway Panel).
  */
 function osc_site_key(): string {

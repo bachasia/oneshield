@@ -34,7 +34,13 @@ class ConnectApiTest extends TestCase
     public function register_creates_a_new_shield_site(): void
     {
         $user    = $this->createUser();
+        $site    = $this->createShieldSite($user, [
+            'name' => 'Precreated Site',
+            'url'  => 'https://placeholder.example.com',
+        ]);
         $payload = [
+            'site_id'       => $site->id,
+            'authorize_key' => $site->site_key,
             'site_url'  => 'https://new-shield-site.example.com',
             'site_name' => 'My Shield Site',
         ];
@@ -42,11 +48,12 @@ class ConnectApiTest extends TestCase
 
         $response = $this->postJson('/api/connect/register', $payload, $headers);
 
-        $response->assertStatus(201)
-                 ->assertJsonFragment(['status' => 'registered'])
+        $response->assertStatus(200)
+                 ->assertJsonFragment(['status' => 'connected'])
                  ->assertJsonStructure(['site_id', 'site_key', 'status']);
 
         $this->assertDatabaseHas('shield_sites', [
+            'id'      => $site->id,
             'user_id' => $user->id,
             'name'    => 'My Shield Site',
             'url'     => 'https://new-shield-site.example.com',
@@ -57,35 +64,61 @@ class ConnectApiTest extends TestCase
     public function register_strips_trailing_slash_from_url(): void
     {
         $user    = $this->createUser();
+        $site    = $this->createShieldSite($user, [
+            'url' => 'https://placeholder.example.com',
+        ]);
         $payload = [
+            'site_id'       => $site->id,
+            'authorize_key' => $site->site_key,
             'site_url'  => 'https://new-shield-site.example.com/',
             'site_name' => 'My Site',
         ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
 
-        $this->postJson('/api/connect/register', $payload, $headers)->assertStatus(201);
+        $this->postJson('/api/connect/register', $payload, $headers)->assertStatus(200);
 
         $this->assertDatabaseHas('shield_sites', [
+            'id'  => $site->id,
             'url' => 'https://new-shield-site.example.com',
         ]);
     }
 
     /** @test */
-    public function register_returns_already_registered_for_duplicate_url(): void
+    public function register_rejects_invalid_authorize_key(): void
     {
         $user = $this->createUser();
-        $this->createShieldSite($user, ['url' => 'https://existing.example.com']);
+        $site = $this->createShieldSite($user);
 
         $payload = [
-            'site_url'  => 'https://existing.example.com',
-            'site_name' => 'Duplicate',
+            'site_id'       => $site->id,
+            'authorize_key' => str_repeat('a', 64),
+            'site_url'      => 'https://existing.example.com',
+            'site_name'     => 'Duplicate',
         ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
 
         $response = $this->postJson('/api/connect/register', $payload, $headers);
 
-        $response->assertStatus(200)
-                 ->assertJsonFragment(['status' => 'already_registered']);
+        $response->assertStatus(403)
+                 ->assertJsonFragment(['error' => 'Invalid authorize key']);
+    }
+
+    /** @test */
+    public function register_rejects_site_not_belonging_to_authenticated_user(): void
+    {
+        $userA = $this->createUser();
+        $userB = $this->createUser();
+        $siteB = $this->createShieldSite($userB);
+
+        $payload = [
+            'site_id'       => $siteB->id,
+            'authorize_key' => $siteB->site_key,
+            'site_url'      => 'https://new-shield-site.example.com',
+            'site_name'     => 'My Shield Site',
+        ];
+        $headers = $this->hmacHeaders($payload, $userA->token_secret);
+
+        $this->postJson('/api/connect/register', $payload, $headers)->assertStatus(404);
     }
 
     /** @test */
@@ -98,14 +131,20 @@ class ConnectApiTest extends TestCase
         $response = $this->postJson('/api/connect/register', $payload, $headers);
 
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['site_url', 'site_name']);
+                 ->assertJsonValidationErrors(['site_id', 'authorize_key', 'site_url', 'site_name']);
     }
 
     /** @test */
     public function register_rejects_invalid_url(): void
     {
         $user    = $this->createUser();
-        $payload = ['site_url' => 'not-a-url', 'site_name' => 'Bad'];
+        $site    = $this->createShieldSite($user);
+        $payload = [
+            'site_id'       => $site->id,
+            'authorize_key' => $site->site_key,
+            'site_url'      => 'not-a-url',
+            'site_name'     => 'Bad',
+        ];
         $headers = $this->hmacHeaders($payload, $user->token_secret);
 
         $this->postJson('/api/connect/register', $payload, $headers)

@@ -4,15 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ShieldSite;
-use App\Services\HmacService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class ConnectController extends Controller
 {
-    public function __construct(private HmacService $hmacService) {}
-
     /**
      * Register a new shield site.
      * POST /api/connect/register
@@ -24,37 +20,32 @@ class ConnectController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'site_url'  => 'required|url|max:500',
-            'site_name' => 'required|string|max:255',
+            'site_id'       => 'required|integer',
+            'authorize_key' => 'required|string|size:64',
+            'site_url'      => 'required|url|max:500',
+            'site_name'     => 'required|string|max:255',
         ]);
 
-        // Check if this site URL is already registered for this user
-        $existing = ShieldSite::where('user_id', $user->id)
-            ->where('url', $validated['site_url'])
-            ->first();
+        $site = ShieldSite::where('id', $validated['site_id'])
+            ->where('user_id', $user->id)
+            ->firstOrFail();
 
-        if ($existing) {
-            return response()->json([
-                'site_id'  => $existing->id,
-                'site_key' => $existing->site_key,
-                'status'   => 'already_registered',
-            ]);
+        if (!hash_equals($site->site_key, $validated['authorize_key'])) {
+            return response()->json(['error' => 'Invalid authorize key'], 403);
         }
 
-        $site = ShieldSite::create([
-            'user_id'  => $user->id,
-            'name'     => $validated['site_name'],
-            'url'      => rtrim($validated['site_url'], '/'),
-            'site_key' => $this->hmacService->generateToken(64),
-            'is_active' => true,
+        $site->update([
+            'name'              => $validated['site_name'],
+            'url'               => rtrim($validated['site_url'], '/'),
+            'is_active'         => true,
             'last_heartbeat_at' => now(),
         ]);
 
         return response()->json([
             'site_id'  => $site->id,
             'site_key' => $site->site_key,
-            'status'   => 'registered',
-        ], 201);
+            'status'   => 'connected',
+        ]);
     }
 
     /**

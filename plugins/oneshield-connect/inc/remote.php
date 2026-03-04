@@ -20,9 +20,21 @@ function osc_register_site(): array|\WP_Error {
         return new \WP_Error('no_token', 'Token Secret not set. Please enter the Token Secret from your Gateway Panel.');
     }
 
+    $register_site_id = (int) osc_register_site_id();
+    if ($register_site_id <= 0) {
+        return new \WP_Error('no_site_id', 'Site ID not set. Please enter the Site ID from Gateway Panel.');
+    }
+
+    $authorize_key = osc_authorize_key();
+    if (empty($authorize_key)) {
+        return new \WP_Error('no_authorize_key', 'Authorize Key not set. Please enter the Authorize Key from Gateway Panel.');
+    }
+
     $payload = [
-        'site_url'  => get_site_url(),
-        'site_name' => get_bloginfo('name'),
+        'site_id'       => $register_site_id,
+        'authorize_key' => $authorize_key,
+        'site_url'      => get_site_url(),
+        'site_name'     => get_bloginfo('name'),
     ];
 
     $timestamp = time();

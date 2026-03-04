@@ -24,6 +24,12 @@ function osc_register_settings(): void {
     register_setting('oneshield_connect', 'oneshield_connect_token_secret', [
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_setting('oneshield_connect', 'oneshield_connect_register_site_id', [
+        'sanitize_callback' => 'absint',
+    ]);
+    register_setting('oneshield_connect', 'oneshield_connect_authorize_key', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
 }
 
 function osc_settings_page(): void {
@@ -34,11 +40,15 @@ function osc_settings_page(): void {
 
     // Handle "Connect Now" action
     if (isset($_POST['osc_connect']) && check_admin_referer('osc_connect_action')) {
-        $new_url    = esc_url_raw($_POST['gateway_url'] ?? '');
-        $new_secret = sanitize_text_field($_POST['token_secret'] ?? '');
-        if ($new_url && $new_secret) {
+        $new_url        = esc_url_raw($_POST['gateway_url'] ?? '');
+        $new_secret     = sanitize_text_field($_POST['token_secret'] ?? '');
+        $new_site_id    = absint($_POST['register_site_id'] ?? 0);
+        $new_auth_key   = sanitize_text_field($_POST['authorize_key'] ?? '');
+        if ($new_url && $new_secret && $new_site_id > 0 && $new_auth_key) {
             osc_update_option('gateway_url', $new_url);
             osc_update_option('token_secret', $new_secret);
+            osc_update_option('register_site_id', $new_site_id);
+            osc_update_option('authorize_key', $new_auth_key);
             $result = osc_register_site();
             if (is_wp_error($result)) {
                 $notice = '<div class="notice notice-error"><p>' . esc_html($result->get_error_message()) . '</p></div>';
@@ -52,6 +62,10 @@ function osc_settings_page(): void {
             $notice = '<div class="notice notice-error"><p>Please enter the Gateway Panel URL.</p></div>';
         } elseif (empty($new_secret)) {
             $notice = '<div class="notice notice-error"><p>Please enter the Token Secret from your Gateway Panel Settings page.</p></div>';
+        } elseif ($new_site_id <= 0) {
+            $notice = '<div class="notice notice-error"><p>Please enter the Shield Site ID from your Gateway Panel.</p></div>';
+        } elseif (empty($new_auth_key)) {
+            $notice = '<div class="notice notice-error"><p>Please enter the Authorize Key from your Gateway Panel.</p></div>';
         }
     }
 
@@ -59,6 +73,8 @@ function osc_settings_page(): void {
     if (isset($_POST['osc_disconnect']) && check_admin_referer('osc_disconnect_action')) {
         osc_update_option('site_id', '');
         osc_update_option('site_key', '');
+        osc_update_option('register_site_id', '');
+        osc_update_option('authorize_key', '');
         $is_connected = false;
         $notice = '<div class="notice notice-success"><p>Disconnected from Gateway Panel.</p></div>';
     }
@@ -100,6 +116,36 @@ function osc_settings_page(): void {
                                     class="regular-text"
                                 />
                                 <p class="description">Enter the URL of your OneShield Gateway Panel.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="register_site_id">Site ID</label></th>
+                            <td>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    id="register_site_id"
+                                    name="register_site_id"
+                                    value="<?php echo esc_attr((string) osc_register_site_id()); ?>"
+                                    placeholder="e.g. 12"
+                                    class="regular-text"
+                                />
+                                <p class="description">Found in Gateway Panel - Shield Sites - your site row.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="authorize_key">Authorize Key</label></th>
+                            <td>
+                                <input
+                                    type="password"
+                                    id="authorize_key"
+                                    name="authorize_key"
+                                    value=""
+                                    placeholder="Paste Authorize Key"
+                                    class="regular-text"
+                                    autocomplete="new-password"
+                                />
+                                <p class="description">Found in Gateway Panel - Shield Sites - Settings - Authorize Key.</p>
                             </td>
                         </tr>
                         <tr>
