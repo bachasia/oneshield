@@ -183,6 +183,16 @@ else
   warn "URL generation may be wrong: $GENERATED_URL"
 fi
 
+# ── Step 7: Package plugin ZIPs ───────────────────────────────────────────────
+section "Step 7: Package plugins"
+
+if [ -x "$REPO_DIR/package-plugins.sh" ]; then
+  "$REPO_DIR/package-plugins.sh"
+  ok "Plugin ZIPs packaged and published to storage"
+else
+  warn "package-plugins.sh not found or not executable; skipping plugin packaging"
+fi
+
 echo ""
 echo -e "${GREEN}${BOLD}Deploy complete.${NC} Commit: $(git -C "$REPO_DIR" rev-parse --short HEAD)"
 echo ""
