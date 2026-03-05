@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\GatewayToken;
+use App\Models\ShieldSite;
 use App\Models\User;
 use App\Services\HmacService;
 use Closure;
@@ -26,22 +27,37 @@ class HmacAuthentication
             ], 401);
         }
 
-        // Resolve the token → find associated user
-        $gatewayToken = GatewayToken::where('token', $tokenValue)
-            ->active()
-            ->first();
+        $user        = null;
+        $tokenSecret = null;
 
-        if (!$gatewayToken) {
-            // Also check user.token_secret (primary token)
-            $user = User::where('token_secret', $tokenValue)->first();
-            if (!$user) {
-                return response()->json(['error' => 'Invalid token'], 401);
-            }
-            $tokenSecret = $tokenValue; // token_secret is the key itself
-        } else {
-            $user = $gatewayToken->user;
+        // 1. Check named gateway tokens (GatewayToken table)
+        $gatewayToken = GatewayToken::where('token', $tokenValue)->active()->first();
+        if ($gatewayToken) {
+            $user        = $gatewayToken->user;
             $tokenSecret = $gatewayToken->token;
             $gatewayToken->update(['last_used_at' => now()]);
+        }
+
+        // 2. Check user.token_secret (primary token used by oneshield-paygates plugin)
+        if (!$user) {
+            $foundUser = User::where('token_secret', $tokenValue)->first();
+            if ($foundUser) {
+                $user        = $foundUser;
+                $tokenSecret = $tokenValue;
+            }
+        }
+
+        // 3. Check shield site site_key (used by oneshield-connect plugin heartbeat)
+        if (!$user) {
+            $site = ShieldSite::where('site_key', $tokenValue)->first();
+            if ($site) {
+                $user        = $site->user;
+                $tokenSecret = $tokenValue;
+            }
+        }
+
+        if (!$user) {
+            return response()->json(['error' => 'Invalid token'], 401);
         }
 
         $payload = $request->all();
