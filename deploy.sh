@@ -2,9 +2,10 @@
 # =============================================================================
 # OneShield — Production Deploy / Update Script
 # Usage:
-#   ./deploy.sh            # normal update (auto-detect what changed)
-#   ./deploy.sh --full     # force full rebuild (composer + npm + docker build)
-#   ./deploy.sh --skip-npm # skip frontend build (PHP-only changes)
+#   ./deploy.sh                  # normal update (pull + auto-detect what changed)
+#   ./deploy.sh --already-pulled # skip git pull (đã pull thủ công rồi)
+#   ./deploy.sh --full           # force full rebuild (composer + npm + docker build)
+#   ./deploy.sh --skip-npm       # skip frontend build (PHP-only changes)
 # =============================================================================
 
 set -euo pipefail
@@ -29,10 +30,12 @@ section() { echo -e "\n${BOLD}── $* ─────────────�
 
 FORCE_FULL=false
 SKIP_NPM=false
+ALREADY_PULLED=false
 for arg in "$@"; do
   case $arg in
-    --full)     FORCE_FULL=true ;;
-    --skip-npm) SKIP_NPM=true ;;
+    --full)           FORCE_FULL=true ;;
+    --skip-npm)       SKIP_NPM=true ;;
+    --already-pulled) ALREADY_PULLED=true ;;
   esac
 done
 
@@ -45,19 +48,32 @@ fi
 section "Step 1: Pull code"
 cd "$REPO_DIR"
 
-BEFORE=$(git rev-parse HEAD)
-git pull origin main
-AFTER=$(git rev-parse HEAD)
+if [ "$ALREADY_PULLED" = true ]; then
+  # Đã pull rồi — so sánh HEAD với commit trước đó (HEAD~1)
+  AFTER=$(git rev-parse HEAD)
+  BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+  warn "Skipping git pull (--already-pulled). Detecting changes vs previous commit..."
+  if [ -n "$BEFORE" ]; then
+    ok "Comparing: $(git rev-parse --short $BEFORE) → $(git rev-parse --short $AFTER)"
+  fi
+else
+  BEFORE=$(git rev-parse HEAD)
+  git pull origin main
+  AFTER=$(git rev-parse HEAD)
 
-if [ "$BEFORE" = "$AFTER" ] && [ "$FORCE_FULL" = false ]; then
-  warn "No new commits. Use --full to force a full redeploy."
-  exit 0
+  if [ "$BEFORE" = "$AFTER" ] && [ "$FORCE_FULL" = false ]; then
+    warn "No new commits. Use --full to force a full redeploy."
+    exit 0
+  fi
+  ok "Updated: $(git rev-parse --short $BEFORE) → $(git rev-parse --short $AFTER)"
 fi
 
-ok "Updated: $BEFORE → $AFTER"
-
 # ── Detect what changed ───────────────────────────────────────────────────────
-CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo "")
+if [ -n "${BEFORE:-}" ]; then
+  CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null || echo "")
+else
+  CHANGED=""
+fi
 
 needs_composer=false
 needs_npm=false
