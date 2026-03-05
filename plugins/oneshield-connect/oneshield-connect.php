@@ -20,8 +20,16 @@ require_once OSC_PLUGIN_DIR . 'inc/base.php';
 require_once OSC_PLUGIN_DIR . 'inc/settings.php';
 require_once OSC_PLUGIN_DIR . 'inc/remote.php';
 require_once OSC_PLUGIN_DIR . 'inc/heartbeat.php';
-require_once OSC_PLUGIN_DIR . 'inc/order.php';
 require_once OSC_PLUGIN_DIR . 'inc/ping.php';
+
+// Load checkout handlers unconditionally so AJAX actions are always registered.
+// (Previously only loaded on ?fe-checkout requests — causing AJAX to 404.)
+require_once OSC_PLUGIN_DIR . 'checkout/stripe.php';
+require_once OSC_PLUGIN_DIR . 'checkout/paypal.php';
+require_once OSC_PLUGIN_DIR . 'inc/order.php';
+
+// WooCommerce payment gateway integration
+require_once OSC_PLUGIN_DIR . 'inc/gateway.php';
 
 // Activation
 register_activation_hook(__FILE__, 'osc_activate');
@@ -66,13 +74,12 @@ function osc_handle_checkout_request() {
     }
 
     // Render the appropriate checkout iframe
+    // (checkout files already loaded globally at plugin init)
     switch ($gateway) {
         case 'stripe':
-            require_once OSC_PLUGIN_DIR . 'checkout/stripe.php';
             osc_render_stripe_checkout($order_id, $token);
             break;
         case 'paypal':
-            require_once OSC_PLUGIN_DIR . 'checkout/paypal.php';
             osc_render_paypal_checkout($order_id, $token);
             break;
         default:
