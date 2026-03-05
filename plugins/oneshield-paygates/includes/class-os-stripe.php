@@ -30,42 +30,70 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
         return __('Credit / Debit Card', 'oneshield-paygates');
     }
 
+    /**
+     * Render the payment iframe directly inside the checkout payment section.
+     * Called by WooCommerce when this gateway is selected on checkout.
+     *
+     * We call the Gateway Panel here (PHP-side, synchronous) to get the iframe URL,
+     * so the iframe is ready before the customer clicks Place Order.
+     */
     public function payment_fields(): void {
-        if ($desc = $this->get_option('description')) {
-            echo '<p>' . wp_kses_post($desc) . '</p>';
-        }
-        echo '<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">'
-           . esc_html__('You will be prompted to enter your card details securely after placing the order.', 'oneshield-paygates')
-           . '</p>';
+        $this->render_iframe_field('stripe');
     }
 
-    public function process_payment($order_id) {
-        $order = wc_get_order($order_id);
+    /**
+     * Validate that the payment has been completed inside the iframe
+     * before WooCommerce processes the order.
+     */
+    public function validate_fields(): bool {
+        $txn_id = sanitize_text_field($_POST['osp_stripe_transaction_id'] ?? '');
 
-        $result = $this->get_iframe_url($order);
-        if (!$result) {
-            wc_add_notice(__('Payment service temporarily unavailable. Please try again.', 'oneshield-paygates'), 'error');
+        if (empty($txn_id)) {
+            wc_add_notice(__('Please complete the card payment in the form above before placing the order.', 'oneshield-paygates'), 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * process_payment() — called after validate_fields() passes.
+     * The iframe has already collected payment; we just need to:
+     *  1. Create the WC order
+     *  2. Confirm the transaction with the Gateway Panel
+     *  3. Mark the order complete and redirect to thank-you
+     */
+    public function process_payment($order_id) {
+        $order      = wc_get_order($order_id);
+        $txn_id     = sanitize_text_field($_POST['osp_stripe_transaction_id']  ?? '');
+        $os_txn_id  = sanitize_text_field($_POST['osp_stripe_os_transaction_id'] ?? '');
+        $os_site_id = (int) ($_POST['osp_stripe_os_site_id'] ?? 0);
+
+        if (empty($txn_id)) {
+            wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
             return ['result' => 'failure'];
         }
 
-        // Store OS transaction data on the order
-        $order->update_meta_data('_os_transaction_id', $result['transaction_id']);
-        $order->update_meta_data('_os_site_id', $result['site_id']);
-        $order->update_meta_data('_os_iframe_url', $result['iframe_url']);
-        $order->set_status('pending', 'Awaiting payment via OneShield.');
-        $order->save();
+        // Confirm with Gateway Panel
+        if ($os_site_id && $os_txn_id) {
+            $confirmed = $this->confirm_with_panel($os_site_id, $order->get_id(), $txn_id);
+            if (!$confirmed) {
+                $this->log('confirm_with_panel failed for txn ' . $txn_id);
+                // Non-fatal — payment already happened; still complete the order
+            }
+        }
 
-        // WC requires a 'redirect' key in the response.
-        // We pass a special URL that JS detects and swaps for the iframe modal.
+        $order->payment_complete($txn_id);
+        $order->add_order_note(sprintf(
+            'OneShield: Stripe payment completed. Transaction ID: %s',
+            $txn_id
+        ));
+
+        WC()->cart->empty_cart();
+
         return [
-            'result'            => 'success',
-            'redirect'          => '#osp-iframe',   // JS intercepts this, no real redirect
-            'iframe_url'        => $result['iframe_url'],
-            'os_transaction_id' => $result['transaction_id'],
-            'wc_order_id'       => $order->get_id(),
-            'gateway'           => $this->gateway_name,
-            'messages'          => '',
-            'nonce'             => wp_create_nonce('osp_confirm_nonce'),
+            'result'   => 'success',
+            'redirect' => $order->get_checkout_order_received_url(),
         ];
     }
 }

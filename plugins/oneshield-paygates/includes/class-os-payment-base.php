@@ -147,6 +147,108 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
 
     abstract protected function get_default_title(): string;
 
+    /**
+     * Render the checkout iframe directly inside the WC payment section.
+     *
+     * Called from payment_fields() — runs PHP-side (synchronous) when the
+     * checkout page loads. Calls the Gateway Panel immediately to get the
+     * iframe URL (shield site selected by rotation/config), then renders
+     * the iframe + hidden inputs that process_payment() will read later.
+     *
+     * @param string $gateway 'stripe' or 'paypal'
+     */
+    protected function render_iframe_field(string $gateway): void {
+        // Description text
+        if ($desc = $this->get_option('description')) {
+            echo '<p style="margin-bottom:8px;">' . wp_kses_post($desc) . '</p>';
+        }
+
+        if (empty($this->gateway_url) || empty($this->token_secret)) {
+            echo '<p style="color:#dc2626;font-size:13px;">'
+               . esc_html__('Payment gateway is not configured. Please contact the store owner.', 'oneshield-paygates')
+               . '</p>';
+            return;
+        }
+
+        // Use a temporary order_id placeholder — WC hasn't created the order yet.
+        // The actual WC order ID is set after process_payment(); the gateway panel
+        // uses its own internal transaction_id to track the payment session.
+        $temp_order_id = 'checkout-' . uniqid();
+
+        $payload = [
+            'gateway'  => $gateway,
+            'order_id' => $temp_order_id,
+            'amount'   => (float) WC()->cart->get_total('raw'),
+            'currency' => get_woocommerce_currency(),
+            'group_id' => $this->group_id ?: null,
+        ];
+
+        $result = $this->get_iframe_url_from_payload($payload);
+
+        if (!$result || empty($result['iframe_url'])) {
+            echo '<p style="color:#dc2626;font-size:13px;">'
+               . esc_html__('Payment service temporarily unavailable. Please refresh the page or try again shortly.', 'oneshield-paygates')
+               . '</p>';
+            return;
+        }
+
+        $iframe_url  = esc_url($result['iframe_url']);
+        $os_txn_id   = esc_attr((string) ($result['transaction_id'] ?? ''));
+        $os_site_id  = esc_attr((string) ($result['site_id'] ?? ''));
+        $field_prefix = 'osp_' . $gateway;
+        $iframe_height = $gateway === 'paypal' ? '300' : '440';
+        ?>
+        <div class="osp-iframe-wrap" style="position:relative;margin-top:8px;">
+
+            <iframe
+                id="osp-iframe-<?php echo esc_attr($gateway); ?>"
+                src="<?php echo $iframe_url; ?>"
+                style="width:100%;height:<?php echo $iframe_height; ?>px;border:1px solid #e5e7eb;border-radius:8px;display:block;"
+                scrolling="no"
+                allow="payment"
+            ></iframe>
+
+            <div id="osp-iframe-loading-<?php echo esc_attr($gateway); ?>"
+                 style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f9fafb;border-radius:8px;font-size:13px;color:#6b7280;">
+                <?php esc_html_e('Loading payment form…', 'oneshield-paygates'); ?>
+            </div>
+
+        </div>
+
+        <!-- Hidden inputs written by JS after postMessage from iframe -->
+        <input type="hidden" name="<?php echo $field_prefix; ?>_transaction_id"    id="<?php echo $field_prefix; ?>_transaction_id"    value="" />
+        <input type="hidden" name="<?php echo $field_prefix; ?>_os_transaction_id" id="<?php echo $field_prefix; ?>_os_transaction_id" value="<?php echo $os_txn_id; ?>" />
+        <input type="hidden" name="<?php echo $field_prefix; ?>_os_site_id"        id="<?php echo $field_prefix; ?>_os_site_id"        value="<?php echo $os_site_id; ?>" />
+        <?php
+    }
+
+    /**
+     * Call Gateway Panel to get an iframe URL for a given payload.
+     * Extracted so it can be reused without a WC_Order instance.
+     */
+    protected function get_iframe_url_from_payload(array $payload): ?array {
+        $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/get-site', [
+            'timeout' => 15,
+            'headers' => $this->sign_request($payload),
+            'body'    => json_encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->log('get-site (fields) error: ' . $response->get_error_message());
+            return null;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code >= 400) {
+            $this->log('get-site (fields) HTTP ' . $code . ': ' . ($body['error'] ?? 'unknown'));
+            return null;
+        }
+
+        return $body;
+    }
+
     protected function load_settings(): void {
         $this->gateway_url  = $this->get_option('gateway_url', '');
         $this->token_secret = $this->get_option('token_secret', '');

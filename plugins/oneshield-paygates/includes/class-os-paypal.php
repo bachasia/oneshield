@@ -31,38 +31,49 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     }
 
     public function payment_fields(): void {
-        if ($desc = $this->get_option('description')) {
-            echo '<p>' . wp_kses_post($desc) . '</p>';
+        $this->render_iframe_field('paypal');
+    }
+
+    public function validate_fields(): bool {
+        $txn_id = sanitize_text_field($_POST['osp_paypal_transaction_id'] ?? '');
+
+        if (empty($txn_id)) {
+            wc_add_notice(__('Please complete the PayPal payment in the form above before placing the order.', 'oneshield-paygates'), 'error');
+            return false;
         }
-        echo '<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">'
-           . esc_html__('You will be redirected to PayPal to complete your payment securely after placing the order.', 'oneshield-paygates')
-           . '</p>';
+
+        return true;
     }
 
     public function process_payment($order_id) {
-        $order = wc_get_order($order_id);
+        $order      = wc_get_order($order_id);
+        $txn_id     = sanitize_text_field($_POST['osp_paypal_transaction_id']     ?? '');
+        $os_txn_id  = sanitize_text_field($_POST['osp_paypal_os_transaction_id']  ?? '');
+        $os_site_id = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
 
-        $result = $this->get_iframe_url($order);
-        if (!$result) {
-            wc_add_notice(__('PayPal service temporarily unavailable. Please try again.', 'oneshield-paygates'), 'error');
+        if (empty($txn_id)) {
+            wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
             return ['result' => 'failure'];
         }
 
-        $order->update_meta_data('_os_transaction_id', $result['transaction_id']);
-        $order->update_meta_data('_os_site_id', $result['site_id']);
-        $order->update_meta_data('_os_iframe_url', $result['iframe_url']);
-        $order->set_status('pending', 'Awaiting payment via OneShield.');
-        $order->save();
+        if ($os_site_id && $os_txn_id) {
+            $confirmed = $this->confirm_with_panel($os_site_id, $order->get_id(), $txn_id);
+            if (!$confirmed) {
+                $this->log('confirm_with_panel failed for txn ' . $txn_id);
+            }
+        }
+
+        $order->payment_complete($txn_id);
+        $order->add_order_note(sprintf(
+            'OneShield: PayPal payment completed. Transaction ID: %s',
+            $txn_id
+        ));
+
+        WC()->cart->empty_cart();
 
         return [
-            'result'            => 'success',
-            'redirect'          => '#osp-iframe',
-            'iframe_url'        => $result['iframe_url'],
-            'os_transaction_id' => $result['transaction_id'],
-            'wc_order_id'       => $order->get_id(),
-            'gateway'           => $this->gateway_name,
-            'messages'          => '',
-            'nonce'             => wp_create_nonce('osp_confirm_nonce'),
+            'result'   => 'success',
+            'redirect' => $order->get_checkout_order_received_url(),
         ];
     }
 }
