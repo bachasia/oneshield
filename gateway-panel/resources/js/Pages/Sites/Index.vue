@@ -91,8 +91,9 @@
     <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <table class="w-full text-sm">
         <thead>
-          <tr class="bg-gray-50 border-b border-gray-200 text-left">
+            <tr class="bg-gray-50 border-b border-gray-200 text-left">
             <th class="px-3 py-3.5 w-8"></th>
+            <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">ID</th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Site Name</th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">URL</th>
             <th class="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-40">Gross Received</th>
@@ -130,23 +131,29 @@
               </svg>
             </td>
 
+            <!-- Site ID -->
+            <td class="px-5 py-4">
+              <span class="inline-block bg-gray-100 text-gray-500 text-xs font-mono font-semibold px-2 py-1 rounded-lg">#{{ site.id }}</span>
+            </td>
+
             <!-- Site Name -->
             <td class="px-5 py-4">
               <div class="font-semibold text-gray-900 leading-5">{{ site.name }}</div>
             </td>
 
-            <!-- URL + heartbeat status -->
+            <!-- URL + plugin connection status -->
             <td class="px-5 py-4">
               <a :href="site.url" target="_blank" class="text-gray-700 hover:text-indigo-600 text-sm font-medium break-all">{{ site.url }}</a>
               <div class="mt-2">
                 <span
-                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                  :class="heartbeatClass(site)"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+                  :class="pluginStatusBadge(site)"
+                  :title="pluginStatusTitle(site)"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                  <svg class="w-3 h-3 flex-shrink-0" :class="pluginStatusColor(site)" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
                   </svg>
-                  {{ heartbeatLabel(site) }}
+                  {{ pluginStatusLabel(site) }}
                 </span>
               </div>
             </td>
@@ -240,11 +247,29 @@
                  >Delete</button>
                 <button
                   @click="checkSite(site)"
-                   class="border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors flex items-center gap-1.5"
+                  :disabled="checkResults[site.id]?.loading"
+                   class="border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors flex items-center gap-1.5 disabled:opacity-60"
                  >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                  Check
+                  <!-- Spinner while loading -->
+                  <svg v-if="checkResults[site.id]?.loading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  </svg>
+                  <svg v-else class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                  {{ checkResults[site.id]?.loading ? 'Checking…' : 'Check' }}
                 </button>
+
+                <!-- Inline result badge, shown after check -->
+                <span
+                  v-if="checkResults[site.id] && !checkResults[site.id].loading"
+                  class="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1"
+                  :class="checkResults[site.id].ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'"
+                  :title="checkResults[site.id].message"
+                >
+                  <svg v-if="checkResults[site.id].ok" class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                  <svg v-else class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                  {{ checkResults[site.id].ok ? 'OK' : checkResults[site.id].status === 'not_connected' ? 'Not set up' : checkResults[site.id].status === 'key_mismatch' ? 'Wrong key' : 'Offline' }}
+                </span>
                 <!-- Drag-to-reorder: reserved for Phase 2 (sortable not yet implemented) -->
               </div>
             </td>
@@ -337,7 +362,10 @@
             <div>
               <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.18em]">Shield Site Settings</p>
               <h2 class="text-lg font-semibold text-gray-900 mt-1">{{ settingsForm.name || settingsSite.name }}</h2>
-              <p class="text-xs text-gray-500 mt-1 break-all">{{ settingsSite.url }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <p class="text-xs text-gray-500 break-all">{{ settingsSite.url }}</p>
+                <span class="inline-block bg-gray-100 text-gray-500 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md flex-shrink-0">ID: {{ settingsSite.id }}</span>
+              </div>
             </div>
             <div class="flex items-center gap-3">
               <button @click="closeSettings" class="w-9 h-9 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors">
@@ -395,11 +423,31 @@
                 </div>
 
                 <div class="space-y-3">
-                  <input
-                    :value="settingsSite.site_key"
-                    readonly
-                    class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600 font-mono"
-                  />
+                  <!-- Site Key -->
+                  <div>
+                    <p class="text-xs font-medium text-gray-500 mb-1">Site Key</p>
+                    <div class="flex gap-2">
+                      <input
+                        :value="settingsSite.site_key"
+                        readonly
+                        class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600 font-mono"
+                      />
+                      <button @click="copyToClipboard(settingsSite.site_key)" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors">Copy</button>
+                    </div>
+                  </div>
+                  <!-- Gateway Connect URL -->
+                  <div>
+                    <p class="text-xs font-medium text-gray-500 mb-1">Gateway URL</p>
+                    <div class="flex gap-2">
+                      <input
+                        :value="connectUrl()"
+                        readonly
+                        class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600 font-mono"
+                      />
+                      <button @click="copyToClipboard(connectUrl())" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors">Copy</button>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">Enter this URL in the OneShield Connect plugin settings on your WordPress site.</p>
+                  </div>
                   <div class="flex items-center justify-between gap-3 rounded-xl bg-gray-50 border border-gray-200 px-3 py-2.5">
                     <div>
                       <p class="text-xs font-medium text-gray-700">Current heartbeat</p>
@@ -688,26 +736,37 @@ function saveSettings() {
 }
 
 // ── Check / Check all ────────────────────────────────────────────────────
-const checkingAll = ref(false);
+const checkingAll  = ref(false);
+// Per-site check state: { [siteId]: { loading, ok, status, message } }
+const checkResults = reactive({});
 
-function checkSite(site) {
-  router.post(`/sites/${site.id}/check`, {}, { preserveState: true });
-}
+async function checkSite(site) {
+  checkResults[site.id] = { loading: true, ok: null, status: null, message: null };
 
-function checkAll() {
-  checkingAll.value = true;
-  const promises = props.sites.data.map(site =>
-    fetch(`/sites/${site.id}/check`, {
+  try {
+    const res = await fetch(`/sites/${site.id}/check`, {
       method: 'POST',
       headers: {
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        'Accept': 'application/json',
       },
-    })
-  );
-  Promise.all(promises).finally(() => {
-    checkingAll.value = false;
-    router.reload({ only: ['sites'] });
-  });
+    });
+    const data = await res.json();
+    checkResults[site.id] = { loading: false, ok: data.ok, status: data.status, message: data.message };
+
+    // If connected, reload to refresh heartbeat badge
+    if (data.ok) {
+      router.reload({ only: ['sites'] });
+    }
+  } catch {
+    checkResults[site.id] = { loading: false, ok: false, status: 'error', message: 'Request failed. Check your network.' };
+  }
+}
+
+async function checkAll() {
+  checkingAll.value = true;
+  await Promise.all(props.sites.data.map(site => checkSite(site)));
+  checkingAll.value = false;
 }
 
 function viewReports(site) {
@@ -792,6 +851,43 @@ function onDragEnd() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+// ── Plugin connection status ──────────────────────────────────────────────
+function pluginConnectState(site) {
+  if (!site.last_heartbeat_at) return 'never';
+  const diffMin = (Date.now() - new Date(site.last_heartbeat_at)) / 60000;
+  if (diffMin <= 10) return 'online';
+  return 'lost';
+}
+
+function pluginStatusLabel(site) {
+  const s = pluginConnectState(site);
+  if (s === 'online') return 'Plugin Connected';
+  if (s === 'lost')   return 'Connection Lost';
+  return 'Not Connected';
+}
+
+function pluginStatusTitle(site) {
+  if (!site.last_heartbeat_at) return 'Plugin has never connected. Install and configure OneShield Connect on this site.';
+  const diffMin = Math.floor((Date.now() - new Date(site.last_heartbeat_at)) / 60000);
+  if (diffMin <= 10) return `Last heartbeat ${diffMin}m ago — plugin is active.`;
+  if (diffMin < 1440) return `Last heartbeat ${Math.floor(diffMin / 60)}h ago — plugin may be offline.`;
+  return `Last heartbeat ${Math.floor(diffMin / 1440)}d ago — plugin may be offline.`;
+}
+
+function pluginStatusColor(site) {
+  const s = pluginConnectState(site);
+  if (s === 'online') return 'text-green-500';
+  if (s === 'lost')   return 'text-amber-500';
+  return 'text-gray-300';
+}
+
+function pluginStatusBadge(site) {
+  const s = pluginConnectState(site);
+  if (s === 'online') return 'bg-green-50 text-green-700';
+  if (s === 'lost')   return 'bg-amber-50 text-amber-700';
+  return 'bg-gray-100 text-gray-400';
+}
+
 function heartbeatClass(site) {
   if (!site.last_heartbeat_at) return 'bg-gray-100 text-gray-500';
   const diffMin = (Date.now() - new Date(site.last_heartbeat_at)) / 60000;
@@ -819,6 +915,18 @@ function formatMoney(val) {
 function webhookUrl(gateway) {
   const base = window.location.origin;
   return `${base}/api/webhook/${gateway}/${settingsSite.value?.id ?? '{site_id}'}`;
+}
+
+function connectUrl() {
+  const tenantId = page.props.auth?.user?.tenant_id;
+  const origin   = window.location.origin;
+  // In production: https://{tenant_id}.oneshieldx.com
+  // In local dev (no subdomain routing): fallback to current origin
+  if (tenantId && !origin.includes('localhost') && !origin.match(/\d+\.\d+\.\d+\.\d+/)) {
+    const url  = new URL(origin);
+    return `${url.protocol}//${tenantId}.${url.hostname.replace(/^[^.]+\./, '')}`;
+  }
+  return origin;
 }
 
 const copyToast  = ref('');
@@ -858,5 +966,15 @@ function copyToClipboard(text) {
 .slideover-enter-from,
 .slideover-leave-to {
   opacity: 0;
+}
+
+/* Hide number input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }
 </style>

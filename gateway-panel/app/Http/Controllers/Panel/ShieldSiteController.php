@@ -177,19 +177,65 @@ class ShieldSiteController extends Controller
     }
 
     /**
-     * Check site connectivity (ping the shield site URL).
+     * Check plugin connectivity by calling the WordPress site's ping endpoint.
+     * POST /sites/{site}/check
+     *
+     * Calls GET {site_url}/wp-json/oneshield/v1/ping, verifies the HMAC proof
+     * using the site_key stored in the panel, and updates last_heartbeat_at on success.
      */
-    public function check(Request $request, ShieldSite $site): RedirectResponse
+    public function check(Request $request, ShieldSite $site): \Illuminate\Http\JsonResponse
     {
         abort_if($site->user_id !== $request->user()->id, 403);
 
+        $pingUrl = rtrim($site->url, '/') . '/wp-json/oneshield/v1/ping';
+
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(5)->get($site->url);
-            $status   = $response->successful() ? 'reachable' : 'unreachable';
-        } catch (\Throwable) {
-            $status = 'unreachable';
+            $response = \Illuminate\Support\Facades\Http::timeout(8)->get($pingUrl);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'unreachable',
+                'message' => 'Could not reach the WordPress site. Make sure it is online and the OneShield Connect plugin is active.',
+            ]);
         }
 
-        return back()->with('success', "Site \"{$site->name}\" is {$status}.");
+        if (! $response->successful()) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'unreachable',
+                'message' => 'WordPress site returned HTTP ' . $response->status() . '. Make sure the site is accessible.',
+            ]);
+        }
+
+        $body = $response->json();
+
+        // Plugin not yet connected / configured
+        if (empty($body['connected'])) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'not_connected',
+                'message' => $body['error'] ?? 'Plugin is installed but not connected to this Gateway Panel. Complete the setup in WordPress → Settings → OneShield Connect.',
+            ]);
+        }
+
+        // Verify the proof: HMAC-SHA256(site_id, site_key) must match
+        $expectedProof = hash_hmac('sha256', (string) $site->id, $site->site_key);
+        if (! hash_equals($expectedProof, (string) ($body['proof'] ?? ''))) {
+            return response()->json([
+                'ok'      => false,
+                'status'  => 'key_mismatch',
+                'message' => 'Plugin is connected to a different Gateway Panel account. Check the Authorize Key and Token Secret on the WordPress site.',
+            ]);
+        }
+
+        // All good — refresh heartbeat timestamp
+        $site->update(['last_heartbeat_at' => now()]);
+
+        return response()->json([
+            'ok'         => true,
+            'status'     => 'connected',
+            'message'    => 'Plugin connected successfully.',
+            'plugin_ver' => $body['plugin_ver'] ?? null,
+        ]);
     }
 }

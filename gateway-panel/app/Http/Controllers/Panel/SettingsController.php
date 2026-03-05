@@ -22,8 +22,14 @@ class SettingsController extends Controller
 
         $appUrl = rtrim(config('app.url'), '/');
 
+        // Tenant gateway URL: https://{tenant_id}.{APP_HOST}
+        $scheme     = parse_url(config('app.url'), PHP_URL_SCHEME) ?? 'https';
+        $appHost    = config('app.host', 'oneshieldx.com');
+        $gatewayUrl = $scheme . '://' . $user->tenant_id . '.' . $appHost;
+
         return Inertia::render('Settings/Index', [
             'token_secret'   => $user->token_secret,
+            'gateway_url'    => $gatewayUrl,
             'gateway_tokens' => $user->gatewayTokens()->get(['id', 'name', 'is_active', 'last_used_at', 'created_at']),
             'webhook_urls'   => [
                 'paypal' => $webhookBase . '/paypal/{site_id}',

@@ -21,6 +21,7 @@ require_once OSC_PLUGIN_DIR . 'inc/settings.php';
 require_once OSC_PLUGIN_DIR . 'inc/remote.php';
 require_once OSC_PLUGIN_DIR . 'inc/heartbeat.php';
 require_once OSC_PLUGIN_DIR . 'inc/order.php';
+require_once OSC_PLUGIN_DIR . 'inc/ping.php';
 
 // Activation
 register_activation_hook(__FILE__, 'osc_activate');

@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex">
+  <div class="h-screen bg-gray-50 flex overflow-hidden">
 
     <!-- ── Sidebar ─────────────────────────────────────────────── -->
-    <aside class="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <aside class="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0 h-full overflow-y-auto">
 
       <!-- Brand -->
       <div class="h-16 flex items-center gap-2.5 px-5 border-b border-gray-200">

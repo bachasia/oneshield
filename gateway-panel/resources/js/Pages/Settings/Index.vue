@@ -196,6 +196,36 @@
         </div>
       </div>
 
+      <!-- Gateway Connect URL -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <div class="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-13.5 0v1.5m13.5-1.5v1.5m0-1.5a3 3 0 00-3-3m-7.5 0V9m0 0a3 3 0 013-3h4.5a3 3 0 013 3m-10.5 0h10.5"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-gray-900 leading-none">Gateway URL</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Enter this URL in the OneShield Connect plugin settings on your WordPress site</p>
+          </div>
+        </div>
+        <div class="px-6 py-5">
+          <div class="flex items-center gap-2">
+            <code class="flex-1 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg text-xs font-mono break-all text-gray-600">{{ gateway_url }}</code>
+            <button
+              @click="copyText(gateway_url)"
+              class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors flex-shrink-0"
+              title="Copy URL"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 mt-3 leading-relaxed">
+            This is the base URL of your gateway panel. The OneShield Connect plugin will use this to communicate with the gateway and process payments.
+          </p>
+        </div>
+      </div>
+
       <!-- Webhook URLs -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <!-- Section header -->
@@ -321,6 +351,7 @@ import { ref } from 'vue';
 
 const props = defineProps({
   token_secret:   String,
+  gateway_url:    String,
   gateway_tokens: Array,
   webhook_urls:   Object,
   plugins:        Array,

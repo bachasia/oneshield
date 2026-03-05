@@ -56,6 +56,15 @@ class HmacAuthentication
             return response()->json(['error' => 'Invalid or expired signature'], 401);
         }
 
+        // Validate subdomain matches tenant — only enforced when subdomain routing is active
+        // (i.e. not on localhost/IP and not on the admin subdomain)
+        $tenant = $request->attributes->get('_tenant');
+        if ($tenant !== null && $tenant->id !== $user->id) {
+            return response()->json([
+                'error' => 'Token does not belong to this gateway endpoint.',
+            ], 403);
+        }
+
         // Bind the authenticated user for downstream controllers
         $request->merge(['_authenticated_user' => $user]);
         $request->setUserResolver(fn () => $user);
