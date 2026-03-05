@@ -200,10 +200,14 @@ class ShieldSiteController extends Controller
         }
 
         if (! $response->successful()) {
+            $hint = $response->status() === 404
+                ? 'The ping endpoint was not found (HTTP 404). Make sure the plugin is updated to the latest version on the WordPress site.'
+                : 'WordPress site returned HTTP ' . $response->status() . '. Make sure the site is accessible.';
+
             return response()->json([
                 'ok'      => false,
                 'status'  => 'unreachable',
-                'message' => 'WordPress site returned HTTP ' . $response->status() . '. Make sure the site is accessible.',
+                'message' => $hint,
             ]);
         }
 
@@ -220,11 +224,19 @@ class ShieldSiteController extends Controller
 
         // Verify the proof: HMAC-SHA256(site_id, site_key) must match
         $expectedProof = hash_hmac('sha256', (string) $site->id, $site->site_key);
-        if (! hash_equals($expectedProof, (string) ($body['proof'] ?? ''))) {
+        $receivedProof = (string) ($body['proof'] ?? '');
+        if (! hash_equals($expectedProof, $receivedProof)) {
             return response()->json([
                 'ok'      => false,
                 'status'  => 'key_mismatch',
                 'message' => 'Plugin is connected to a different Gateway Panel account. Check the Authorize Key and Token Secret on the WordPress site.',
+                '_debug'  => app()->environment('production') ? null : [
+                    'site_id_panel'    => $site->id,
+                    'site_id_plugin'   => $body['site_id'] ?? null,
+                    'expected_proof'   => substr($expectedProof, 0, 8) . '...',
+                    'received_proof'   => substr($receivedProof, 0, 8) . '...',
+                    'site_key_length'  => strlen($site->site_key),
+                ],
             ]);
         }
 
