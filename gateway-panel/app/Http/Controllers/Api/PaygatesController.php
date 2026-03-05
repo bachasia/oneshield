@@ -30,13 +30,27 @@ class PaygatesController extends Controller
             'order_id'  => 'required|string|max:255',
             'amount'    => 'required|numeric|min:0.01',
             'currency'  => 'required|string|size:3',
-            'group_id'  => 'nullable|integer|exists:site_groups,id',
+            'group_id'  => 'nullable|string|max:255',
         ]);
+
+        // Resolve group_id: accept integer ID or group name string
+        $groupId = null;
+        $rawGroupId = $validated['group_id'] ?? null;
+        if ($rawGroupId !== null && $rawGroupId !== '') {
+            if (ctype_digit((string) $rawGroupId)) {
+                $groupId = (int) $rawGroupId;
+            } else {
+                $group = \App\Models\SiteGroup::where('user_id', $user->id)
+                    ->where('name', $rawGroupId)
+                    ->first();
+                $groupId = $group?->id;
+            }
+        }
 
         $site = $this->siteRouter->selectSite(
             $user->id,
             $validated['gateway'],
-            $validated['group_id'] ?? null,
+            $groupId,
             (float) $validated['amount']
         );
 
@@ -170,13 +184,27 @@ class PaygatesController extends Controller
         $validated = $request->validate([
             'gateway'  => 'required|in:paypal,stripe,airwallex',
             'order_id' => 'required|string',
-            'group_id' => 'nullable|integer|exists:site_groups,id',
+            'group_id' => 'nullable|string|max:255',
         ]);
+
+        // Resolve group_id: accept integer ID or group name string
+        $groupId = null;
+        $rawGroupId = $validated['group_id'] ?? null;
+        if ($rawGroupId !== null && $rawGroupId !== '') {
+            if (ctype_digit((string) $rawGroupId)) {
+                $groupId = (int) $rawGroupId;
+            } else {
+                $group = \App\Models\SiteGroup::where('user_id', $user->id)
+                    ->where('name', $rawGroupId)
+                    ->first();
+                $groupId = $group?->id;
+            }
+        }
 
         $site = $this->siteRouter->selectSite(
             $user->id,
             $validated['gateway'],
-            $validated['group_id'] ?? null
+            $groupId
         );
 
         if (!$site) {
