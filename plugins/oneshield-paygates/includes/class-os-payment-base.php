@@ -213,6 +213,7 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
                 style="width:100%;height:<?php echo $iframe_height; ?>px;border:1px solid #e5e7eb;border-radius:8px;display:block;"
                 scrolling="no"
                 allow="payment"
+                onload="var l=document.getElementById('osp-iframe-loading-<?php echo esc_attr($gateway); ?>');if(l)l.style.display='none';"
             ></iframe>
 
             <div id="osp-iframe-loading-<?php echo esc_attr($gateway); ?>"
