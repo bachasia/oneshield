@@ -199,29 +199,48 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             return;
         }
 
-        $iframe_url  = esc_url($result['iframe_url']);
-        $os_txn_id   = esc_attr((string) ($result['transaction_id'] ?? ''));
-        $os_site_id  = esc_attr((string) ($result['site_id'] ?? ''));
+        $iframe_url   = esc_url($result['iframe_url']);
+        $os_txn_id    = esc_attr((string) ($result['transaction_id'] ?? ''));
+        $os_site_id   = esc_attr((string) ($result['site_id'] ?? ''));
         $field_prefix = 'osp_' . $gateway;
-        $iframe_height = $gateway === 'paypal' ? '300' : '440';
+        $iframe_id    = 'osp-iframe-' . $gateway;
+        $loading_id   = 'osp-iframe-loading-' . $gateway;
+        // Start small; auto-resize via postMessage from iframe content
+        $initial_height = $gateway === 'paypal' ? '120' : '200';
         ?>
-        <div class="osp-iframe-wrap" style="position:relative;margin-top:8px;">
+        <div class="osp-iframe-wrap" style="position:relative;margin-top:4px;">
 
             <iframe
-                id="osp-iframe-<?php echo esc_attr($gateway); ?>"
+                id="<?php echo esc_attr($iframe_id); ?>"
                 src="<?php echo $iframe_url; ?>"
-                style="width:100%;height:<?php echo $iframe_height; ?>px;border:1px solid #e5e7eb;border-radius:8px;display:block;"
+                style="width:100%;height:<?php echo $initial_height; ?>px;border:none;display:block;overflow:hidden;"
                 scrolling="no"
                 allow="payment"
-                onload="var l=document.getElementById('osp-iframe-loading-<?php echo esc_attr($gateway); ?>');if(l)l.style.display='none';"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups"
+                referrerpolicy="no-referrer"
+                onload="var l=document.getElementById('<?php echo esc_attr($loading_id); ?>');if(l)l.style.display='none';"
             ></iframe>
 
-            <div id="osp-iframe-loading-<?php echo esc_attr($gateway); ?>"
-                 style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#f9fafb;border-radius:8px;font-size:13px;color:#6b7280;">
+            <div id="<?php echo esc_attr($loading_id); ?>"
+                 style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;font-size:13px;color:#9ca3af;">
                 <?php esc_html_e('Loading payment form…', 'oneshield-paygates'); ?>
             </div>
 
         </div>
+
+        <!-- Auto-resize iframe based on content height -->
+        <script>
+        (function(){
+            var iframeId = '<?php echo esc_js($iframe_id); ?>';
+            window.addEventListener('message', function(e) {
+                if (!e.data || e.data.source !== 'oneshield-connect') return;
+                if (e.data.action === 'resize' && e.data.height) {
+                    var f = document.getElementById(iframeId);
+                    if (f) f.style.height = Math.max(e.data.height, 50) + 'px';
+                }
+            });
+        })();
+        </script>
 
         <!-- Hidden inputs written by JS after postMessage from iframe -->
         <input type="hidden" name="<?php echo $field_prefix; ?>_transaction_id"    id="<?php echo $field_prefix; ?>_transaction_id"    value="" />

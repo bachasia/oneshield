@@ -1,14 +1,16 @@
 <?php
 /**
  * Render PayPal checkout page (inside iframe on Shield Site).
+ *
+ * Designed to look native — no card wrapper, transparent background, compact.
  */
 
 defined('ABSPATH') || exit;
 
 function osc_render_paypal_checkout(string $order_id, string $token): void {
-    $config = osc_get_paypal_config();
+    $config    = osc_get_paypal_config();
     $client_id = $config['client_id'] ?? '';
-    $mode = $config['mode'] ?? 'sandbox';
+    $mode      = $config['mode'] ?? 'sandbox';
 
     if (empty($client_id)) {
         wp_die('PayPal is not configured on this Shield Site.', 'Payment Error', ['response' => 503]);
@@ -18,105 +20,151 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
     $currency = strtoupper(sanitize_text_field($_GET['currency'] ?? 'USD'));
     $sdk_url  = 'https://www.paypal.com/sdk/js?client-id=' . urlencode($client_id) . '&currency=' . urlencode($currency);
 
+    if ($amount <= 0) {
+        wp_die('Invalid payment amount.', 'Payment Error', ['response' => 400]);
+    }
+
     ?>
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Secure Payment</title>
+        <title>Payment</title>
         <script src="<?php echo esc_url($sdk_url); ?>"></script>
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; padding: 24px; }
-            .card { background: #fff; border-radius: 12px; padding: 24px; max-width: 480px; margin: 0 auto; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-            .amount { font-size: 22px; font-weight: 700; color: #003087; margin-bottom: 4px; }
-            #paypal-button-container { margin-top: 20px; }
-            #error-message { color: #dc2626; font-size: 14px; margin-top: 12px; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: transparent;
+                padding: 0;
+                min-height: 0;
+            }
+            #paypal-button-container { min-height: 45px; }
+            #error-message {
+                color: #dc2626;
+                font-size: 13px;
+                margin-top: 8px;
+                display: none;
+            }
+            #error-message:not(:empty) { display: block; }
+            #loading {
+                text-align: center;
+                padding: 24px 0;
+                color: #9ca3af;
+                font-size: 13px;
+            }
+            #loading.hidden { display: none; }
         </style>
     </head>
     <body>
-        <div class="card">
-            <div class="amount"><?php echo esc_html($currency . ' ' . number_format($amount, 2)); ?></div>
-            <p style="color:#64748b;font-size:13px;margin-bottom:20px;">Order #<?php echo esc_html($order_id); ?></p>
-            <div id="paypal-button-container"></div>
-            <div id="error-message"></div>
-        </div>
+        <div id="loading">Initializing PayPal...</div>
+        <div id="paypal-button-container" style="display:none;"></div>
+        <div id="error-message"></div>
 
         <script>
-        const orderData = {
-            order_id: '<?php echo esc_js($order_id); ?>',
-            token: '<?php echo esc_js($token); ?>',
-            amount: '<?php echo esc_js(number_format($amount, 2, '.', '')); ?>',
-            currency: '<?php echo esc_js($currency); ?>',
-            ajax_url: '<?php echo esc_js(admin_url('admin-ajax.php')); ?>',
-            nonce: '<?php echo esc_js(wp_create_nonce('osc_paypal_nonce')); ?>',
-        };
+        (function() {
+            const orderData = {
+                order_id: '<?php echo esc_js($order_id); ?>',
+                token:    '<?php echo esc_js($token); ?>',
+                amount:   '<?php echo esc_js(number_format($amount, 2, '.', '')); ?>',
+                currency: '<?php echo esc_js($currency); ?>',
+                ajax_url: '<?php echo esc_js(admin_url('admin-ajax.php')); ?>',
+            };
 
-        paypal.Buttons({
-            createOrder: async function() {
-                const resp = await fetch(orderData.ajax_url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        action: 'osc_create_paypal_order',
-                        order_id: orderData.order_id,
-                        amount: orderData.amount,
-                        currency: orderData.currency,
-                        nonce: orderData.nonce,
-                    }),
-                });
-                const data = await resp.json();
-                if (!data.success) {
-                    document.getElementById('error-message').textContent = data.data || 'Failed to create order.';
-                    return null;
-                }
-                return data.data.paypal_order_id;
-            },
+            paypal.Buttons({
+                style: {
+                    layout:  'vertical',
+                    color:   'gold',
+                    shape:   'rect',
+                    label:   'paypal',
+                    height:  45,
+                },
 
-            onApprove: async function(data) {
-                const resp = await fetch(orderData.ajax_url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        action: 'osc_capture_paypal_order',
-                        paypal_order_id: data.orderID,
-                        order_id: orderData.order_id,
-                        nonce: orderData.nonce,
-                    }),
-                });
-                const result = await resp.json();
-
-                if (result.success) {
-                    // Notify tracking order handler before postMessage
-                    await fetch(orderData.ajax_url, {
+                createOrder: async function() {
+                    const resp = await fetch(orderData.ajax_url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action: 'osc_complete_tracking',
-                            transaction_id: result.data.capture_id,
+                            action:   'osc_create_paypal_order',
                             order_id: orderData.order_id,
-                            nonce: orderData.nonce,
+                            amount:   orderData.amount,
+                            currency: orderData.currency,
                         }),
-                    }).catch(() => {}); // Non-blocking; tracking failure must not block payment confirmation
+                    });
+                    const data = await resp.json();
+                    if (!data.success) {
+                        showError(data.data || 'Failed to create order.');
+                        return null;
+                    }
+                    return data.data.paypal_order_id;
+                },
 
-                    window.parent.postMessage({
-                        source: 'oneshield-connect',
-                        status: 'success',
-                        gateway: 'paypal',
-                        transaction_id: result.data.capture_id,
-                        order_id: orderData.order_id,
-                    }, '*');
-                } else {
-                    document.getElementById('error-message').textContent = result.data || 'Payment capture failed.';
-                }
-            },
+                onApprove: async function(data) {
+                    const resp = await fetch(orderData.ajax_url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            action:          'osc_capture_paypal_order',
+                            paypal_order_id: data.orderID,
+                            order_id:        orderData.order_id,
+                        }),
+                    });
+                    const result = await resp.json();
 
-            onError: function(err) {
-                document.getElementById('error-message').textContent = 'Payment failed. Please try again.';
-                console.error('PayPal error:', err);
-            },
-        }).render('#paypal-button-container');
+                    if (result.success) {
+                        // Notify tracking (non-blocking)
+                        fetch(orderData.ajax_url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                action:         'osc_complete_tracking',
+                                transaction_id: result.data.capture_id,
+                                order_id:       orderData.order_id,
+                            }),
+                        }).catch(function() {});
+
+                        window.parent.postMessage({
+                            source:         'oneshield-connect',
+                            status:         'success',
+                            gateway:        'paypal',
+                            transaction_id: result.data.capture_id,
+                            order_id:       orderData.order_id,
+                        }, '*');
+                    } else {
+                        showError(result.data || 'Payment capture failed.');
+                    }
+                },
+
+                onError: function(err) {
+                    showError('Payment failed. Please try again.');
+                    console.error('PayPal error:', err);
+                },
+
+                onInit: function() {
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('paypal-button-container').style.display = 'block';
+                    notifyParentResize();
+                },
+            }).render('#paypal-button-container');
+
+            function showError(msg) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('paypal-button-container').style.display = 'block';
+                var el = document.getElementById('error-message');
+                el.textContent = msg;
+                el.style.display = 'block';
+            }
+
+            function notifyParentResize() {
+                var h = document.body.scrollHeight;
+                window.parent.postMessage({
+                    source: 'oneshield-connect',
+                    action: 'resize',
+                    height: h,
+                }, '*');
+            }
+        })();
         </script>
     </body>
     </html>
@@ -129,7 +177,6 @@ add_action('wp_ajax_osc_create_paypal_order', 'osc_ajax_create_paypal_order');
 
 function osc_ajax_create_paypal_order(): void {
     // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
-    // Secured by HMAC checkout token at page level.
 
     $amount   = sanitize_text_field($_POST['amount'] ?? '0');
     $currency = sanitize_text_field($_POST['currency'] ?? 'USD');

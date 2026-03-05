@@ -73,7 +73,25 @@ function osc_handle_checkout_request() {
         wp_die('Invalid checkout request', 'OneShield Connect', ['response' => 400]);
     }
 
-    // Allow this page to be embedded in an iframe on any origin.
+    // ── Origin validation ──────────────────────────────────────────────────
+    // Only allow this page to be loaded inside an iframe (not directly).
+    // When embedded, the browser sends a Referer or Sec-Fetch-Dest header.
+    // Direct browser access (typing URL) sends Sec-Fetch-Dest: document
+    // with no cross-site indicators.
+    $sec_fetch_dest = $_SERVER['HTTP_SEC_FETCH_DEST'] ?? '';
+    $sec_fetch_site = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? '';
+    $referer        = $_SERVER['HTTP_REFERER'] ?? '';
+
+    // Allow: iframe embeds (dest=iframe) or same-origin navigations.
+    // Block: direct navigation (dest=document + site=none) unless referer is present.
+    $is_iframe  = ($sec_fetch_dest === 'iframe');
+    $has_referer = !empty($referer);
+
+    if (!$is_iframe && !$has_referer && $sec_fetch_dest === 'document' && $sec_fetch_site === 'none') {
+        wp_die('This page can only be accessed through a checkout process.', 'Access Denied', ['response' => 403]);
+    }
+
+    // ── Allow this page to be embedded in an iframe on any origin ──────────
     // Remove ALL restrictive headers that WordPress, security plugins, or the
     // web-server (LiteSpeed, Nginx, etc.) may add by default.
     header_remove('X-Frame-Options');
