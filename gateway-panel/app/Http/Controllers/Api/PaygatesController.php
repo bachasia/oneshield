@@ -151,7 +151,9 @@ class PaygatesController extends Controller
             $site,
             $validated['gateway'],
             $validated['order_id'],
-            $checkoutToken
+            $checkoutToken,
+            (float) $validated['amount'],
+            $validated['currency']
         );
 
         return response()->json([
@@ -236,6 +238,8 @@ class PaygatesController extends Controller
         $validated = $request->validate([
             'gateway'  => 'required|in:paypal,stripe,airwallex',
             'order_id' => 'required|string',
+            'amount'   => 'required|numeric|min:0.01',
+            'currency' => 'required|string|size:3',
             'group_id' => 'nullable|string|max:255',
         ]);
 
@@ -273,7 +277,9 @@ class PaygatesController extends Controller
                 $site,
                 $validated['gateway'],
                 $validated['order_id'],
-                $checkoutToken
+                $checkoutToken,
+                (float) $validated['amount'],
+                $validated['currency']
             ),
         ]);
     }

@@ -162,13 +162,15 @@ class SiteRouterService
     /**
      * Build the iframe URL for a shield site checkout.
      */
-    public function buildIframeUrl(ShieldSite $site, string $gateway, string $orderId, string $token): string
+    public function buildIframeUrl(ShieldSite $site, string $gateway, string $orderId, string $token, float $amount = 0, string $currency = 'usd'): string
     {
         return rtrim($site->url, '/') . '/?' . http_build_query([
             'fe-checkout' => '1',
-            'gateway' => $gateway,
-            'order_id' => $orderId,
-            'token' => $token,
+            'gateway'     => $gateway,
+            'order_id'    => $orderId,
+            'token'       => $token,
+            'amount'      => $amount,
+            'currency'    => strtolower($currency),
         ]);
     }
 
