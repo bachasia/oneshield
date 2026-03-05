@@ -257,8 +257,20 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
 
         if ($code >= 400) {
             $api_error = $body['error'] ?? $raw_body;
-            $this->last_error = 'HTTP ' . $code . ': ' . $api_error;
-            $this->log('get-site HTTP ' . $code . ': ' . $api_error);
+            $debug_hint = '';
+            if (!empty($body['debug'])) {
+                $d = $body['debug'];
+                $debug_hint = sprintf(
+                    ' [total=%s, active=%s, gw_enabled=%s, online=%s | hint: %s]',
+                    $d['total_sites']           ?? '?',
+                    $d['active_sites']          ?? '?',
+                    $d['gateway_enabled_sites'] ?? '?',
+                    $d['online_sites']          ?? '?',
+                    $d['hint']                  ?? '-'
+                );
+            }
+            $this->last_error = 'HTTP ' . $code . ': ' . $api_error . $debug_hint;
+            $this->log('get-site HTTP ' . $code . ': ' . $api_error . $debug_hint);
             return null;
         }
 
