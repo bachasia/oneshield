@@ -61,6 +61,55 @@ class PaygatesController extends Controller
             $gwSites = $activeSites->filter(fn ($s) => $s->supportsGateway($validated['gateway']));
             $onlineSites = $gwSites->filter(fn ($s) => $s->last_heartbeat_at && $s->last_heartbeat_at->gte(now()->subMinutes(10)));
 
+            // Per-site spin limit detail for debugging
+            $gw = $validated['gateway'];
+            $reqAmount = (float) $validated['amount'];
+            $spinDetail = $onlineSites->map(function ($s) use ($gw, $reqAmount) {
+                $maxPerOrder = (float) ($gw === 'paypal' ? $s->paypal_max_per_order : $s->stripe_max_per_order);
+                $incomeLimit = (float) ($gw === 'paypal' ? $s->paypal_income_limit  : $s->stripe_income_limit);
+
+                // Compute actual cycle earnings for income limit check
+                $cycleEarned = null;
+                if ($incomeLimit > 0) {
+                    $cycleStart = match ($s->receive_cycle) {
+                        'daily'   => now()->startOfDay(),
+                        'weekly'  => now()->startOfWeek(),
+                        'monthly' => now()->startOfMonth(),
+                        default   => \Illuminate\Support\Carbon::createFromTimestamp(0),
+                    };
+                    $cycleEarned = (float) Transaction::where('site_id', $s->id)
+                        ->where('gateway', $gw)
+                        ->where('status', 'completed')
+                        ->where('created_at', '>=', $cycleStart)
+                        ->sum('amount');
+                }
+
+                // Determine blocked reason
+                $reason = 'passes';
+                if ($maxPerOrder > 0 && $reqAmount > $maxPerOrder) {
+                    $reason = "Order amount {$reqAmount} exceeds max_per_order {$maxPerOrder}";
+                } elseif ($incomeLimit > 0 && $cycleEarned >= $incomeLimit) {
+                    $reason = "Cycle earnings {$cycleEarned} reached income_limit {$incomeLimit} ({$s->receive_cycle})";
+                }
+
+                // Also check if passesSpinLimits agrees
+                $routerPasses = app(SiteRouterService::class)->passesSpinLimits($s, $gw, $reqAmount);
+
+                return [
+                    'site_id'         => $s->id,
+                    'name'            => $s->name,
+                    'max_per_order'   => $maxPerOrder,
+                    'income_limit'    => $incomeLimit,
+                    'receive_cycle'   => $s->receive_cycle,
+                    'cycle_earned'    => $cycleEarned,
+                    'order_amount'    => $reqAmount,
+                    'failure_count'   => $s->failure_count,
+                    'last_heartbeat'  => $s->last_heartbeat_at?->toIso8601String(),
+                    'passes_spin'     => $routerPasses,
+                    'blocked_reason'  => $reason,
+                ];
+            })->values();
+
             return response()->json([
                 'error' => 'No active shield site available for the requested gateway',
                 'debug' => [
@@ -68,9 +117,12 @@ class PaygatesController extends Controller
                     'active_sites'          => $activeSites->count(),
                     'gateway_enabled_sites' => $gwSites->count(),
                     'online_sites'          => $onlineSites->count(),
-                    'requested_gateway'     => $validated['gateway'],
+                    'requested_gateway'     => $gw,
+                    'requested_amount'      => $reqAmount,
+                    'resolved_group_id'     => $groupId,
+                    'spin_detail'           => $spinDetail,
                     'hint'                  => $gwSites->isEmpty()
-                        ? 'No sites have ' . $validated['gateway'] . ' enabled with credentials configured.'
+                        ? 'No sites have ' . $gw . ' enabled with credentials configured.'
                         : ($onlineSites->isEmpty()
                             ? 'Sites exist but none have a recent heartbeat (within 10 min). Check the Shield Site plugin connection.'
                             : 'Sites exist and are online but may have exceeded spin/income limits.'),
