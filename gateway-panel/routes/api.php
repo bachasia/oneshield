@@ -87,6 +87,7 @@ Route::prefix('connect')
 Route::prefix('paygates')
     ->middleware([ApiCors::class, HmacAuthentication::class, ThrottlePerToken::class])
     ->group(function () {
+        Route::get('status',      [PaygatesController::class, 'status']);
         Route::post('get-site',   [PaygatesController::class, 'getSite']);
         Route::post('confirm',    [PaygatesController::class, 'confirm']);
         Route::get('iframe-url',  [PaygatesController::class, 'iframeUrl']);

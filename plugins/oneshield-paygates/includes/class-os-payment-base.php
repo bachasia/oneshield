@@ -39,6 +39,10 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
                 'type'        => 'password',
                 'description' => __('Token Secret from your Gateway Panel (Settings page).', 'oneshield-paygates'),
             ],
+            'connection_status' => [
+                'title' => __('Connection Status', 'oneshield-paygates'),
+                'type'  => 'connection_status',
+            ],
             'group_id' => [
                 'title'       => __('Group ID', 'oneshield-paygates'),
                 'type'        => 'text',
@@ -52,6 +56,93 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
                 'default' => 'no',
             ],
         ];
+    }
+
+    /**
+     * Render the custom "connection_status" field type.
+     * WooCommerce calls generate_{type}_html for custom field types.
+     */
+    public function generate_connection_status_html(string $key, array $data): string {
+        $gateway_url  = $this->get_option('gateway_url', '');
+        $token_secret = $this->get_option('token_secret', '');
+        $nonce        = wp_create_nonce('osp_status_nonce');
+        $ajax_url     = admin_url('admin-ajax.php');
+        $gateway_name = strtoupper($this->gateway_name);
+
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <?php echo esc_html($data['title']); ?>
+            </th>
+            <td class="forminp">
+                <div id="osp-status-<?php echo esc_attr($this->id); ?>" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span id="osp-status-badge-<?php echo esc_attr($this->id); ?>"
+                          style="display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#f3f4f6;color:#6b7280;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:#9ca3af;display:inline-block;"></span>
+                        <?php esc_html_e('Not checked', 'oneshield-paygates'); ?>
+                    </span>
+                    <button type="button"
+                            id="osp-test-btn-<?php echo esc_attr($this->id); ?>"
+                            class="button button-secondary"
+                            style="display:flex;align-items:center;gap:6px;"
+                            onclick="ospTestConnection('<?php echo esc_js($this->id); ?>', '<?php echo esc_js($ajax_url); ?>', '<?php echo esc_js($nonce); ?>')">
+                        <span id="osp-test-spinner-<?php echo esc_attr($this->id); ?>" class="spinner" style="display:none;float:none;margin:0;"></span>
+                        <?php esc_html_e('Test Connection', 'oneshield-paygates'); ?>
+                    </button>
+                    <span id="osp-status-detail-<?php echo esc_attr($this->id); ?>"
+                          style="font-size:12px;color:#6b7280;"></span>
+                </div>
+                <p style="margin-top:6px;font-size:12px;color:#9ca3af;">
+                    <?php esc_html_e('Tests the connection to your Gateway Panel using the URL and Token Secret above. Save settings first if you made changes.', 'oneshield-paygates'); ?>
+                </p>
+            </td>
+        </tr>
+
+        <script>
+        function ospTestConnection(gatewayId, ajaxUrl, nonce) {
+            var badge   = document.getElementById('osp-status-badge-'  + gatewayId);
+            var detail  = document.getElementById('osp-status-detail-' + gatewayId);
+            var spinner = document.getElementById('osp-test-spinner-'  + gatewayId);
+            var btn     = document.getElementById('osp-test-btn-'      + gatewayId);
+
+            // Loading state
+            spinner.style.display = 'inline-block';
+            btn.disabled = true;
+            badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#9ca3af;display:inline-block;"></span> Checking&hellip;';
+            badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#f3f4f6;color:#6b7280;';
+            detail.textContent = '';
+
+            jQuery.post(ajaxUrl, {
+                action:     'osp_test_connection',
+                gateway_id: gatewayId,
+                nonce:      nonce,
+            }, function(resp) {
+                spinner.style.display = 'none';
+                btn.disabled = false;
+
+                if (resp && resp.success && resp.data && resp.data.ok) {
+                    var d = resp.data;
+                    badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;"></span> Connected';
+                    badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#dcfce7;color:#15803d;';
+                    detail.textContent = d.account.name + ' · ' + d.sites.stripe + ' Stripe / ' + d.sites.paypal + ' PayPal site(s) active · ' + d.sites.online + ' online';
+                } else {
+                    var msg = (resp && resp.data && resp.data.message) ? resp.data.message : 'Could not connect. Check Gateway URL and Token Secret.';
+                    badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;display:inline-block;"></span> Failed';
+                    badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#fee2e2;color:#dc2626;';
+                    detail.textContent = msg;
+                }
+            }).fail(function() {
+                spinner.style.display = 'none';
+                btn.disabled = false;
+                badge.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#dc2626;display:inline-block;"></span> Request failed';
+                badge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#fee2e2;color:#dc2626;';
+                detail.textContent = 'Network error — could not reach the server.';
+            });
+        }
+        </script>
+        <?php
+        return ob_get_clean();
     }
 
     abstract protected function get_default_title(): string;

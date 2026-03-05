@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ShieldSite;
 use App\Models\Transaction;
 use App\Services\HmacService;
 use App\Services\SiteRouterService;
@@ -106,6 +107,37 @@ class PaygatesController extends Controller
             'success'        => true,
             'transaction_id' => $transaction->id,
             'status'         => $transaction->status,
+        ]);
+    }
+
+    /**
+     * Connection status check for the Paygates plugin settings page.
+     * GET /api/paygates/status
+     *
+     * Returns account info + per-gateway active site counts so the plugin
+     * admin can confirm the Token Secret is valid and sites are ready.
+     */
+    public function status(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $sites = ShieldSite::where('user_id', $user->id)->where('is_active', true)->get();
+
+        $now = now();
+        $connected = fn ($site) => $site->last_heartbeat_at && $site->last_heartbeat_at->diffInMinutes($now) <= 10;
+
+        return response()->json([
+            'ok'      => true,
+            'account' => [
+                'name'      => $user->name,
+                'tenant_id' => $user->tenant_id,
+            ],
+            'sites' => [
+                'total'   => $sites->count(),
+                'stripe'  => $sites->filter(fn ($s) => $s->stripe_enabled && $s->hasGatewayCredentials('stripe'))->count(),
+                'paypal'  => $sites->filter(fn ($s) => $s->paypal_enabled && $s->hasGatewayCredentials('paypal'))->count(),
+                'online'  => $sites->filter($connected)->count(),
+            ],
         ]);
     }
 
