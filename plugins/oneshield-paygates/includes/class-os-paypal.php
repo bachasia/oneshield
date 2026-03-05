@@ -31,8 +31,12 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     }
 
     public function payment_fields(): void {
-        echo '<div id="os-paypal-container" data-gateway="paypal"></div>';
-        echo '<p class="os-loading" style="text-align:center;color:#888;">' . esc_html__('Loading PayPal...', 'oneshield-paygates') . '</p>';
+        if ($desc = $this->get_option('description')) {
+            echo '<p>' . wp_kses_post($desc) . '</p>';
+        }
+        echo '<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">'
+           . esc_html__('You will be redirected to PayPal to complete your payment securely after placing the order.', 'oneshield-paygates')
+           . '</p>';
     }
 
     public function process_payment($order_id) {
@@ -47,14 +51,17 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
         $order->update_meta_data('_os_transaction_id', $result['transaction_id']);
         $order->update_meta_data('_os_site_id', $result['site_id']);
         $order->update_meta_data('_os_iframe_url', $result['iframe_url']);
+        $order->set_status('pending', 'Awaiting payment via OneShield.');
         $order->save();
 
         return [
             'result'            => 'success',
+            'redirect'          => '#osp-iframe',
             'iframe_url'        => $result['iframe_url'],
             'os_transaction_id' => $result['transaction_id'],
             'wc_order_id'       => $order->get_id(),
             'gateway'           => $this->gateway_name,
+            'messages'          => '',
             'nonce'             => wp_create_nonce('osp_confirm_nonce'),
         ];
     }
