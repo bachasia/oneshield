@@ -73,7 +73,15 @@ function osc_handle_checkout_request() {
         wp_die('Invalid checkout request', 'OneShield Connect', ['response' => 400]);
     }
 
-    // Render the appropriate checkout iframe
+    // Allow this page to be embedded in an iframe on any origin.
+    // Remove restrictive headers that WordPress, security plugins, or the
+    // web-server (LiteSpeed, Nginx, etc.) may add by default.
+    header_remove('X-Frame-Options');
+    header('Content-Security-Policy: frame-ancestors *');
+    // Override Permissions-Policy: payment must be allowed inside the iframe
+    header('Permissions-Policy: payment=(self "https://*.stripe.com" "https://*.paypal.com")');
+
+    // Render the appropriate checkout page
     // (checkout files already loaded globally at plugin init)
     switch ($gateway) {
         case 'stripe':
