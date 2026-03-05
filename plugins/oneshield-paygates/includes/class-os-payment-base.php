@@ -189,6 +189,13 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             echo '<p style="color:#dc2626;font-size:13px;">'
                . esc_html__('Payment service temporarily unavailable. Please refresh the page or try again shortly.', 'oneshield-paygates')
                . '</p>';
+
+            // Show detailed error to logged-in admins only
+            if (current_user_can('manage_woocommerce') && $this->last_error) {
+                echo '<p style="color:#9ca3af;font-size:11px;margin-top:4px;">'
+                   . '<strong>Admin debug:</strong> ' . esc_html($this->last_error)
+                   . '</p>';
+            }
             return;
         }
 
@@ -226,23 +233,32 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
      * Call Gateway Panel to get an iframe URL for a given payload.
      * Extracted so it can be reused without a WC_Order instance.
      */
+    /** @var string|null Last error from get_iframe_url_from_payload() for display. */
+    protected ?string $last_error = null;
+
     protected function get_iframe_url_from_payload(array $payload): ?array {
-        $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/get-site', [
+        $url = rtrim($this->gateway_url, '/') . '/api/paygates/get-site';
+
+        $response = wp_remote_post($url, [
             'timeout' => 15,
             'headers' => $this->sign_request($payload),
             'body'    => json_encode($payload),
         ]);
 
         if (is_wp_error($response)) {
-            $this->log('get-site (fields) error: ' . $response->get_error_message());
+            $this->last_error = 'Network error: ' . $response->get_error_message();
+            $this->log('get-site error: ' . $this->last_error);
             return null;
         }
 
-        $code = wp_remote_retrieve_response_code($response);
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $code     = wp_remote_retrieve_response_code($response);
+        $raw_body = wp_remote_retrieve_body($response);
+        $body     = json_decode($raw_body, true);
 
         if ($code >= 400) {
-            $this->log('get-site (fields) HTTP ' . $code . ': ' . ($body['error'] ?? 'unknown'));
+            $api_error = $body['error'] ?? $raw_body;
+            $this->last_error = 'HTTP ' . $code . ': ' . $api_error;
+            $this->log('get-site HTTP ' . $code . ': ' . $api_error);
             return null;
         }
 

@@ -41,8 +41,26 @@ class PaygatesController extends Controller
         );
 
         if (!$site) {
+            // Provide debugging hints in the error response
+            $allSites = ShieldSite::where('user_id', $user->id)->get();
+            $activeSites = $allSites->where('is_active', true);
+            $gwSites = $activeSites->filter(fn ($s) => $s->supportsGateway($validated['gateway']));
+            $onlineSites = $gwSites->filter(fn ($s) => $s->last_heartbeat_at && $s->last_heartbeat_at->gte(now()->subMinutes(10)));
+
             return response()->json([
                 'error' => 'No active shield site available for the requested gateway',
+                'debug' => [
+                    'total_sites'           => $allSites->count(),
+                    'active_sites'          => $activeSites->count(),
+                    'gateway_enabled_sites' => $gwSites->count(),
+                    'online_sites'          => $onlineSites->count(),
+                    'requested_gateway'     => $validated['gateway'],
+                    'hint'                  => $gwSites->isEmpty()
+                        ? 'No sites have ' . $validated['gateway'] . ' enabled with credentials configured.'
+                        : ($onlineSites->isEmpty()
+                            ? 'Sites exist but none have a recent heartbeat (within 10 min). Check the Shield Site plugin connection.'
+                            : 'Sites exist and are online but may have exceeded spin/income limits.'),
+                ],
             ], 503);
         }
 
