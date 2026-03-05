@@ -43,6 +43,14 @@ class ShieldSiteController extends Controller
             $gateways = $grossByGateway->get($site->id, collect());
             $site->gross_paypal = (float) ($gateways->firstWhere('gateway', 'paypal')?->total ?? 0);
             $site->gross_stripe = (float) ($gateways->firstWhere('gateway', 'stripe')?->total ?? 0);
+
+            // Boolean flags — tells the frontend a credential is saved without exposing the value
+            $site->has_paypal_client_id    = ! empty($site->getRawOriginal('paypal_client_id'));
+            $site->has_paypal_secret       = ! empty($site->getRawOriginal('paypal_secret'));
+            $site->has_stripe_public_key   = ! empty($site->getRawOriginal('stripe_public_key'));
+            $site->has_stripe_secret_key   = ! empty($site->getRawOriginal('stripe_secret_key'));
+            $site->has_stripe_webhook_secret = ! empty($site->getRawOriginal('stripe_webhook_secret'));
+
             return $site;
         });
 

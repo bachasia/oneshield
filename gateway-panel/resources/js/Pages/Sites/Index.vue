@@ -516,11 +516,25 @@
                       <div v-if="activeGateway === 'paypal'" class="grid grid-cols-2 gap-4">
                         <div class="col-span-2">
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">PayPal Client ID</label>
-                          <input v-model="settingsForm.paypal_client_id" type="text" placeholder="Enter PayPal Client ID used on this site" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <div class="relative">
+                            <input v-model="settingsForm.paypal_client_id" type="text"
+                              :placeholder="settingsSite.has_paypal_client_id ? '••• Saved — paste to replace' : 'Enter PayPal Client ID'"
+                              class="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              :class="settingsSite.has_paypal_client_id && !settingsForm.paypal_client_id ? 'border-green-300 bg-green-50/40' : 'border-gray-300'" />
+                            <span v-if="settingsSite.has_paypal_client_id && !settingsForm.paypal_client_id"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Saved</span>
+                          </div>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">PayPal Client Secret</label>
-                          <input v-model="settingsForm.paypal_secret" type="password" placeholder="Enter PayPal Client Secret used on this site" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <div class="relative">
+                            <input v-model="settingsForm.paypal_secret" type="password"
+                              :placeholder="settingsSite.has_paypal_secret ? '••• Saved — paste to replace' : 'Enter PayPal Client Secret'"
+                              class="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              :class="settingsSite.has_paypal_secret && !settingsForm.paypal_secret ? 'border-green-300 bg-green-50/40' : 'border-gray-300'" />
+                            <span v-if="settingsSite.has_paypal_secret && !settingsForm.paypal_secret"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Saved</span>
+                          </div>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">PayPal Mode</label>
@@ -541,11 +555,25 @@
                       <div v-else class="grid grid-cols-2 gap-4">
                         <div class="col-span-2">
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Stripe Public Key</label>
-                          <input v-model="settingsForm.stripe_public_key" type="text" placeholder="pk_live_..." class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <div class="relative">
+                            <input v-model="settingsForm.stripe_public_key" type="text"
+                              :placeholder="settingsSite.has_stripe_public_key ? '••• Saved — paste to replace' : 'pk_live_...'"
+                              class="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              :class="settingsSite.has_stripe_public_key && !settingsForm.stripe_public_key ? 'border-green-300 bg-green-50/40' : 'border-gray-300'" />
+                            <span v-if="settingsSite.has_stripe_public_key && !settingsForm.stripe_public_key"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Saved</span>
+                          </div>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Stripe Secret Key</label>
-                          <input v-model="settingsForm.stripe_secret_key" type="password" placeholder="sk_live_..." class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <div class="relative">
+                            <input v-model="settingsForm.stripe_secret_key" type="password"
+                              :placeholder="settingsSite.has_stripe_secret_key ? '••• Saved — paste to replace' : 'sk_live_...'"
+                              class="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              :class="settingsSite.has_stripe_secret_key && !settingsForm.stripe_secret_key ? 'border-green-300 bg-green-50/40' : 'border-gray-300'" />
+                            <span v-if="settingsSite.has_stripe_secret_key && !settingsForm.stripe_secret_key"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Saved</span>
+                          </div>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Stripe Mode</label>
@@ -563,7 +591,14 @@
                         </div>
                         <div class="col-span-2">
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Stripe Webhook Signing Secret</label>
-                          <input v-model="settingsForm.stripe_webhook_secret" type="text" placeholder="whsec_..." class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                          <div class="relative">
+                            <input v-model="settingsForm.stripe_webhook_secret" type="text"
+                              :placeholder="settingsSite.has_stripe_webhook_secret ? '••• Saved — paste to replace' : 'whsec_...'"
+                              class="w-full px-3 py-2.5 border rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              :class="settingsSite.has_stripe_webhook_secret && !settingsForm.stripe_webhook_secret ? 'border-green-300 bg-green-50/40' : 'border-gray-300'" />
+                            <span v-if="settingsSite.has_stripe_webhook_secret && !settingsForm.stripe_webhook_secret"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-green-600 bg-green-100 px-1.5 py-0.5 rounded">Saved</span>
+                          </div>
                         </div>
                         <div class="col-span-2">
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Webhook URL</label>
