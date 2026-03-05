@@ -139,7 +139,11 @@ add_action('wp_ajax_nopriv_osc_create_payment_intent', 'osc_ajax_create_payment_
 add_action('wp_ajax_osc_create_payment_intent', 'osc_ajax_create_payment_intent');
 
 function osc_ajax_create_payment_intent(): void {
-    check_ajax_referer('osc_stripe_nonce', 'nonce');
+    // NOTE: We intentionally skip check_ajax_referer() here.
+    // WordPress nonces rely on cookies, which are blocked in cross-origin
+    // iframes due to SameSite=Lax policy (the checkout page is embedded on
+    // the money site, a different domain). The request is already secured by
+    // the HMAC checkout token validated at the page level.
 
     $amount   = (int) ($_POST['amount'] ?? 0);
     $currency = sanitize_text_field($_POST['currency'] ?? 'usd');

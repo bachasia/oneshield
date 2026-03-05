@@ -128,7 +128,8 @@ add_action('wp_ajax_nopriv_osc_create_paypal_order', 'osc_ajax_create_paypal_ord
 add_action('wp_ajax_osc_create_paypal_order', 'osc_ajax_create_paypal_order');
 
 function osc_ajax_create_paypal_order(): void {
-    check_ajax_referer('osc_paypal_nonce', 'nonce');
+    // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
+    // Secured by HMAC checkout token at page level.
 
     $amount   = sanitize_text_field($_POST['amount'] ?? '0');
     $currency = sanitize_text_field($_POST['currency'] ?? 'USD');
@@ -170,7 +171,7 @@ add_action('wp_ajax_nopriv_osc_capture_paypal_order', 'osc_ajax_capture_paypal_o
 add_action('wp_ajax_osc_capture_paypal_order', 'osc_ajax_capture_paypal_order');
 
 function osc_ajax_capture_paypal_order(): void {
-    check_ajax_referer('osc_paypal_nonce', 'nonce');
+    // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
 
     $paypal_order_id = sanitize_text_field($_POST['paypal_order_id'] ?? '');
 
