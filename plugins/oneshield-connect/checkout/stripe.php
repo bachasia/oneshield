@@ -221,7 +221,17 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     await refreshBillingDetails();
                 }
 
-                confirmPayment();
+                try {
+                    await confirmPayment();
+                } catch (err) {
+                    var msg = (err && err.message) ? err.message : 'Payment failed. Please try again.';
+                    showError(msg);
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'payment_error',
+                        message: msg,
+                    }, '*');
+                }
             });
 
             async function refreshBillingDetails() {
@@ -266,7 +276,23 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     };
                 }
 
-                var { error, paymentIntent } = await stripe.confirmPayment(confirmOpts);
+                var result;
+                try {
+                    result = await stripe.confirmPayment(confirmOpts);
+                } catch (err) {
+                    var thrownMsg = (err && err.message) ? err.message : 'Payment confirmation failed.';
+                    showError(thrownMsg);
+                    btn.disabled = false;
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'payment_error',
+                        message: thrownMsg,
+                    }, '*');
+                    return;
+                }
+
+                var error = result.error;
+                var paymentIntent = result.paymentIntent;
 
                 if (error) {
                     showError(error.message);
