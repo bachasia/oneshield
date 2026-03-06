@@ -241,21 +241,11 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         ];
 
         // Collect extra params from settings to pass through to the iframe
+        // Only simple flags — no PII in URL. Shield site handles billing collection.
         $extra_params = $this->get_iframe_extra_params();
 
-        // Send billing address if enabled
         if ($this->get_option('send_billing', 'yes') === 'yes') {
-            $customer = WC()->customer;
-            if ($customer) {
-                $extra_params['billing_first_name'] = $customer->get_billing_first_name();
-                $extra_params['billing_last_name']  = $customer->get_billing_last_name();
-                $extra_params['billing_email']      = $customer->get_billing_email();
-                $extra_params['billing_country']    = $customer->get_billing_country();
-                $extra_params['billing_state']      = $customer->get_billing_state();
-                $extra_params['billing_city']       = $customer->get_billing_city();
-                $extra_params['billing_postcode']   = $customer->get_billing_postcode();
-                $extra_params['billing_address_1']  = $customer->get_billing_address_1();
-            }
+            $extra_params['send_billing'] = 'yes';
         }
 
         $payload['extra_params'] = $extra_params;

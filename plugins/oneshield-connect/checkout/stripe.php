@@ -20,21 +20,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
     $currency     = strtolower(sanitize_text_field($_GET['currency'] ?? 'usd'));
     $amount_cents = (int) round($amount * 100);
 
-    // Extra params from money site plugin settings
+    // Extra params from money site plugin settings (simple flags only)
     $capture_method       = sanitize_text_field($_GET['capture_method'] ?? 'automatic');
     $statement_descriptor = sanitize_text_field($_GET['statement_descriptor'] ?? '');
     $enable_wallets       = ($_GET['enable_wallets'] ?? '1') === '1';
     $send_billing         = ($_GET['send_billing'] ?? '') === 'yes';
     $mode_param           = sanitize_text_field($_GET['mode'] ?? 'live');
     $description_format   = sanitize_text_field($_GET['description_format'] ?? '');
-
-    // Billing info (if sent)
-    $billing = [];
-    if ($send_billing) {
-        foreach (['billing_first_name','billing_last_name','billing_email','billing_country','billing_state','billing_city','billing_postcode','billing_address_1'] as $k) {
-            $billing[$k] = sanitize_text_field($_GET[$k] ?? '');
-        }
-    }
 
     if ($amount_cents <= 0) {
         wp_die('Invalid payment amount.', 'Payment Error', ['response' => 400]);
@@ -95,6 +87,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 capture_method:       '<?php echo esc_js($capture_method); ?>',
                 statement_descriptor: '<?php echo esc_js($statement_descriptor); ?>',
                 description_format:   '<?php echo esc_js($description_format); ?>',
+                send_billing:         <?php echo $send_billing ? 'true' : 'false'; ?>,
             };
 
             let elements, paymentElement;
@@ -132,12 +125,23 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         },
                     });
 
-                    paymentElement = elements.create('payment', {
+                    var paymentOpts = {
                         layout: {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
-                    });
+                    };
+
+                    // Collect billing address inside Stripe Elements when send_billing=yes
+                    if (orderData.send_billing) {
+                        paymentOpts.fields = {
+                            billingDetails: {
+                                address: 'auto',
+                            },
+                        };
+                    }
+
+                    paymentElement = elements.create('payment', paymentOpts);
 
                     paymentElement.on('ready', function() {
                         document.getElementById('loading').classList.add('hidden');
