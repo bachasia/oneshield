@@ -158,6 +158,16 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     });
 
                     paymentElement.mount('#payment-element');
+
+                    // ResizeObserver: continuously report height changes as Stripe
+                    // Elements renders its internal components (tabs, fields, etc.)
+                    // This eliminates the blank space on first render.
+                    if (typeof ResizeObserver !== 'undefined') {
+                        var ro = new ResizeObserver(function() {
+                            notifyParentResize();
+                        });
+                        ro.observe(document.body);
+                    }
                 } catch (err) {
                     showError('Network error. Please refresh and try again.');
                 }
@@ -272,11 +282,14 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
             }
 
             function notifyParentResize() {
-                var h = document.body.scrollHeight;
+                // Use getBoundingClientRect for accurate rendered height,
+                // avoiding scrollHeight over-estimation on first paint.
+                var h = document.documentElement.getBoundingClientRect().height
+                     || document.body.scrollHeight;
                 window.parent.postMessage({
                     source: 'oneshield-connect',
                     action: 'resize',
-                    height: h,
+                    height: Math.ceil(h),
                 }, '*');
             }
 

@@ -270,8 +270,9 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         $field_prefix   = 'osp_' . $gateway;
         $iframe_id      = 'osp-iframe-' . $gateway;
         $loading_id     = 'osp-iframe-loading-' . $gateway;
-        // Start small; auto-resize via postMessage from iframe content
-        $initial_height = $gateway === 'paypal' ? '120' : '200';
+        // Start at a height that covers Stripe Elements fully on first render.
+        // ResizeObserver inside the iframe will adjust to exact height shortly after.
+        $initial_height = $gateway === 'paypal' ? '120' : '380';
         ?>
         <div class="osp-iframe-wrap" style="position:relative;margin-top:4px;">
 
