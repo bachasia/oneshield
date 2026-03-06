@@ -48,6 +48,59 @@ function osp_add_gateways(array $gateways): array {
     return $gateways;
 }
 
+// AJAX handler: send billing to gateway panel just before Place Order
+// Called by checkout.js when user clicks Place Order and OneShield gateway is selected.
+add_action('wp_ajax_nopriv_osp_send_billing', 'osp_ajax_send_billing');
+add_action('wp_ajax_osp_send_billing', 'osp_ajax_send_billing');
+
+function osp_ajax_send_billing(): void {
+    check_ajax_referer('osp_confirm_nonce', 'nonce');
+
+    $gateway    = sanitize_text_field($_POST['gateway']    ?? '');
+    $os_txn_id  = absint($_POST['os_txn_id'] ?? 0);
+
+    if (!$os_txn_id || !in_array($gateway, ['stripe', 'paypal'], true)) {
+        wp_send_json_error('Invalid params');
+    }
+
+    $gateway_class = osp_get_gateway_instance($gateway);
+    if (!$gateway_class) {
+        wp_send_json_error('Gateway not found');
+    }
+
+    // Collect final billing from WC customer (user-confirmed at this point)
+    $customer = WC()->customer;
+    if (!$customer) {
+        wp_send_json_error('No customer session');
+    }
+
+    $billing = array_filter([
+        'first_name' => $customer->get_billing_first_name(),
+        'last_name'  => $customer->get_billing_last_name(),
+        'email'      => $customer->get_billing_email(),
+        'phone'      => $customer->get_billing_phone(),
+        'address_1'  => $customer->get_billing_address_1(),
+        'address_2'  => $customer->get_billing_address_2(),
+        'city'       => $customer->get_billing_city(),
+        'state'      => $customer->get_billing_state(),
+        'postcode'   => $customer->get_billing_postcode(),
+        'country'    => $customer->get_billing_country(),
+    ]);
+
+    if (empty($billing)) {
+        // send_billing may be disabled — just confirm success so JS can proceed
+        wp_send_json_success(['skipped' => true]);
+    }
+
+    $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing);
+    if ($result) {
+        wp_send_json_success();
+    } else {
+        // Non-fatal: proceed anyway (payment still works, just without billing on PaymentMethod)
+        wp_send_json_success(['warning' => 'billing_update_failed']);
+    }
+}
+
 // AJAX handler for iframe checkout postMessage confirm
 add_action('wp_ajax_nopriv_osp_confirm_payment', 'osp_ajax_confirm_payment');
 add_action('wp_ajax_osp_confirm_payment', 'osp_ajax_confirm_payment');

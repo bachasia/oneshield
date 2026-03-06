@@ -244,25 +244,8 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         $extra_params = $this->get_iframe_extra_params();
         $payload['extra_params'] = $extra_params;
 
-        // Billing data — sent in POST body (not URL) to avoid PII in query string.
-        // Stored encrypted in the transaction record; shield site retrieves it server-side.
-        if ($this->get_option('send_billing', 'yes') === 'yes') {
-            $customer = WC()->customer;
-            if ($customer) {
-                $payload['billing'] = array_filter([
-                    'first_name' => $customer->get_billing_first_name(),
-                    'last_name'  => $customer->get_billing_last_name(),
-                    'email'      => $customer->get_billing_email(),
-                    'phone'      => $customer->get_billing_phone(),
-                    'address_1'  => $customer->get_billing_address_1(),
-                    'address_2'  => $customer->get_billing_address_2(),
-                    'city'       => $customer->get_billing_city(),
-                    'state'      => $customer->get_billing_state(),
-                    'postcode'   => $customer->get_billing_postcode(),
-                    'country'    => $customer->get_billing_country(),
-                ]);
-            }
-        }
+        // Billing is NOT sent here — it is sent in process_payment() after WC creates
+        // the order, ensuring we always use the final (user-confirmed) billing address.
 
         $result = $this->get_iframe_url_from_payload($payload);
 
@@ -454,6 +437,44 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         }
 
         return $body; // { site_id, transaction_id, iframe_url, token }
+    }
+
+    /**
+     * Send (or update) billing data on a pending transaction.
+     * Called just before the user confirms payment — billing is final at this point.
+     *
+     * @param int   $os_txn_id Transaction ID on the gateway panel
+     * @param array $billing   Billing fields array
+     */
+    public function send_billing_to_panel(int $os_txn_id, array $billing): bool {
+        if (empty($this->gateway_url) || empty($this->token_secret)) {
+            return false;
+        }
+
+        $payload = [
+            'transaction_id' => $os_txn_id,
+            'billing'        => $billing,
+        ];
+
+        $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/update-billing', [
+            'timeout' => 8,
+            'headers' => $this->sign_request($payload),
+            'body'    => json_encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->log('send_billing_to_panel error: ' . $response->get_error_message());
+            return false;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code !== 200) {
+            $this->log('send_billing_to_panel HTTP ' . $code);
+            return false;
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        return (bool) ($body['success'] ?? false);
     }
 
     /**

@@ -188,6 +188,43 @@ class PaygatesController extends Controller
     }
 
     /**
+     * Update billing data on an existing pending transaction.
+     * Called by process_payment() after WC creates the order — at this point
+     * billing is final (user has confirmed checkout).
+     * POST /api/paygates/update-billing
+     */
+    public function updateBilling(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'transaction_id'     => 'required|integer',
+            'billing'            => 'required|array',
+            'billing.first_name' => 'nullable|string|max:100',
+            'billing.last_name'  => 'nullable|string|max:100',
+            'billing.email'      => 'nullable|email|max:255',
+            'billing.phone'      => 'nullable|string|max:30',
+            'billing.address_1'  => 'nullable|string|max:255',
+            'billing.address_2'  => 'nullable|string|max:255',
+            'billing.city'       => 'nullable|string|max:100',
+            'billing.state'      => 'nullable|string|max:100',
+            'billing.postcode'   => 'nullable|string|max:20',
+            'billing.country'    => 'nullable|string|size:2',
+        ]);
+
+        $transaction = Transaction::whereHas('site', fn ($q) => $q->where('user_id', $user->id))
+            ->where('id', $validated['transaction_id'])
+            ->where('status', 'pending')
+            ->firstOrFail();
+
+        $transaction->update([
+            'billing_data' => array_filter($validated['billing']),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Confirm a completed payment.
      * POST /api/paygates/confirm
      */

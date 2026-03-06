@@ -170,11 +170,47 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
             });
 
             // Also listen for postMessage from money site to trigger confirmation
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.action === 'oneshield-confirm-payment') {
-                    confirmPayment();
+            window.addEventListener('message', async function(event) {
+                if (!event.data || event.data.action !== 'oneshield-confirm-payment') {
+                    return;
                 }
+
+                // Money site can send latest txn/site IDs right before confirm.
+                if (event.data.txn_id) {
+                    orderData.txn_id = parseInt(event.data.txn_id, 10) || orderData.txn_id;
+                }
+                if (event.data.site_id) {
+                    orderData.os_site_id = parseInt(event.data.site_id, 10) || orderData.os_site_id;
+                }
+
+                // Billing may only be available now (sent at Place Order time).
+                if (orderData.send_billing && orderData.txn_id && orderData.os_site_id) {
+                    await refreshBillingDetails();
+                }
+
+                confirmPayment();
             });
+
+            async function refreshBillingDetails() {
+                try {
+                    const resp = await fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            action:     'osc_get_billing_details',
+                            txn_id:     orderData.txn_id,
+                            os_site_id: orderData.os_site_id,
+                        }),
+                    });
+
+                    const data = await resp.json();
+                    if (data.success && data.data && data.data.billing_details) {
+                        orderData.billing_details = data.data.billing_details;
+                    }
+                } catch (err) {
+                    // Non-fatal: continue confirmPayment without billing_details.
+                }
+            }
 
             async function confirmPayment() {
                 var btn = document.getElementById('submit');
@@ -255,6 +291,10 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
 // AJAX: Create Stripe PaymentIntent
 add_action('wp_ajax_nopriv_osc_create_payment_intent', 'osc_ajax_create_payment_intent');
 add_action('wp_ajax_osc_create_payment_intent', 'osc_ajax_create_payment_intent');
+
+// AJAX: Fetch latest billing_details for confirmPayment()
+add_action('wp_ajax_nopriv_osc_get_billing_details', 'osc_ajax_get_billing_details');
+add_action('wp_ajax_osc_get_billing_details', 'osc_ajax_get_billing_details');
 
 function osc_ajax_create_payment_intent(): void {
     // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
@@ -376,6 +416,38 @@ function osc_ajax_create_payment_intent(): void {
         'client_secret'   => $body['client_secret'],
         'billing_details' => $billing_for_js, // null when send_billing=no
     ]);
+}
+
+function osc_ajax_get_billing_details(): void {
+    $txn_id     = (int) ($_POST['txn_id'] ?? 0);
+    $os_site_id = (int) ($_POST['os_site_id'] ?? 0);
+
+    if (!$txn_id || !$os_site_id) {
+        wp_send_json_success(['billing_details' => null]);
+    }
+
+    $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id);
+    if (empty($billing)) {
+        wp_send_json_success(['billing_details' => null]);
+    }
+
+    $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+
+    $billing_for_js = array_filter([
+        'name'  => $full_name ?: null,
+        'email' => $billing['email'] ?? null,
+        'phone' => $billing['phone'] ?? null,
+        'address' => array_filter([
+            'line1'       => $billing['address_1'] ?? null,
+            'line2'       => $billing['address_2'] ?? null,
+            'city'        => $billing['city'] ?? null,
+            'state'       => $billing['state'] ?? null,
+            'postal_code' => $billing['postcode'] ?? null,
+            'country'     => $billing['country'] ?? null,
+        ]),
+    ]);
+
+    wp_send_json_success(['billing_details' => $billing_for_js]);
 }
 
 function osc_get_stripe_config(): array {

@@ -16,9 +16,19 @@ function osp_enqueue_scripts(): void {
         true
     );
 
+    // Determine which OneShield gateways have send_billing enabled
+    $send_billing_gateways = [];
+    $instances = WC()->payment_gateways()->payment_gateways();
+    foreach (['os_stripe' => 'stripe', 'os_paypal' => 'paypal'] as $id => $name) {
+        if (isset($instances[$id]) && $instances[$id]->get_option('send_billing', 'yes') === 'yes') {
+            $send_billing_gateways[] = $name;
+        }
+    }
+
     wp_localize_script('oneshield-paygates-checkout', 'osp_data', [
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('osp_confirm_nonce'),
+        'ajax_url'             => admin_url('admin-ajax.php'),
+        'nonce'                => wp_create_nonce('osp_confirm_nonce'),
+        'send_billing_gateways' => $send_billing_gateways,
     ]);
 }
 
