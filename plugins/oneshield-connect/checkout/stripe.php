@@ -271,6 +271,12 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 if (error) {
                     showError(error.message);
                     btn.disabled = false;
+                    // Notify parent to hide loading overlay
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'payment_error',
+                        message: error.message,
+                    }, '*');
                     return;
                 }
 

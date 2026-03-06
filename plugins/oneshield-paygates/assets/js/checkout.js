@@ -7,12 +7,13 @@
  *  2. Customer fills in card details inside the iframe (iframe is ready).
  *  3. Customer clicks Place Order:
  *     a. JS intercepts the click.
- *     b. If send_billing is enabled: AJAX osp_send_billing → gateway panel
+ *     b. Shows full-page loading overlay.
+ *     c. If send_billing is enabled: AJAX osp_send_billing → gateway panel
  *        stores final billing on the pending transaction.
- *     c. postMessage 'oneshield-confirm-payment' + txn_id → iframe.
- *     d. Iframe fetches billing from gateway panel (server-side),
+ *     d. postMessage 'oneshield-confirm-payment' + txn_id → iframe.
+ *     e. Iframe fetches billing from gateway panel (server-side),
  *        attaches to confirmPayment(), processes Stripe payment.
- *     e. Stripe responds → iframe postMessage 'success' + transaction_id.
+ *     f. Stripe responds → iframe postMessage 'success' + transaction_id.
  *  4. JS receives success → writes transaction_id into hidden input.
  *  5. JS re-submits WC checkout form.
  *  6. process_payment() reads hidden input, confirms with panel, completes order.
@@ -31,6 +32,75 @@
         paypal: { confirmed: false, txnId: '' },
     };
     var isConfirming = false;
+
+    // ── Loading overlay ─────────────────────────────────────────────────────
+
+    var $overlay = null;
+
+    function createOverlay() {
+        if ($overlay) return;
+        $overlay = $([
+            '<div id="osp-payment-overlay" style="',
+                'display:none;',
+                'position:fixed;inset:0;z-index:999999;',
+                'background:rgba(255,255,255,0.92);',
+                'backdrop-filter:blur(3px);',
+                '-webkit-backdrop-filter:blur(3px);',
+                'align-items:center;justify-content:center;flex-direction:column;gap:16px;',
+            '">',
+                '<div id="osp-overlay-spinner" style="',
+                    'width:48px;height:48px;',
+                    'border:4px solid #e5e7eb;',
+                    'border-top-color:#6366f1;',
+                    'border-radius:50%;',
+                    'animation:osp-spin 0.8s linear infinite;',
+                '"></div>',
+                '<p id="osp-overlay-text" style="',
+                    'margin:0;font-size:16px;font-weight:600;color:#111827;',
+                    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
+                '">Processing your payment…</p>',
+                '<p id="osp-overlay-sub" style="',
+                    'margin:0;font-size:13px;color:#6b7280;',
+                    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
+                '">Please do not close or refresh this page.</p>',
+            '</div>',
+            '<style>',
+                '@keyframes osp-spin{to{transform:rotate(360deg)}}',
+                '#osp-payment-overlay{display:none}',
+                '#osp-payment-overlay.osp-visible{display:flex!important}',
+            '</style>',
+        ].join(''));
+        $('body').append($overlay);
+    }
+
+    function showOverlay(text, sub) {
+        createOverlay();
+        $('#osp-overlay-text').text(text || 'Processing your payment…');
+        $('#osp-overlay-sub').text(sub || 'Please do not close or refresh this page.');
+        // Reset spinner color
+        $('#osp-overlay-spinner').css('border-top-color', '#6366f1');
+        $overlay.filter('#osp-payment-overlay').addClass('osp-visible');
+    }
+
+    function hideOverlay() {
+        if ($overlay) {
+            $overlay.filter('#osp-payment-overlay').removeClass('osp-visible');
+        }
+    }
+
+    function showOverlaySuccess() {
+        createOverlay();
+        $('#osp-overlay-spinner').replaceWith(
+            '<div id="osp-overlay-spinner" style="width:48px;height:48px;">' +
+            '<svg width="48" height="48" fill="none" viewBox="0 0 24 24">' +
+            '<circle cx="12" cy="12" r="11" stroke="#16a34a" stroke-width="2"/>' +
+            '<path stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M7 12l3.5 3.5L17 9"/>' +
+            '</svg></div>'
+        );
+        $('#osp-overlay-text').text('Payment approved!');
+        $('#osp-overlay-sub').text('Completing your order…');
+        $overlay.filter('#osp-payment-overlay').addClass('osp-visible');
+    }
 
     // ── Detect active OneShield gateway ────────────────────────────────────
 
@@ -56,6 +126,11 @@
             if (!gateway) return;
             var f = getIframe(gateway);
             if (f) f.style.height = Math.max(msg.height, 50) + 'px';
+        }
+
+        // Hide overlay if iframe reports an error
+        if (msg.action === 'payment_error') {
+            hideOverlay();
         }
     });
 
@@ -83,7 +158,10 @@
 
         if (txnInput) txnInput.value = msg.transaction_id;
 
-        // Show success UI inside the iframe wrap
+        // Show success overlay before re-submitting
+        showOverlaySuccess();
+
+        // Replace iframe with success UI
         var iframe = getIframe(gateway);
         if (iframe) {
             var box = iframe.parentElement;
@@ -141,6 +219,9 @@
         var $btn = $(this);
         $btn.prop('disabled', true).css('opacity', '0.6');
 
+        // Show loading overlay
+        showOverlay();
+
         function doConfirm() {
             // postMessage to iframe: trigger Stripe/PayPal confirmation
             iframe.contentWindow.postMessage({
@@ -154,11 +235,11 @@
         // If send_billing enabled for this gateway, push billing first
         if (sendBillingGws.indexOf(gateway) !== -1 && (osTxnId || osCheckoutId)) {
             $.post(ajaxUrl, {
-                action:       'osp_send_billing',
-                gateway:      gateway,
-                os_txn_id:    osTxnId,
+                action:         'osp_send_billing',
+                gateway:        gateway,
+                os_txn_id:      osTxnId,
                 os_checkout_id: osCheckoutId,
-                nonce:        ospData.nonce || '',
+                nonce:          ospData.nonce || '',
             }).always(function () {
                 // Always proceed even if billing update fails (non-fatal)
                 doConfirm();
@@ -167,10 +248,11 @@
             doConfirm();
         }
 
-        // Re-enable button after timeout in case iframe never responds
+        // Re-enable button + hide overlay after timeout in case iframe never responds
         setTimeout(function () {
             $btn.prop('disabled', false).css('opacity', '');
             isConfirming = false;
+            hideOverlay();
         }, 30000);
     });
 
@@ -196,6 +278,7 @@
         state.paypal.confirmed = false;
         state.paypal.txnId     = '';
         isConfirming = false;
+        hideOverlay();
     });
 
     // ── Utilities ───────────────────────────────────────────────────────────
