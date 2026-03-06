@@ -765,19 +765,30 @@ function closeSettings() {
 }
 
 function saveSettings() {
-  // Clone form data and remove empty credential fields to prevent overwriting saved values
-  const payload = { ...settingsForm.data() };
-  
-  // Remove empty credential fields
-  if (!payload.paypal_client_id) delete payload.paypal_client_id;
-  if (!payload.paypal_secret) delete payload.paypal_secret;
-  if (!payload.stripe_public_key) delete payload.stripe_public_key;
-  if (!payload.stripe_secret_key) delete payload.stripe_secret_key;
-  if (!payload.stripe_webhook_secret) delete payload.stripe_webhook_secret;
-  
-  settingsForm.put(`/sites/${settingsSite.value.id}`, {
-    data: payload,
-    onSuccess: closeSettings,
+  settingsForm
+    .transform((data) => {
+      const payload = { ...data };
+      const credentialFields = [
+        'paypal_client_id',
+        'paypal_secret',
+        'stripe_public_key',
+        'stripe_secret_key',
+        'stripe_webhook_secret',
+      ];
+
+      credentialFields.forEach((field) => {
+        if (payload[field] === '' || payload[field] === null) {
+          delete payload[field];
+        }
+      });
+
+      return payload;
+    })
+    .put(`/sites/${settingsSite.value.id}`, {
+      onSuccess: closeSettings,
+      onFinish: () => {
+        settingsForm.transform((data) => data);
+      },
   });
 }
 
