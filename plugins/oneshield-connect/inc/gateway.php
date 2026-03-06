@@ -7,7 +7,7 @@
  *  - OneShield Pay via PayPal
  *
  * Each gateway embeds a checkout iframe pointing to this site's
- * ?fe-checkout endpoint, which renders the Stripe/PayPal payment form.
+ * ?os-checkout endpoint, which renders the Stripe/PayPal payment form.
  */
 
 defined('ABSPATH') || exit;
@@ -207,7 +207,7 @@ function osc_build_checkout_url(string $gateway): string {
     // We pass a placeholder; JS on the checkout page will update the iframe
     // src once WC fires the payment step (handled by osc_print_iframe_listener_script).
     return add_query_arg([
-        'fe-checkout' => '1',
+        'os-checkout' => '1',
         'gateway'     => $gateway,
         'order_id'    => '__ORDER_ID__',
         'amount'      => '__AMOUNT__',

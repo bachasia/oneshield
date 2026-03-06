@@ -174,7 +174,7 @@ class SiteRouterService
         // CheckoutSessionService::buildIframeUrl() instead. This method remains
         // for backward-compat during dual-mode rollout.
         $params = [
-            'fe-checkout' => '1',
+            'os-checkout' => '1',
             'gateway'     => $gateway,
             'order_id'    => $orderId,
             'token'       => $token,

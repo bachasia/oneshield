@@ -275,7 +275,7 @@ class SiteRouterServiceTest extends TestCase
         $url = $this->router->buildIframeUrl($site, 'stripe', 'ORDER-42', 'token-abc');
 
         $this->assertStringStartsWith('https://shield.example.com/', $url);
-        $this->assertStringContainsString('fe-checkout=1', $url);
+        $this->assertStringContainsString('os-checkout=1', $url);
         $this->assertStringContainsString('gateway=stripe', $url);
         $this->assertStringContainsString('order_id=ORDER-42', $url);
         $this->assertStringContainsString('token=token-abc', $url);

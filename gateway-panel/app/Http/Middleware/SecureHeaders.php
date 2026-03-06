@@ -28,8 +28,9 @@ class SecureHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
 
         // X-Frame-Options — panel pages should NOT be embeddable
-        // Exception: checkout pages (/?fe-checkout=1) need to be in an iframe
-        $isCheckout = str_contains($request->getRequestUri(), 'fe-checkout');
+        // Exception: checkout pages (/?os-checkout=1) need to be embeddable in an iframe.
+        $uri = $request->getRequestUri();
+        $isCheckout = str_contains($uri, 'os-checkout');
         if (!$isCheckout) {
             $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         }

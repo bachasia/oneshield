@@ -23,7 +23,7 @@ require_once OSC_PLUGIN_DIR . 'inc/heartbeat.php';
 require_once OSC_PLUGIN_DIR . 'inc/ping.php';
 
 // Load checkout handlers unconditionally so AJAX actions are always registered.
-// (Previously only loaded on ?fe-checkout requests — causing AJAX to 404.)
+// (Previously only loaded conditionally — causing AJAX actions to 404.)
 require_once OSC_PLUGIN_DIR . 'checkout/stripe.php';
 require_once OSC_PLUGIN_DIR . 'checkout/paypal.php';
 require_once OSC_PLUGIN_DIR . 'inc/order.php';
@@ -58,10 +58,10 @@ add_filter('cron_schedules', function ($schedules) {
 // Heartbeat cron
 add_action('osc_heartbeat_cron', 'osc_run_heartbeat');
 
-// Handle ?fe-checkout requests
+// Handle checkout iframe requests (?os-checkout=1)
 add_action('init', 'osc_handle_checkout_request');
 function osc_handle_checkout_request() {
-    if (!isset($_GET['fe-checkout'])) {
+    if (!isset($_GET['os-checkout'])) {
         return;
     }
 

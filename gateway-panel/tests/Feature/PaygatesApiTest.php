@@ -78,7 +78,7 @@ class PaygatesApiTest extends TestCase
         $response = $this->postJson('/api/paygates/get-site', $payload, $headers);
 
         $iframeUrl = $response->json('iframe_url');
-        $this->assertStringContainsString('fe-checkout=1', $iframeUrl);
+        $this->assertStringContainsString('os-checkout=1', $iframeUrl);
         $this->assertStringContainsString('gateway=paypal', $iframeUrl);
         $this->assertStringContainsString('order_id=ORD-123', $iframeUrl);
         $this->assertStringContainsString('token=', $iframeUrl);
@@ -315,7 +315,7 @@ class PaygatesApiTest extends TestCase
         $response->assertStatus(200)
                  ->assertJsonStructure(['iframe_url']);
 
-        $this->assertStringContainsString('fe-checkout=1', $response->json('iframe_url'));
+        $this->assertStringContainsString('os-checkout=1', $response->json('iframe_url'));
     }
 
     /** @test */

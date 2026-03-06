@@ -156,7 +156,7 @@ class CheckoutSessionService
     public function buildIframeUrl(ShieldSite $site, string $checkoutId): string
     {
         return rtrim($site->url, '/') . '/?' . http_build_query([
-            'fe-checkout'  => '1',
+            'os-checkout'  => '1',
             'checkout_id'  => $checkoutId,
         ]);
     }
