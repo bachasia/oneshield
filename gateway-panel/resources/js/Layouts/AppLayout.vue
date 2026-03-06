@@ -142,7 +142,7 @@
     <div class="flex-1 flex flex-col min-w-0">
 
       <!-- Top bar -->
-      <header class="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+      <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
         <!-- Page title + breadcrumb -->
         <div class="flex items-center gap-2 text-sm">
           <span class="text-gray-400">OneShield</span>
