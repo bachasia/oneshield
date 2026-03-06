@@ -131,7 +131,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             defaultCollapsed: false,
                         },
                         fields: {
-                            billingDetails: orderData.send_billing ? 'auto' : 'never',
+                            billingDetails: 'never',
                         },
                     };
 
