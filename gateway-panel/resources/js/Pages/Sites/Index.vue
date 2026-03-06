@@ -627,14 +627,14 @@
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1.5">Income Limit</label>
-                        <input v-if="activeGateway === 'paypal'" v-model="settingsForm.paypal_income_limit" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                        <input v-else v-model="settingsForm.stripe_income_limit" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input v-if="activeGateway === 'paypal'" v-model="settingsForm.paypal_income_limit" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input v-else v-model="settingsForm.stripe_income_limit" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                         <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">Maximum total income for this account in the selected cycle. Use `0` for unlimited.</p>
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1.5">Max Amount Per Order</label>
-                        <input v-if="activeGateway === 'paypal'" v-model="settingsForm.paypal_max_per_order" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                        <input v-else v-model="settingsForm.stripe_max_per_order" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input v-if="activeGateway === 'paypal'" v-model="settingsForm.paypal_max_per_order" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input v-else v-model="settingsForm.stripe_max_per_order" type="number" min="0" step="0.01" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                         <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">Maximum single order amount this shield site can process through the active gateway.</p>
                       </div>
                     </div>
@@ -765,7 +765,18 @@ function closeSettings() {
 }
 
 function saveSettings() {
+  // Clone form data and remove empty credential fields to prevent overwriting saved values
+  const payload = { ...settingsForm.data() };
+  
+  // Remove empty credential fields
+  if (!payload.paypal_client_id) delete payload.paypal_client_id;
+  if (!payload.paypal_secret) delete payload.paypal_secret;
+  if (!payload.stripe_public_key) delete payload.stripe_public_key;
+  if (!payload.stripe_secret_key) delete payload.stripe_secret_key;
+  if (!payload.stripe_webhook_secret) delete payload.stripe_webhook_secret;
+  
   settingsForm.put(`/sites/${settingsSite.value.id}`, {
+    data: payload,
     onSuccess: closeSettings,
   });
 }
