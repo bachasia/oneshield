@@ -15,6 +15,46 @@
 
     <div class="max-w-2xl space-y-6">
 
+      <!-- CORS Whitelist -->
+      <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+          <div class="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-sky-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-gray-900 leading-none">CORS Whitelist</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Only listed money-site origins can call your gateway API from browser</p>
+          </div>
+        </div>
+
+        <form @submit.prevent="saveCorsOrigins" class="px-6 py-5">
+          <label class="block text-xs font-medium text-gray-700 mb-1.5">Allowed Origins</label>
+          <textarea
+            v-model="corsForm.cors_origins"
+            rows="5"
+            placeholder="https://store1.com\nhttps://store2.com"
+            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-mono text-gray-700 focus:ring-2 focus:ring-sky-500 focus:outline-none"
+          />
+          <p v-if="corsForm.errors.cors_origins" class="text-xs text-red-600 mt-1.5">{{ corsForm.errors.cors_origins }}</p>
+          <p class="text-xs text-gray-400 mt-2 leading-relaxed">
+            Enter one origin per line (or comma separated). Include scheme, for example <code class="bg-gray-100 px-1 rounded font-mono">https://shop.example.com</code>.
+            Leave empty to block browser-origin API calls for this tenant.
+          </p>
+
+          <div class="mt-4">
+            <button
+              type="submit"
+              :disabled="corsForm.processing"
+              class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50 transition-colors"
+            >
+              {{ corsForm.processing ? 'Saving...' : 'Save Whitelist' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <!-- Token Secret -->
       <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <!-- Section header -->
@@ -352,6 +392,7 @@ import { ref } from 'vue';
 const props = defineProps({
   token_secret:   String,
   gateway_url:    String,
+  cors_origins:   Array,
   gateway_tokens: Array,
   webhook_urls:   Object,
   plugins:        Array,
@@ -359,6 +400,9 @@ const props = defineProps({
 
 const showToken        = ref(false);
 const regenForm        = useForm({});
+const corsForm         = useForm({
+  cors_origins: (props.cors_origins || []).join('\n'),
+});
 const showCreateToken  = ref(false);
 const createTokenForm  = useForm({ name: '' });
 const copyToast        = ref('');
@@ -390,6 +434,10 @@ function submitCreateToken() {
       createTokenForm.reset();
     },
   });
+}
+
+function saveCorsOrigins() {
+  corsForm.post('/settings/cors-origins');
 }
 
 function revokeToken(token) {

@@ -30,6 +30,7 @@ class SettingsController extends Controller
         return Inertia::render('Settings/Index', [
             'token_secret'   => $user->token_secret,
             'gateway_url'    => $gatewayUrl,
+            'cors_origins'   => $user->cors_origins ?? [],
             'gateway_tokens' => $user->gatewayTokens()->get(['id', 'name', 'is_active', 'last_used_at', 'created_at']),
             'webhook_urls'   => [
                 'paypal' => $webhookBase . '/paypal/{site_id}',
@@ -102,5 +103,67 @@ class SettingsController extends Controller
         $token->update(['is_active' => false]);
 
         return back()->with('success', "Token \"{$token->name}\" revoked.");
+    }
+
+    /**
+     * Save tenant CORS whitelist origins.
+     * POST /settings/cors-origins
+     */
+    public function updateCorsOrigins(Request $request): RedirectResponse
+    {
+        $raw = (string) $request->input('cors_origins', '');
+
+        $entries = preg_split('/[\r\n,]+/', $raw) ?: [];
+        $origins = [];
+        $invalid = [];
+
+        foreach ($entries as $entry) {
+            $entry = trim($entry);
+            if ($entry === '') {
+                continue;
+            }
+
+            $normalized = $this->normalizeOrigin($entry);
+            if ($normalized === null) {
+                $invalid[] = $entry;
+                continue;
+            }
+
+            $origins[] = $normalized;
+        }
+
+        $origins = array_values(array_unique($origins));
+
+        if (!empty($invalid)) {
+            return back()->withErrors([
+                'cors_origins' => 'Invalid origin(s): ' . implode(', ', array_slice($invalid, 0, 5)),
+            ]);
+        }
+
+        $request->user()->update([
+            'cors_origins' => $origins,
+        ]);
+
+        return back()->with('success', 'CORS whitelist updated.');
+    }
+
+    private function normalizeOrigin(string $origin): ?string
+    {
+        $origin = rtrim($origin, '/');
+
+        if (!preg_match('#^https?://#i', $origin)) {
+            return null;
+        }
+
+        $parts = parse_url($origin);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+        $port = isset($parts['port']) ? ':' . (int) $parts['port'] : '';
+
+        return $scheme . '://' . $host . $port;
     }
 }

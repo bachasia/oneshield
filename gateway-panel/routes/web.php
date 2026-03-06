@@ -75,6 +75,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
 
     // Settings
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('settings/cors-origins', [SettingsController::class, 'updateCorsOrigins'])->name('settings.cors-origins');
     Route::post('settings/regenerate-token', [SettingsController::class, 'regenerateToken'])->name('settings.regenerate-token');
     Route::post('settings/tokens', [SettingsController::class, 'createToken'])->name('settings.tokens.create');
     Route::delete('settings/tokens/{token}', [SettingsController::class, 'revokeToken'])->name('settings.tokens.revoke');

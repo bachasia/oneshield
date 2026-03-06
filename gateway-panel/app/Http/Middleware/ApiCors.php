@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\GatewayToken;
+use App\Models\ShieldSite;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -16,7 +19,7 @@ class ApiCors
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $allowedOrigins = config('oneshield.cors_origins', ['*']);
+        $allowedOrigins = $this->resolveAllowedOrigins($request);
         $origin = $request->header('Origin', '');
 
         // Determine if this origin is allowed
@@ -53,5 +56,56 @@ class ApiCors
         }
 
         return $response;
+    }
+
+    private function resolveAllowedOrigins(Request $request): array
+    {
+        $origin = (string) $request->header('Origin', '');
+        $tokenValue = (string) $request->header('X-OneShield-Token', '');
+
+        if ($tokenValue !== '') {
+            $user = $this->resolveUserFromToken($tokenValue);
+
+            if ($user) {
+                $tenantOrigins = array_values(array_filter($user->cors_origins ?? []));
+                if (!empty($tenantOrigins)) {
+                    return $tenantOrigins;
+                }
+            }
+
+            // Tenant token provided but no whitelist configured: block by default.
+            return [];
+        }
+
+        // Preflight requests don't include token value. Allow only origins that
+        // appear in at least one tenant whitelist.
+        if ($origin !== '' && User::whereJsonContains('cors_origins', $origin)->exists()) {
+            return [$origin];
+        }
+
+        // No tenant match: block by default.
+        return [];
+    }
+
+    private function resolveUserFromToken(string $tokenValue): ?User
+    {
+        $user = User::where('token_secret', $tokenValue)->first();
+        if ($user) {
+            return $user;
+        }
+
+        $gatewayToken = GatewayToken::where('token', $tokenValue)
+            ->where('is_active', true)
+            ->first();
+        if ($gatewayToken) {
+            return $gatewayToken->user;
+        }
+
+        $site = ShieldSite::where('site_key', $tokenValue)->first();
+        if ($site) {
+            return $site->user;
+        }
+
+        return null;
     }
 }

@@ -20,6 +20,7 @@ class User extends Authenticatable
         'password',
         'tenant_id',
         'token_secret',
+        'cors_origins',
         'is_super_admin',
     ];
 
@@ -31,6 +32,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'is_super_admin' => 'boolean',
+        'cors_origins'   => 'array',
     ];
 
     protected function casts(): array
@@ -39,6 +41,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
             'is_super_admin'    => 'boolean',
+            'cors_origins'      => 'array',
         ];
     }
 
