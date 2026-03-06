@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ShieldSite;
 use App\Models\Transaction;
+use App\Services\CheckoutSessionService;
 use App\Services\HmacService;
 use App\Services\SiteRouterService;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ class PaygatesController extends Controller
     public function __construct(
         private SiteRouterService $siteRouter,
         private HmacService $hmacService,
+        private CheckoutSessionService $sessionService,
     ) {}
 
     /**
@@ -162,6 +164,51 @@ class PaygatesController extends Controller
             $site->site_key
         );
 
+        // ── Phase 1: Dual mode ────────────────────────────────────────────
+        // When CHECKOUT_ID_ENABLED=true, create a checkout_session and return
+        // a short iframe URL with only checkout_id (no sensitive params).
+        // Otherwise fall back to legacy full-param URL.
+        $checkoutIdEnabled = config('oneshield.checkout_id_enabled', false);
+
+        if ($checkoutIdEnabled) {
+            $amountMinor   = (int) round((float) $validated['amount'] * 100);
+            $amountDisplay = number_format((float) $validated['amount'], 2, '.', '');
+
+            $extraParams = $validated['extra_params'] ?? [];
+
+            $session = $this->sessionService->create($user, $site, [
+                'gateway'            => $validated['gateway'],
+                'order_ref'          => $validated['order_id'],
+                'amount_minor'       => $amountMinor,
+                'currency'           => $validated['currency'],
+                'amount_display'     => $amountDisplay,
+                'mode'               => $extraParams['mode'] ?? 'live',
+                'capture_method'     => $extraParams['capture_method'] ?? 'automatic',
+                'enable_wallets'     => ($extraParams['enable_wallets'] ?? '1') === '1',
+                'descriptor'         => $extraParams['statement_descriptor'] ?? null,
+                'description_format' => $extraParams['description_format'] ?? null,
+                'billing'            => $validated['billing'] ?? null,
+                'meta'               => [
+                    'transaction_id' => $transaction->id,
+                    'site_id'        => $site->id,
+                    'txn_id'         => $transaction->id,
+                ],
+            ]);
+
+            // Link session → transaction
+            $session->update(['transaction_id' => $transaction->id]);
+
+            return response()->json([
+                'site_id'        => $site->id,
+                'transaction_id' => $transaction->id,
+                'checkout_id'    => $session->id,
+                'iframe_url'     => $this->sessionService->buildIframeUrl($site, $session->id),
+                'token'          => $checkoutToken,
+                'expires_at'     => $session->expires_at->toIso8601String(),
+            ]);
+        }
+
+        // ── Legacy mode (Phase 1 fallback / Phase 0) ──────────────────────
         // Merge transaction_id + site_id into extra_params so shield site
         // can retrieve billing data from the gateway panel via /api/connect/billing
         $extraParams = array_merge($validated['extra_params'] ?? [], [

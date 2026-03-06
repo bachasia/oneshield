@@ -53,6 +53,8 @@ class HmacAuthentication
             if ($site) {
                 $user        = $site->user;
                 $tokenSecret = $tokenValue;
+                // Store site_id for controllers that need it (e.g. CheckoutSessionController::resolve)
+                $request->attributes->set('site_id', $site->id);
             }
         }
 

@@ -77,4 +77,20 @@ return [
         explode(',', env('ONESHIELD_CORS_ORIGINS', '*'))
     ),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Checkout Session (Phase 1 Feature Flag)
+    |--------------------------------------------------------------------------
+    | CHECKOUT_ID_ENABLED — when true, getSite() returns a short iframe URL
+    | with only checkout_id instead of full query params (amount, currency, etc.)
+    |
+    | Rollout: set to true per-tenant via env or config override.
+    | Set CHECKOUT_ID_TTL_MINUTES to control session expiry (default: 30).
+    */
+    'checkout_id_enabled' => env('CHECKOUT_ID_ENABLED', false),
+
+    'checkout_session' => [
+        'ttl_minutes' => env('CHECKOUT_ID_TTL_MINUTES', 30),
+    ],
+
 ];

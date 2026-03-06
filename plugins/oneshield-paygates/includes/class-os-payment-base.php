@@ -263,12 +263,13 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             return;
         }
 
-        $iframe_url   = esc_url($result['iframe_url']);
-        $os_txn_id    = esc_attr((string) ($result['transaction_id'] ?? ''));
-        $os_site_id   = esc_attr((string) ($result['site_id'] ?? ''));
-        $field_prefix = 'osp_' . $gateway;
-        $iframe_id    = 'osp-iframe-' . $gateway;
-        $loading_id   = 'osp-iframe-loading-' . $gateway;
+        $iframe_url     = esc_url($result['iframe_url']);
+        $os_txn_id      = esc_attr((string) ($result['transaction_id'] ?? ''));
+        $os_site_id     = esc_attr((string) ($result['site_id'] ?? ''));
+        $os_checkout_id = esc_attr((string) ($result['checkout_id'] ?? ''));
+        $field_prefix   = 'osp_' . $gateway;
+        $iframe_id      = 'osp-iframe-' . $gateway;
+        $loading_id     = 'osp-iframe-loading-' . $gateway;
         // Start small; auto-resize via postMessage from iframe content
         $initial_height = $gateway === 'paypal' ? '120' : '200';
         ?>
@@ -310,6 +311,7 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         <input type="hidden" name="<?php echo $field_prefix; ?>_transaction_id"    id="<?php echo $field_prefix; ?>_transaction_id"    value="" />
         <input type="hidden" name="<?php echo $field_prefix; ?>_os_transaction_id" id="<?php echo $field_prefix; ?>_os_transaction_id" value="<?php echo $os_txn_id; ?>" />
         <input type="hidden" name="<?php echo $field_prefix; ?>_os_site_id"        id="<?php echo $field_prefix; ?>_os_site_id"        value="<?php echo $os_site_id; ?>" />
+        <input type="hidden" name="<?php echo $field_prefix; ?>_os_checkout_id"    id="<?php echo $field_prefix; ?>_os_checkout_id"    value="<?php echo $os_checkout_id; ?>" />
         <?php
     }
 

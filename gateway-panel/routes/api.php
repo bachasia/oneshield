@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CheckoutSessionController;
 use App\Http\Controllers\Api\ConnectController;
 use App\Http\Controllers\Api\PaygatesController;
 use App\Http\Controllers\Api\WebhookController;
@@ -93,6 +94,28 @@ Route::prefix('paygates')
         Route::post('confirm',        [PaygatesController::class, 'confirm']);
         Route::post('update-billing', [PaygatesController::class, 'updateBilling']);
         Route::get('iframe-url',      [PaygatesController::class, 'iframeUrl']);
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Checkout Sessions API (money site → gateway panel)
+| Authentication: HMAC-SHA256 + per-token rate limiting
+|--------------------------------------------------------------------------
+*/
+Route::prefix('checkout-sessions')
+    ->middleware([ApiCors::class, HmacAuthentication::class, ThrottlePerToken::class])
+    ->group(function () {
+        // Create a new session (called by Paygates plugin / money site)
+        Route::post('/',             [CheckoutSessionController::class, 'create']);
+
+        // Resolve session context (called by Shield Site WP plugin)
+        Route::get('/{id}',          [CheckoutSessionController::class, 'resolve']);
+
+        // Refresh amount/currency before payment
+        Route::post('/{id}/refresh', [CheckoutSessionController::class, 'refresh']);
+
+        // Mark session completed (internal / webhook flow)
+        Route::post('/{id}/complete', [CheckoutSessionController::class, 'complete']);
     });
 
 /*

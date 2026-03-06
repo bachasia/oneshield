@@ -161,9 +161,18 @@ class SiteRouterService
 
     /**
      * Build the iframe URL for a shield site checkout.
+     *
+     * In dual-mode (Phase 1): if CHECKOUT_ID_ENABLED is true, delegates to
+     * CheckoutSessionService::buildIframeUrl(). Otherwise falls back to legacy
+     * query-param URL.
+     *
+     * @deprecated Use CheckoutSessionService::buildIframeUrl() directly (Phase 2).
      */
     public function buildIframeUrl(ShieldSite $site, string $gateway, string $orderId, string $token, float $amount = 0, string $currency = 'usd', array $extraParams = []): string
     {
+        // Phase 1: when checkout_id feature is enabled, callers should use
+        // CheckoutSessionService::buildIframeUrl() instead. This method remains
+        // for backward-compat during dual-mode rollout.
         $params = [
             'fe-checkout' => '1',
             'gateway'     => $gateway,
