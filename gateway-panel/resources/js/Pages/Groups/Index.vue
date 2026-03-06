@@ -36,7 +36,7 @@
       <div
         v-for="(group, idx) in groups"
         :key="group.id"
-        class="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-sm transition-all group/card"
+        class="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-gray-300 transition-all"
       >
         <!-- Card header -->
         <div class="flex items-start gap-3 mb-3">
@@ -53,8 +53,8 @@
             <h3 class="font-semibold text-gray-900 truncate">{{ group.name }}</h3>
             <p v-if="group.description" class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ group.description }}</p>
           </div>
-          <!-- Actions (show on hover) -->
-          <div class="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+          <!-- Actions -->
+          <div class="flex gap-1">
             <button
               @click="editGroup(group)"
               class="p-1.5 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors cursor-pointer"
