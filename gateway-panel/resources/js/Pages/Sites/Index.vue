@@ -42,7 +42,7 @@
       <div class="flex items-center gap-2">
         <button
           @click="addSite"
-          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          class="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
           Add Site
@@ -50,7 +50,7 @@
         <button
           @click="checkAll"
           :disabled="checkingAll"
-          class="flex items-center gap-1.5 border border-blue-500 text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          class="flex items-center gap-1.5 border border-blue-500 text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
           Check all
@@ -65,7 +65,7 @@
         <select
           v-model="filterGroup"
           @change="applyFilters"
-          class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[180px]"
+          class="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-[180px] cursor-pointer"
         >
           <option value="">All Groups</option>
           <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
@@ -74,7 +74,7 @@
       <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
         <button
           @click="toggleActiveOnly"
-          class="relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none"
+          class="relative inline-flex h-6 w-10 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
           :class="showActiveOnly ? 'bg-indigo-600' : 'bg-gray-300'"
         >
           <span
@@ -143,7 +143,7 @@
 
             <!-- URL + plugin connection status -->
             <td class="px-5 py-4">
-              <a :href="site.url" target="_blank" class="text-gray-700 hover:text-indigo-600 text-sm font-medium break-all">{{ site.url }}</a>
+              <a :href="site.url" target="_blank" class="text-gray-700 hover:text-indigo-600 hover:underline text-sm font-medium break-all cursor-pointer transition-colors">{{ site.url }}</a>
               <div class="mt-2">
                 <span
                   class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
@@ -235,20 +235,20 @@
               <div class="flex items-center gap-2 justify-end flex-wrap">
                 <button
                   @click="openSettings(site)"
-                   class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition-colors"
+                   class="bg-indigo-700 hover:bg-indigo-800 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition-colors cursor-pointer"
                  >Settings</button>
                 <button
                   @click="viewReports(site)"
-                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors"
+                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors cursor-pointer"
                  >Reports</button>
                 <button
                   @click="confirmDelete(site)"
-                   class="bg-red-500 hover:bg-red-600 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition-colors"
+                   class="bg-red-500 hover:bg-red-600 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition-colors cursor-pointer"
                  >Delete</button>
                 <button
                   @click="checkSite(site)"
                   :disabled="checkResults[site.id]?.loading"
-                   class="border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                   class="border border-blue-400 text-blue-600 hover:bg-blue-50 text-xs px-3.5 py-2 rounded-lg font-medium transition-colors flex items-center gap-1.5 disabled:opacity-60 cursor-pointer disabled:cursor-not-allowed"
                  >
                   <!-- Spinner while loading -->
                   <svg v-if="checkResults[site.id]?.loading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -285,10 +285,10 @@
           :key="link.label"
           :href="link.url || ''"
           v-html="link.label"
-           class="px-3 py-1 rounded-lg text-sm"
+           class="px-3 py-1 rounded-lg text-sm transition-colors"
           :class="link.active
             ? 'bg-indigo-600 text-white'
-            : link.url ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'"
+            : link.url ? 'text-gray-600 hover:bg-gray-100 cursor-pointer' : 'text-gray-300 cursor-not-allowed'"
         />
       </div>
     </div>
@@ -311,7 +311,7 @@
         <p class="text-sm text-gray-500 mb-5">Contact your administrator to upgrade your plan.</p>
         <button
           @click="showUpgradeModal = false"
-          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition-colors"
+          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer"
         >Got it</button>
       </div>
     </div>
@@ -333,14 +333,14 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-700 mb-1">Group (optional)</label>
-            <select v-model="addForm.group_id" class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <select v-model="addForm.group_id" class="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
               <option :value="null">No Group</option>
               <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
             </select>
           </div>
            <div class="flex gap-3 pt-3">
-            <button type="button" @click="showAddModal = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button type="submit" :disabled="addForm.processing" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">Add Site</button>
+            <button type="button" @click="showAddModal = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">Cancel</button>
+            <button type="submit" :disabled="addForm.processing" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 cursor-pointer transition-colors">Add Site</button>
           </div>
         </form>
       </div>
@@ -352,7 +352,7 @@
     <transition name="slideover">
       <div v-if="settingsSite" class="fixed inset-0 z-50 flex">
         <!-- Backdrop -->
-        <div class="flex-1 bg-black/40" @click="closeSettings" />
+        <div class="flex-1 bg-black/40 cursor-pointer" @click="closeSettings" />
 
         <!-- Panel -->
         <div class="w-full max-w-[1180px] bg-white shadow-xl flex flex-col overflow-hidden rounded-l-[32px] border-l border-gray-200">
@@ -368,13 +368,13 @@
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <button @click="closeSettings" class="w-9 h-9 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors">
+              <button @click="closeSettings" class="w-9 h-9 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
               <button
                 @click="saveSettings"
                 :disabled="settingsForm.processing"
-                class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-5 py-2.5 rounded-xl font-medium disabled:opacity-50 transition-colors"
+                class="bg-indigo-700 hover:bg-indigo-800 text-white text-sm px-5 py-2.5 rounded-xl font-medium disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {{ settingsForm.processing ? 'Saving...' : 'Save Settings' }}
               </button>
@@ -403,7 +403,7 @@
                   </div>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">Groups</label>
-                    <select v-model="settingsForm.group_id" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <select v-model="settingsForm.group_id" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                       <option :value="null">No Group</option>
                       <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                     </select>
@@ -432,7 +432,7 @@
                         readonly
                         class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600 font-mono"
                       />
-                      <button @click="copyToClipboard(settingsSite.site_key)" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors">Copy</button>
+                      <button @click="copyToClipboard(settingsSite.site_key)" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors cursor-pointer">Copy</button>
                     </div>
                   </div>
                   <!-- Gateway Connect URL -->
@@ -444,7 +444,7 @@
                         readonly
                         class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-600 font-mono"
                       />
-                      <button @click="copyToClipboard(connectUrl())" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors">Copy</button>
+                      <button @click="copyToClipboard(connectUrl())" class="px-3 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors cursor-pointer">Copy</button>
                     </div>
                     <p class="text-[11px] text-gray-400 mt-1.5 leading-relaxed">Enter this URL in the OneShield Connect plugin settings on your WordPress site.</p>
                   </div>
@@ -477,7 +477,7 @@
                     v-for="tab in gatewayTabs"
                     :key="tab.key"
                     @click="activeGateway = tab.key"
-                    class="min-w-[190px] flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors border"
+                    class="min-w-[190px] flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-colors border cursor-pointer"
                     :class="activeGateway === tab.key
                       ? 'bg-gray-50 text-gray-900 border-gray-300'
                       : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-800'"
@@ -538,14 +538,14 @@
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">PayPal Mode</label>
-                          <select v-model="settingsForm.paypal_mode" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                          <select v-model="settingsForm.paypal_mode" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                             <option value="sandbox">sandbox</option>
                             <option value="live">live</option>
                           </select>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Activation</label>
-                          <select v-model="settingsForm.paypal_enabled" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                          <select v-model="settingsForm.paypal_enabled" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                             <option :value="false">No</option>
                             <option :value="true">Yes</option>
                           </select>
@@ -577,14 +577,14 @@
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Stripe Mode</label>
-                          <select v-model="settingsForm.stripe_mode" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                          <select v-model="settingsForm.stripe_mode" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                             <option value="test">test</option>
                             <option value="live">live</option>
                           </select>
                         </div>
                         <div>
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Activation</label>
-                          <select v-model="settingsForm.stripe_enabled" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                          <select v-model="settingsForm.stripe_enabled" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                             <option :value="false">No</option>
                             <option :value="true">Yes</option>
                           </select>
@@ -604,7 +604,7 @@
                           <label class="block text-xs font-medium text-gray-700 mb-1.5">Webhook URL</label>
                           <div class="flex gap-2">
                             <input :value="webhookUrl('stripe')" readonly class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-xs bg-gray-50 text-gray-500 font-mono" />
-                            <button @click="copyToClipboard(webhookUrl('stripe'))" class="px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors">Copy</button>
+                            <button @click="copyToClipboard(webhookUrl('stripe'))" class="px-3.5 py-2.5 border border-gray-300 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors cursor-pointer">Copy</button>
                           </div>
                         </div>
                       </div>
@@ -617,7 +617,7 @@
                       </div>
                       <div>
                         <label class="block text-xs font-medium text-gray-700 mb-1.5">Receive Cycle</label>
-                        <select v-model="settingsForm.receive_cycle" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <select v-model="settingsForm.receive_cycle" class="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer">
                           <option value="lifetime">Lifetime</option>
                           <option value="monthly">Monthly</option>
                           <option value="weekly">Weekly</option>
