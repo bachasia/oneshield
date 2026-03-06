@@ -12,7 +12,7 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
     public function __construct() {
         $this->id                 = 'os_stripe';
         $this->method_title       = __('OneShield Stripe', 'oneshield-paygates');
-        $this->method_description = __('Accept Stripe payments via OneShield Shield Sites.', 'oneshield-paygates');
+        $this->method_description = __('Credit Card payment via Stripe.', 'oneshield-paygates');
         $this->has_fields         = true;
         $this->supports           = ['products'];
 
@@ -20,30 +20,140 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
         $this->init_settings();
         $this->load_settings();
 
-        $this->title       = $this->get_option('title', 'Credit / Debit Card');
-        $this->description = $this->get_option('description', 'Pay securely with your credit or debit card.');
+        $this->title       = $this->get_option('title', 'Credit Card');
+        $this->description = $this->get_option('description', 'Pay with your credit card via Stripe.');
+        $this->icon        = $this->get_card_icons_html();
 
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, [$this, 'process_admin_options']);
     }
 
     protected function get_default_title(): string {
-        return __('Credit / Debit Card', 'oneshield-paygates');
+        return __('Credit Card', 'oneshield-paygates');
+    }
+
+    protected function get_default_description(): string {
+        return __('Pay with your credit card via Stripe.', 'oneshield-paygates');
+    }
+
+    /**
+     * Stripe-specific form fields added after the shared base fields.
+     */
+    protected function get_gateway_form_fields(): array {
+        return [
+            'capture_method' => [
+                'title'       => __('Capture Method', 'oneshield-paygates'),
+                'type'        => 'select',
+                'description' => __('Automatic captures the payment immediately. Manual authorizes and captures later.', 'oneshield-paygates'),
+                'default'     => 'automatic',
+                'desc_tip'    => true,
+                'options'     => [
+                    'automatic' => __('Automatic', 'oneshield-paygates'),
+                    'manual'    => __('Manual', 'oneshield-paygates'),
+                ],
+            ],
+            'enable_wallets' => [
+                'title'       => __('Enable Wallets', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable wallets ApplePay, GooglePay, Amazon Pay, etc.', 'oneshield-paygates'),
+                'default'     => 'yes',
+                'desc_tip'    => true,
+                'description' => __('When enabled, customers can pay with digital wallets if available.', 'oneshield-paygates'),
+            ],
+            'statement_descriptor' => [
+                'title'       => __('Statement Descriptor', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __('Provides information about a card payment that customers see on their statements. Concatenated with the prefix (shortened descriptor) or statement descriptor that\'s set on the account to form the complete statement descriptor. The concatenated descriptor must contain 1-22 characters.', 'oneshield-paygates'),
+                'default'     => '',
+                'placeholder' => get_bloginfo('name'),
+            ],
+            'description_format' => [
+                'title'       => __('Description Format', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __(
+                    'The order description format on Stripe. Available shortcodes:<br/>'
+                    . '[order_id] : Order ID<br/>'
+                    . '[first_name] : Firstname of customer<br/>'
+                    . '[last_name] : Lastname of customer<br/>'
+                    . '[rand_str] : Random n characters.<br/>'
+                    . 'Leave blank to use OneShield default format.',
+                    'oneshield-paygates'
+                ),
+                'default'     => '',
+                'placeholder' => 'Order #[order_id] - [first_name] [last_name]',
+            ],
+            'send_billing' => [
+                'title'       => __('Send Billing Address', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Send billing address to Stripe', 'oneshield-paygates'),
+                'default'     => 'yes',
+                'desc_tip'    => true,
+                'description' => __('Include customer billing info in the payment request.', 'oneshield-paygates'),
+            ],
+            'test_mode' => [
+                'title'       => __('Test Mode', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable test mode', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('When enabled, payments will be processed in test/sandbox mode.', 'oneshield-paygates'),
+            ],
+            'debug' => [
+                'title'       => __('Debug Log', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable logging', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('Log events to WooCommerce → Status → Logs.', 'oneshield-paygates'),
+            ],
+        ];
+    }
+
+    /**
+     * Extra parameters to pass via gateway panel to the iframe URL.
+     */
+    protected function get_iframe_extra_params(): array {
+        $params = parent::get_iframe_extra_params();
+
+        $capture = $this->get_option('capture_method', 'automatic');
+        if ($capture) {
+            $params['capture_method'] = $capture;
+        }
+
+        if ($this->get_option('enable_wallets', 'yes') === 'yes') {
+            $params['enable_wallets'] = '1';
+        }
+
+        $descriptor = $this->get_option('statement_descriptor', '');
+        if ($descriptor) {
+            $params['statement_descriptor'] = $descriptor;
+        }
+
+        $desc_format = $this->get_option('description_format', '');
+        if ($desc_format) {
+            $params['description_format'] = $desc_format;
+        }
+
+        return $params;
+    }
+
+    /**
+     * Card brand icons HTML for the gateway title.
+     */
+    private function get_card_icons_html(): string {
+        $icons_url = plugin_dir_url(dirname(__FILE__)) . 'assets/images/';
+        // Use inline SVG-style or WC default icons
+        return '';
     }
 
     /**
      * Render the payment iframe directly inside the checkout payment section.
-     * Called by WooCommerce when this gateway is selected on checkout.
-     *
-     * We call the Gateway Panel here (PHP-side, synchronous) to get the iframe URL,
-     * so the iframe is ready before the customer clicks Place Order.
      */
     public function payment_fields(): void {
         $this->render_iframe_field('stripe');
     }
 
     /**
-     * Validate that the payment has been completed inside the iframe
-     * before WooCommerce processes the order.
+     * Validate that the payment has been completed inside the iframe.
      */
     public function validate_fields(): bool {
         $txn_id = sanitize_text_field($_POST['osp_stripe_transaction_id'] ?? '');
@@ -57,15 +167,11 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
     }
 
     /**
-     * process_payment() — called after validate_fields() passes.
-     * The iframe has already collected payment; we just need to:
-     *  1. Create the WC order
-     *  2. Confirm the transaction with the Gateway Panel
-     *  3. Mark the order complete and redirect to thank-you
+     * Process payment after iframe confirms success.
      */
     public function process_payment($order_id) {
         $order      = wc_get_order($order_id);
-        $txn_id     = sanitize_text_field($_POST['osp_stripe_transaction_id']  ?? '');
+        $txn_id     = sanitize_text_field($_POST['osp_stripe_transaction_id']    ?? '');
         $os_txn_id  = sanitize_text_field($_POST['osp_stripe_os_transaction_id'] ?? '');
         $os_site_id = (int) ($_POST['osp_stripe_os_site_id'] ?? 0);
 
@@ -74,12 +180,10 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
             return ['result' => 'failure'];
         }
 
-        // Confirm with Gateway Panel
         if ($os_site_id && $os_txn_id) {
             $confirmed = $this->confirm_with_panel($os_site_id, $order->get_id(), $txn_id);
             if (!$confirmed) {
                 $this->log('confirm_with_panel failed for txn ' . $txn_id);
-                // Non-fatal — payment already happened; still complete the order
             }
         }
 

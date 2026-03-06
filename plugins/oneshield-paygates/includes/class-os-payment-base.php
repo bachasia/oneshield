@@ -14,7 +14,17 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
     protected string $group_id     = '';
 
     public function init_form_fields(): void {
-        $this->form_fields = [
+        $this->form_fields = array_merge(
+            $this->get_base_form_fields(),
+            $this->get_gateway_form_fields()
+        );
+    }
+
+    /**
+     * Base fields shared by all gateways.
+     */
+    protected function get_base_form_fields(): array {
+        return [
             'enabled' => [
                 'title'   => __('Enable/Disable', 'oneshield-paygates'),
                 'type'    => 'checkbox',
@@ -28,16 +38,30 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
                 'default'     => $this->get_default_title(),
                 'desc_tip'    => true,
             ],
-            'gateway_url' => [
-                'title'       => __('Gateway Panel URL', 'oneshield-paygates'),
+            'description' => [
+                'title'       => __('Description', 'oneshield-paygates'),
                 'type'        => 'text',
-                'description' => __('URL of your OneShield Gateway Panel.', 'oneshield-paygates'),
-                'placeholder' => 'https://gateway.oneshield.io',
+                'description' => __('Displayed to customer below the title at checkout.', 'oneshield-paygates'),
+                'default'     => $this->get_default_description(),
+                'desc_tip'    => true,
+            ],
+            'place_order_text' => [
+                'title'       => __('Place Order Button Text', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __('Custom text for the Place Order button when this gateway is selected.', 'oneshield-paygates'),
+                'default'     => 'Place Order',
+                'desc_tip'    => true,
+            ],
+            'gateway_url' => [
+                'title'       => __('Gateway URL', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __('Your OneShield Gateway Panel URL (no trailing slash). E.g. https://demo.oneshieldx.com', 'oneshield-paygates'),
+                'placeholder' => 'https://demo.oneshieldx.com',
             ],
             'token_secret' => [
                 'title'       => __('Token Secret', 'oneshield-paygates'),
                 'type'        => 'password',
-                'description' => __('Token Secret from your Gateway Panel (Settings page).', 'oneshield-paygates'),
+                'description' => __('The token string from your Gateway Panel. Go to gateway site → Settings page to get this value.', 'oneshield-paygates'),
             ],
             'connection_status' => [
                 'title' => __('Connection Status', 'oneshield-paygates'),
@@ -46,16 +70,49 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'group_id' => [
                 'title'       => __('Group ID', 'oneshield-paygates'),
                 'type'        => 'text',
-                'description' => __('Optional. Route payments to a specific group of Shield Sites.', 'oneshield-paygates'),
+                'description' => __('The ID of group accounts you want to use for transactions from this payment method.', 'oneshield-paygates'),
                 'default'     => '',
             ],
+        ];
+    }
+
+    /**
+     * Gateway-specific fields. Override in child classes.
+     */
+    protected function get_gateway_form_fields(): array {
+        return [
+            'send_billing' => [
+                'title'       => __('Send Billing Address', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Send billing address to payment gateway', 'oneshield-paygates'),
+                'default'     => 'yes',
+                'desc_tip'    => true,
+                'description' => __('Include customer billing info in the payment request.', 'oneshield-paygates'),
+            ],
+            'test_mode' => [
+                'title'       => __('Test Mode', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable test mode', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('When enabled, payments will be processed in test/sandbox mode.', 'oneshield-paygates'),
+            ],
             'debug' => [
-                'title'   => __('Debug Log', 'oneshield-paygates'),
-                'type'    => 'checkbox',
-                'label'   => __('Enable logging to WooCommerce log file.', 'oneshield-paygates'),
-                'default' => 'no',
+                'title'       => __('Debug Log', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable logging', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('Log events to WooCommerce → Status → Logs.', 'oneshield-paygates'),
             ],
         ];
+    }
+
+    /**
+     * Default description. Override in child classes.
+     */
+    protected function get_default_description(): string {
+        return '';
     }
 
     /**
@@ -183,6 +240,26 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'group_id' => $this->group_id ?: null,
         ];
 
+        // Collect extra params from settings to pass through to the iframe
+        $extra_params = $this->get_iframe_extra_params();
+
+        // Send billing address if enabled
+        if ($this->get_option('send_billing', 'yes') === 'yes') {
+            $customer = WC()->customer;
+            if ($customer) {
+                $extra_params['billing_first_name'] = $customer->get_billing_first_name();
+                $extra_params['billing_last_name']  = $customer->get_billing_last_name();
+                $extra_params['billing_email']      = $customer->get_billing_email();
+                $extra_params['billing_country']    = $customer->get_billing_country();
+                $extra_params['billing_state']      = $customer->get_billing_state();
+                $extra_params['billing_city']       = $customer->get_billing_city();
+                $extra_params['billing_postcode']   = $customer->get_billing_postcode();
+                $extra_params['billing_address_1']  = $customer->get_billing_address_1();
+            }
+        }
+
+        $payload['extra_params'] = $extra_params;
+
         $result = $this->get_iframe_url_from_payload($payload);
 
         if (!$result || empty($result['iframe_url'])) {
@@ -297,10 +374,32 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         return $body;
     }
 
+    /**
+     * Extra parameters to pass through to the iframe URL.
+     * Override in child classes to add gateway-specific params.
+     */
+    protected function get_iframe_extra_params(): array {
+        $params = [];
+
+        if ($this->get_option('test_mode', 'no') === 'yes') {
+            $params['mode'] = 'test';
+        } else {
+            $params['mode'] = 'live';
+        }
+
+        return $params;
+    }
+
     protected function load_settings(): void {
         $this->gateway_url  = $this->get_option('gateway_url', '');
         $this->token_secret = $this->get_option('token_secret', '');
         $this->group_id     = $this->get_option('group_id', '');
+
+        // Custom Place Order button text
+        $custom_btn = $this->get_option('place_order_text', '');
+        if (!empty($custom_btn)) {
+            $this->order_button_text = $custom_btn;
+        }
     }
 
     /**

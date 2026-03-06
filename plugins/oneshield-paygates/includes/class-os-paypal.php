@@ -12,7 +12,7 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     public function __construct() {
         $this->id                 = 'os_paypal';
         $this->method_title       = __('OneShield PayPal', 'oneshield-paygates');
-        $this->method_description = __('Accept PayPal payments via OneShield Shield Sites.', 'oneshield-paygates');
+        $this->method_description = __('PayPal payment via OneShield Shield Sites.', 'oneshield-paygates');
         $this->has_fields         = true;
         $this->supports           = ['products'];
 
@@ -28,6 +28,42 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
 
     protected function get_default_title(): string {
         return __('PayPal', 'oneshield-paygates');
+    }
+
+    protected function get_default_description(): string {
+        return __('Pay securely with your PayPal account.', 'oneshield-paygates');
+    }
+
+    /**
+     * PayPal-specific form fields.
+     */
+    protected function get_gateway_form_fields(): array {
+        return [
+            'send_billing' => [
+                'title'       => __('Send Billing Address', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Send billing address to PayPal', 'oneshield-paygates'),
+                'default'     => 'yes',
+                'desc_tip'    => true,
+                'description' => __('Include customer billing info in the PayPal payment request.', 'oneshield-paygates'),
+            ],
+            'test_mode' => [
+                'title'       => __('Test Mode', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable test mode (sandbox)', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('When enabled, payments will be processed in PayPal sandbox mode.', 'oneshield-paygates'),
+            ],
+            'debug' => [
+                'title'       => __('Debug Log', 'oneshield-paygates'),
+                'type'        => 'checkbox',
+                'label'       => __('Enable logging', 'oneshield-paygates'),
+                'default'     => 'no',
+                'desc_tip'    => true,
+                'description' => __('Log events to WooCommerce → Status → Logs.', 'oneshield-paygates'),
+            ],
+        ];
     }
 
     public function payment_fields(): void {

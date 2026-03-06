@@ -20,6 +20,22 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
     $currency     = strtolower(sanitize_text_field($_GET['currency'] ?? 'usd'));
     $amount_cents = (int) round($amount * 100);
 
+    // Extra params from money site plugin settings
+    $capture_method       = sanitize_text_field($_GET['capture_method'] ?? 'automatic');
+    $statement_descriptor = sanitize_text_field($_GET['statement_descriptor'] ?? '');
+    $enable_wallets       = ($_GET['enable_wallets'] ?? '1') === '1';
+    $send_billing         = ($_GET['send_billing'] ?? '') === 'yes';
+    $mode_param           = sanitize_text_field($_GET['mode'] ?? 'live');
+    $description_format   = sanitize_text_field($_GET['description_format'] ?? '');
+
+    // Billing info (if sent)
+    $billing = [];
+    if ($send_billing) {
+        foreach (['billing_first_name','billing_last_name','billing_email','billing_country','billing_state','billing_city','billing_postcode','billing_address_1'] as $k) {
+            $billing[$k] = sanitize_text_field($_GET[$k] ?? '');
+        }
+    }
+
     if ($amount_cents <= 0) {
         wp_die('Invalid payment amount.', 'Payment Error', ['response' => 400]);
     }
@@ -72,10 +88,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
         (function() {
             const stripe = Stripe('<?php echo esc_js($publishable_key); ?>');
             const orderData = {
-                order_id: '<?php echo esc_js($order_id); ?>',
-                token:    '<?php echo esc_js($token); ?>',
-                amount:   <?php echo (int) $amount_cents; ?>,
-                currency: '<?php echo esc_js($currency); ?>',
+                order_id:             '<?php echo esc_js($order_id); ?>',
+                token:                '<?php echo esc_js($token); ?>',
+                amount:               <?php echo (int) $amount_cents; ?>,
+                currency:             '<?php echo esc_js($currency); ?>',
+                capture_method:       '<?php echo esc_js($capture_method); ?>',
+                statement_descriptor: '<?php echo esc_js($statement_descriptor); ?>',
+                description_format:   '<?php echo esc_js($description_format); ?>',
             };
 
             let elements, paymentElement;
@@ -86,10 +105,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action:   'osc_create_payment_intent',
-                            order_id: orderData.order_id,
-                            amount:   orderData.amount,
-                            currency: orderData.currency,
+                            action:               'osc_create_payment_intent',
+                            order_id:             orderData.order_id,
+                            amount:               orderData.amount,
+                            currency:             orderData.currency,
+                            capture_method:       orderData.capture_method,
+                            statement_descriptor: orderData.statement_descriptor,
+                            description_format:   orderData.description_format,
                         }),
                     });
 
@@ -217,9 +239,12 @@ function osc_ajax_create_payment_intent(): void {
     // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
     // Secured by HMAC checkout token at page level.
 
-    $amount   = (int) ($_POST['amount'] ?? 0);
-    $currency = sanitize_text_field($_POST['currency'] ?? 'usd');
-    $order_id = sanitize_text_field($_POST['order_id'] ?? '');
+    $amount               = (int) ($_POST['amount'] ?? 0);
+    $currency             = sanitize_text_field($_POST['currency'] ?? 'usd');
+    $order_id             = sanitize_text_field($_POST['order_id'] ?? '');
+    $capture_method       = sanitize_text_field($_POST['capture_method'] ?? 'automatic');
+    $statement_descriptor = sanitize_text_field($_POST['statement_descriptor'] ?? '');
+    $description_format   = sanitize_text_field($_POST['description_format'] ?? '');
 
     if ($amount <= 0) {
         wp_send_json_error('Invalid amount');
@@ -232,18 +257,38 @@ function osc_ajax_create_payment_intent(): void {
         wp_send_json_error('Stripe not configured');
     }
 
+    // Build Stripe PaymentIntent params
+    $pi_params = [
+        'amount'   => $amount,
+        'currency' => $currency,
+        'metadata[order_id]' => $order_id,
+        'automatic_payment_methods[enabled]' => 'true',
+    ];
+
+    // Capture method: automatic or manual
+    if (in_array($capture_method, ['automatic', 'manual'], true)) {
+        $pi_params['capture_method'] = $capture_method;
+    }
+
+    // Statement descriptor (max 22 chars, alphanumeric)
+    if (!empty($statement_descriptor)) {
+        $pi_params['statement_descriptor_suffix'] = substr($statement_descriptor, 0, 22);
+    }
+
+    // Description
+    if (!empty($description_format)) {
+        $desc = str_replace('[order_id]', $order_id, $description_format);
+        $desc = str_replace('[rand_str]', substr(bin2hex(random_bytes(4)), 0, 8), $desc);
+        $pi_params['description'] = $desc;
+    }
+
     $response = wp_remote_post('https://api.stripe.com/v1/payment_intents', [
         'timeout' => 15,
         'headers' => [
             'Authorization' => 'Bearer ' . $secret_key,
             'Content-Type'  => 'application/x-www-form-urlencoded',
         ],
-        'body' => http_build_query([
-            'amount'   => $amount,
-            'currency' => $currency,
-            'metadata[order_id]' => $order_id,
-            'automatic_payment_methods[enabled]' => 'true',
-        ]),
+        'body' => http_build_query($pi_params),
     ]);
 
     if (is_wp_error($response)) {

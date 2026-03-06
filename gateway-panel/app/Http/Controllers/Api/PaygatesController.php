@@ -26,11 +26,13 @@ class PaygatesController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'gateway'   => 'required|in:paypal,stripe,airwallex',
-            'order_id'  => 'required|string|max:255',
-            'amount'    => 'required|numeric|min:0.01',
-            'currency'  => 'required|string|size:3',
-            'group_id'  => 'nullable|string|max:255',
+            'gateway'      => 'required|in:paypal,stripe,airwallex',
+            'order_id'     => 'required|string|max:255',
+            'amount'       => 'required|numeric|min:0.01',
+            'currency'     => 'required|string|size:3',
+            'group_id'     => 'nullable|string|max:255',
+            'extra_params' => 'nullable|array',
+            'extra_params.*' => 'nullable|string|max:500',
         ]);
 
         // Resolve group_id: accept integer ID or group name string
@@ -153,7 +155,8 @@ class PaygatesController extends Controller
             $validated['order_id'],
             $checkoutToken,
             (float) $validated['amount'],
-            $validated['currency']
+            $validated['currency'],
+            $validated['extra_params'] ?? []
         );
 
         return response()->json([
@@ -236,11 +239,13 @@ class PaygatesController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'gateway'  => 'required|in:paypal,stripe,airwallex',
-            'order_id' => 'required|string',
-            'amount'   => 'required|numeric|min:0.01',
-            'currency' => 'required|string|size:3',
-            'group_id' => 'nullable|string|max:255',
+            'gateway'        => 'required|in:paypal,stripe,airwallex',
+            'order_id'       => 'required|string',
+            'amount'         => 'required|numeric|min:0.01',
+            'currency'       => 'required|string|size:3',
+            'group_id'       => 'nullable|string|max:255',
+            'extra_params'   => 'nullable|array',
+            'extra_params.*' => 'nullable|string|max:500',
         ]);
 
         // Resolve group_id: accept integer ID or group name string
@@ -279,7 +284,8 @@ class PaygatesController extends Controller
                 $validated['order_id'],
                 $checkoutToken,
                 (float) $validated['amount'],
-                $validated['currency']
+                $validated['currency'],
+                $validated['extra_params'] ?? []
             ),
         ]);
     }

@@ -162,16 +162,24 @@ class SiteRouterService
     /**
      * Build the iframe URL for a shield site checkout.
      */
-    public function buildIframeUrl(ShieldSite $site, string $gateway, string $orderId, string $token, float $amount = 0, string $currency = 'usd'): string
+    public function buildIframeUrl(ShieldSite $site, string $gateway, string $orderId, string $token, float $amount = 0, string $currency = 'usd', array $extraParams = []): string
     {
-        return rtrim($site->url, '/') . '/?' . http_build_query([
+        $params = [
             'fe-checkout' => '1',
             'gateway'     => $gateway,
             'order_id'    => $orderId,
             'token'       => $token,
             'amount'      => $amount,
             'currency'    => strtolower($currency),
-        ]);
+        ];
+
+        // Merge extra params from the money site plugin settings
+        // (capture_method, statement_descriptor, enable_wallets, billing info, etc.)
+        if (!empty($extraParams)) {
+            $params = array_merge($params, $extraParams);
+        }
+
+        return rtrim($site->url, '/') . '/?' . http_build_query($params);
     }
 
     /**
