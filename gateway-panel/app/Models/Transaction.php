@@ -17,11 +17,14 @@ class Transaction extends Model
         'gateway_transaction_id',
         'money_site_domain',
         'raw_response',
+        'billing_data',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount'       => 'decimal:2',
         'raw_response' => 'array',
+        // billing_data is stored as AES-encrypted JSON
+        'billing_data' => 'encrypted:array',
     ];
 
     public function site(): BelongsTo

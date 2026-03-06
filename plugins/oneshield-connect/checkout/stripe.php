@@ -27,6 +27,8 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
     $send_billing         = ($_GET['send_billing'] ?? '') === 'yes';
     $mode_param           = sanitize_text_field($_GET['mode'] ?? 'live');
     $description_format   = sanitize_text_field($_GET['description_format'] ?? '');
+    $txn_id               = (int) ($_GET['txn_id'] ?? 0);
+    $os_site_id           = (int) ($_GET['site_id'] ?? 0);
 
     if ($amount_cents <= 0) {
         wp_die('Invalid payment amount.', 'Payment Error', ['response' => 400]);
@@ -88,6 +90,8 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 statement_descriptor: '<?php echo esc_js($statement_descriptor); ?>',
                 description_format:   '<?php echo esc_js($description_format); ?>',
                 send_billing:         <?php echo $send_billing ? 'true' : 'false'; ?>,
+                txn_id:               <?php echo (int) $txn_id; ?>,
+                os_site_id:           <?php echo (int) $os_site_id; ?>,
             };
 
             let elements, paymentElement;
@@ -105,6 +109,9 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             capture_method:       orderData.capture_method,
                             statement_descriptor: orderData.statement_descriptor,
                             description_format:   orderData.description_format,
+                            send_billing:         orderData.send_billing ? 'yes' : 'no',
+                            txn_id:               orderData.txn_id,
+                            os_site_id:           orderData.os_site_id,
                         }),
                     });
 
@@ -243,6 +250,9 @@ function osc_ajax_create_payment_intent(): void {
     $capture_method       = sanitize_text_field($_POST['capture_method'] ?? 'automatic');
     $statement_descriptor = sanitize_text_field($_POST['statement_descriptor'] ?? '');
     $description_format   = sanitize_text_field($_POST['description_format'] ?? '');
+    $send_billing         = ($_POST['send_billing'] ?? 'no') === 'yes';
+    $txn_id               = (int) ($_POST['txn_id'] ?? 0);
+    $os_site_id           = (int) ($_POST['os_site_id'] ?? 0);
 
     if ($amount <= 0) {
         wp_send_json_error('Invalid amount');
@@ -268,7 +278,7 @@ function osc_ajax_create_payment_intent(): void {
         $pi_params['capture_method'] = $capture_method;
     }
 
-    // Statement descriptor (max 22 chars, alphanumeric)
+    // Statement descriptor (max 22 chars)
     if (!empty($statement_descriptor)) {
         $pi_params['statement_descriptor_suffix'] = substr($statement_descriptor, 0, 22);
     }
@@ -278,6 +288,35 @@ function osc_ajax_create_payment_intent(): void {
         $desc = str_replace('[order_id]', $order_id, $description_format);
         $desc = str_replace('[rand_str]', substr(bin2hex(random_bytes(4)), 0, 8), $desc);
         $pi_params['description'] = $desc;
+    }
+
+    // Fetch and attach billing from gateway panel (server-side, secure)
+    if ($send_billing && $txn_id && $os_site_id) {
+        $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id);
+        if (!empty($billing)) {
+            if (!empty($billing['email'])) {
+                $pi_params['receipt_email'] = $billing['email'];
+            }
+            // Stripe billing_details for the PaymentIntent
+            foreach (['name', 'email', 'phone'] as $field) {
+                $val = '';
+                if ($field === 'name') {
+                    $val = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+                } else {
+                    $val = $billing[$field] ?? '';
+                }
+                if (!empty($val)) {
+                    $pi_params['shipping[name]'] = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+                }
+            }
+            // Address
+            $addr_fields = ['line1' => 'address_1', 'line2' => 'address_2', 'city' => 'city', 'state' => 'state', 'postal_code' => 'postcode', 'country' => 'country'];
+            foreach ($addr_fields as $stripe_key => $billing_key) {
+                if (!empty($billing[$billing_key])) {
+                    $pi_params['shipping[address][' . $stripe_key . ']'] = $billing[$billing_key];
+                }
+            }
+        }
     }
 
     $response = wp_remote_post('https://api.stripe.com/v1/payment_intents', [
@@ -307,4 +346,30 @@ function osc_get_stripe_config(): array {
         'secret_key'      => osc_get_option('stripe_secret_key', ''),
         'mode'            => osc_get_option('stripe_mode', 'test'),
     ];
+}
+
+/**
+ * Fetch billing details from the gateway panel for a given transaction.
+ * Called server-side (PHP) — no PII in URLs or JS.
+ *
+ * @return array|null Billing data array, or null on failure.
+ */
+function osc_fetch_billing_from_gateway(int $txn_id, int $site_id): ?array {
+    if (!osc_is_connected()) {
+        return null;
+    }
+
+    $payload  = ['transaction_id' => $txn_id, 'site_id' => $site_id];
+    $response = wp_remote_post(osc_gateway_url() . '/api/connect/billing', [
+        'timeout' => 8,
+        'headers' => osc_build_headers($payload),
+        'body'    => json_encode($payload),
+    ]);
+
+    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+        return null;
+    }
+
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+    return $body['billing'] ?? null;
 }

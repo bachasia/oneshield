@@ -76,6 +76,7 @@ Route::prefix('connect')
         Route::post('register',          [ConnectController::class, 'register']);
         Route::post('heartbeat',         [ConnectController::class, 'heartbeat']);
         Route::get('status/{site_id}',   [ConnectController::class, 'status']);
+        Route::post('billing',           [ConnectController::class, 'billing']);
     });
 
 /*

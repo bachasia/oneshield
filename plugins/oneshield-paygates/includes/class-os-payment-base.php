@@ -240,15 +240,29 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'group_id' => $this->group_id ?: null,
         ];
 
-        // Collect extra params from settings to pass through to the iframe
-        // Only simple flags — no PII in URL. Shield site handles billing collection.
+        // Collect extra params from settings to pass through to the iframe (simple flags only)
         $extra_params = $this->get_iframe_extra_params();
-
-        if ($this->get_option('send_billing', 'yes') === 'yes') {
-            $extra_params['send_billing'] = 'yes';
-        }
-
         $payload['extra_params'] = $extra_params;
+
+        // Billing data — sent in POST body (not URL) to avoid PII in query string.
+        // Stored encrypted in the transaction record; shield site retrieves it server-side.
+        if ($this->get_option('send_billing', 'yes') === 'yes') {
+            $customer = WC()->customer;
+            if ($customer) {
+                $payload['billing'] = array_filter([
+                    'first_name' => $customer->get_billing_first_name(),
+                    'last_name'  => $customer->get_billing_last_name(),
+                    'email'      => $customer->get_billing_email(),
+                    'phone'      => $customer->get_billing_phone(),
+                    'address_1'  => $customer->get_billing_address_1(),
+                    'address_2'  => $customer->get_billing_address_2(),
+                    'city'       => $customer->get_billing_city(),
+                    'state'      => $customer->get_billing_state(),
+                    'postcode'   => $customer->get_billing_postcode(),
+                    'country'    => $customer->get_billing_country(),
+                ]);
+            }
+        }
 
         $result = $this->get_iframe_url_from_payload($payload);
 

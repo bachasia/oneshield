@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ShieldSite;
+use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -94,6 +95,37 @@ class ConnectController extends Controller
             ],
             'credentials' => $credentials,
         ]);
+    }
+
+    /**
+     * Get billing details for a transaction.
+     * POST /api/connect/billing
+     *
+     * Called by shield site AJAX when creating PaymentIntent,
+     * to get billing data stored by the money site at checkout time.
+     * Requires the shield site to authenticate via HMAC (site_key).
+     */
+    public function billing(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|integer',
+            'site_id'        => 'required|integer',
+        ]);
+
+        // Verify the shield site owns this transaction
+        $transaction = Transaction::where('id', $validated['transaction_id'])
+            ->where('site_id', $validated['site_id'])
+            ->first();
+
+        if (!$transaction) {
+            return response()->json(['error' => 'Transaction not found'], 404);
+        }
+
+        if (empty($transaction->billing_data)) {
+            return response()->json(['billing' => null]);
+        }
+
+        return response()->json(['billing' => $transaction->billing_data]);
     }
 
     /**

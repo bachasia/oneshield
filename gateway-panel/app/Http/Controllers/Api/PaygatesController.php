@@ -26,13 +26,25 @@ class PaygatesController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'gateway'      => 'required|in:paypal,stripe,airwallex',
-            'order_id'     => 'required|string|max:255',
-            'amount'       => 'required|numeric|min:0.01',
-            'currency'     => 'required|string|size:3',
-            'group_id'     => 'nullable|string|max:255',
-            'extra_params' => 'nullable|array',
-            'extra_params.*' => 'nullable|string|max:500',
+            'gateway'          => 'required|in:paypal,stripe,airwallex',
+            'order_id'         => 'required|string|max:255',
+            'amount'           => 'required|numeric|min:0.01',
+            'currency'         => 'required|string|size:3',
+            'group_id'         => 'nullable|string|max:255',
+            'extra_params'     => 'nullable|array',
+            'extra_params.*'   => 'nullable|string|max:500',
+            // Billing details — only accepted when send_billing is set
+            'billing'                   => 'nullable|array',
+            'billing.first_name'        => 'nullable|string|max:100',
+            'billing.last_name'         => 'nullable|string|max:100',
+            'billing.email'             => 'nullable|email|max:255',
+            'billing.phone'             => 'nullable|string|max:30',
+            'billing.address_1'         => 'nullable|string|max:255',
+            'billing.address_2'         => 'nullable|string|max:255',
+            'billing.city'              => 'nullable|string|max:100',
+            'billing.state'             => 'nullable|string|max:100',
+            'billing.postcode'          => 'nullable|string|max:20',
+            'billing.country'           => 'nullable|string|size:2',
         ]);
 
         // Resolve group_id: accept integer ID or group name string
@@ -141,6 +153,7 @@ class PaygatesController extends Controller
             'gateway'            => $validated['gateway'],
             'status'             => 'pending',
             'money_site_domain'  => parse_url($request->header('Origin', ''), PHP_URL_HOST) ?? 'unknown',
+            'billing_data'       => !empty($validated['billing']) ? $validated['billing'] : null,
         ]);
 
         // One-time token for this checkout session (signed with site_key)
@@ -149,6 +162,13 @@ class PaygatesController extends Controller
             $site->site_key
         );
 
+        // Merge transaction_id + site_id into extra_params so shield site
+        // can retrieve billing data from the gateway panel via /api/connect/billing
+        $extraParams = array_merge($validated['extra_params'] ?? [], [
+            'txn_id'  => (string) $transaction->id,
+            'site_id' => (string) $site->id,
+        ]);
+
         $iframeUrl = $this->siteRouter->buildIframeUrl(
             $site,
             $validated['gateway'],
@@ -156,7 +176,7 @@ class PaygatesController extends Controller
             $checkoutToken,
             (float) $validated['amount'],
             $validated['currency'],
-            $validated['extra_params'] ?? []
+            $extraParams
         );
 
         return response()->json([
