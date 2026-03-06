@@ -227,10 +227,33 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             return;
         }
 
-        // Use a temporary order_id placeholder — WC hasn't created the order yet.
-        // The actual WC order ID is set after process_payment(); the gateway panel
-        // uses its own internal transaction_id to track the payment session.
-        $temp_order_id = 'checkout-' . uniqid();
+        // Use a stable temporary order_id per checkout session so page refreshes
+        // do not create a new PaymentIntent each time.
+        $temp_order_id = '';
+        $cart_fingerprint = md5(json_encode([
+            (float) WC()->cart->get_total('raw'),
+            get_woocommerce_currency(),
+            WC()->cart->get_cart_hash(),
+        ]));
+
+        if (WC()->session) {
+            $id_key   = 'osp_' . $gateway . '_temp_order_id';
+            $fp_key   = 'osp_' . $gateway . '_temp_order_fp';
+            $saved_id = (string) WC()->session->get($id_key, '');
+            $saved_fp = (string) WC()->session->get($fp_key, '');
+
+            if (!empty($saved_id) && $saved_fp === $cart_fingerprint) {
+                $temp_order_id = $saved_id;
+            } else {
+                $temp_order_id = 'checkout-' . wp_generate_uuid4();
+                WC()->session->set($id_key, $temp_order_id);
+                WC()->session->set($fp_key, $cart_fingerprint);
+            }
+        }
+
+        if (empty($temp_order_id)) {
+            $temp_order_id = 'checkout-' . wp_generate_uuid4();
+        }
 
         $payload = [
             'gateway'  => $gateway,
@@ -238,6 +261,7 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'amount'   => (float) WC()->cart->get_total('raw'),
             'currency' => get_woocommerce_currency(),
             'group_id' => $this->group_id ?: null,
+            'idempotency_key' => 'osp:' . $gateway . ':' . $temp_order_id,
         ];
 
         // Collect extra params from settings to pass through to the iframe (simple flags only)

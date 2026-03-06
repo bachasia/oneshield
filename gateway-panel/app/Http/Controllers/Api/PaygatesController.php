@@ -33,6 +33,7 @@ class PaygatesController extends Controller
             'amount'           => 'required|numeric|min:0.01',
             'currency'         => 'required|string|size:3',
             'group_id'         => 'nullable|string|max:255',
+            'idempotency_key'  => 'nullable|string|max:100',
             'extra_params'     => 'nullable|array',
             'extra_params.*'   => 'nullable|string|max:500',
             // Billing details — only accepted when send_billing is set
@@ -176,6 +177,7 @@ class PaygatesController extends Controller
                 'descriptor'         => $extraParams['statement_descriptor'] ?? null,
                 'description_format' => $extraParams['description_format'] ?? null,
                 'billing'            => $validated['billing'] ?? null,
+                'idempotency_key'    => $validated['idempotency_key'] ?? null,
                 'meta'               => [
                     'money_site_domain' => $moneySiteDomain,
                     'site_id'           => $site->id,
