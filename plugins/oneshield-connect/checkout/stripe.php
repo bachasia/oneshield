@@ -145,6 +145,23 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         fields: {
                             billingDetails: 'never',
                         },
+                        wallets: {
+                            applePay:  <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
+                            googlePay: <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
+                        },
+                        // Hide "Save my info" / Stripe Link prompt
+                        terms: {
+                            card:         'never',
+                            applePay:     'never',
+                            googlePay:    'never',
+                            paypal:       'never',
+                            auBecsDebit:  'never',
+                            bancontact:   'never',
+                            ideal:        'never',
+                            sepaDebit:    'never',
+                            sofort:       'never',
+                            usBankAccount:'never',
+                        },
                     };
 
                     paymentElement = elements.create('payment', paymentOpts);
