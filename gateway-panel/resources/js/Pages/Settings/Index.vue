@@ -39,7 +39,7 @@
             <div class="flex flex-col gap-1">
               <button
                 @click="showToken = !showToken"
-                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
+                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors cursor-pointer"
                 :title="showToken ? 'Hide token' : 'Show token'"
               >
                 <svg v-if="!showToken" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -47,7 +47,7 @@
               </button>
               <button
                 @click="copyToken"
-                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors"
+                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors cursor-pointer"
                 title="Copy token"
               >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
@@ -68,7 +68,7 @@
               <button
                 type="submit"
                 :disabled="regenForm.processing"
-                class="px-3 py-1.5 bg-white hover:bg-red-600 hover:text-white text-red-700 border border-red-300 hover:border-red-600 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
+                class="px-3 py-1.5 bg-white hover:bg-red-600 hover:text-white text-red-700 border border-red-300 hover:border-red-600 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
               >
                 {{ regenForm.processing ? 'Regenerating…' : 'Regenerate' }}
               </button>
@@ -94,7 +94,7 @@
           <!-- Create token button -->
           <button
             @click="showCreateToken = true"
-            class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium transition-colors"
+            class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium transition-colors cursor-pointer"
           >
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -112,7 +112,7 @@
               <code class="flex-1 bg-white border border-green-200 px-3 py-2 rounded-lg text-xs font-mono break-all text-gray-800">{{ $page.props.flash.new_token }}</code>
               <button
                 @click="copyText($page.props.flash.new_token)"
-                class="w-8 h-8 rounded-lg border border-green-200 flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors flex-shrink-0"
+                class="w-8 h-8 rounded-lg border border-green-200 flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors flex-shrink-0 cursor-pointer"
                 title="Copy token"
               >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
@@ -158,7 +158,7 @@
               <button
                 v-if="token.is_active"
                 @click="revokeToken(token)"
-                class="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                class="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
               >
                 Revoke
               </button>
@@ -189,8 +189,8 @@
               <p class="text-xs text-gray-400 mt-1.5">Give it a descriptive name so you can identify it later.</p>
             </div>
             <div class="flex gap-3 pt-2">
-              <button type="button" @click="showCreateToken = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button type="submit" :disabled="createTokenForm.processing" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50">Create</button>
+              <button type="button" @click="showCreateToken = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50 cursor-pointer transition-colors">Cancel</button>
+              <button type="submit" :disabled="createTokenForm.processing" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed transition-colors">Create</button>
             </div>
           </form>
         </div>
@@ -214,7 +214,7 @@
             <code class="flex-1 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg text-xs font-mono break-all text-gray-600">{{ gateway_url }}</code>
             <button
               @click="copyText(gateway_url)"
-              class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors flex-shrink-0"
+              class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors flex-shrink-0 cursor-pointer"
               title="Copy URL"
             >
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
@@ -267,7 +267,7 @@
               <code class="flex-1 bg-gray-50 border border-gray-200 px-3 py-2 rounded-lg text-xs font-mono break-all text-gray-600">{{ url }}</code>
               <button
                 @click="copyText(url)"
-                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors flex-shrink-0"
+                class="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50 transition-colors flex-shrink-0 cursor-pointer"
                 title="Copy URL"
               >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
@@ -326,7 +326,7 @@
             <!-- Download button -->
             <a
               :href="plugin.download_url"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex-shrink-0"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex-shrink-0 cursor-pointer"
               :class="plugin.key === 'connect'
                 ? 'text-indigo-700 border-indigo-200 bg-indigo-50 hover:bg-indigo-600 hover:text-white hover:border-indigo-600'
                 : 'text-violet-700 border-violet-200 bg-violet-50 hover:bg-violet-600 hover:text-white hover:border-violet-600'"
