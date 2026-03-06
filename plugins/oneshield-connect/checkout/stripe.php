@@ -130,16 +130,10 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
+                        fields: {
+                            billingDetails: orderData.send_billing ? 'auto' : 'never',
+                        },
                     };
-
-                    // Collect billing address inside Stripe Elements when send_billing=yes
-                    if (orderData.send_billing) {
-                        paymentOpts.fields = {
-                            billingDetails: {
-                                address: 'auto',
-                            },
-                        };
-                    }
 
                     paymentElement = elements.create('payment', paymentOpts);
 
