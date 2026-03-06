@@ -121,6 +121,9 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         return;
                     }
 
+                    // Store billing_details returned by PHP (fetched server-side from gateway panel)
+                    orderData.billing_details = data.data.billing_details || null;
+
                     elements = stripe.elements({
                         clientSecret: data.data.client_secret,
                         appearance: {
@@ -177,10 +180,23 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 var btn = document.getElementById('submit');
                 btn.disabled = true;
 
-                var { error, paymentIntent } = await stripe.confirmPayment({
+                var confirmOpts = {
                     elements: elements,
                     redirect: 'if_required',
-                });
+                };
+
+                // Attach billing_details to PaymentMethod for AVS / fraud checks.
+                // billingDetails:'never' hides fields in the UI but we still need
+                // to supply them programmatically so Stripe Radar has the data.
+                if (orderData.billing_details) {
+                    confirmOpts.confirmParams = {
+                        payment_method_data: {
+                            billing_details: orderData.billing_details,
+                        },
+                    };
+                }
+
+                var { error, paymentIntent } = await stripe.confirmPayment(confirmOpts);
 
                 if (error) {
                     showError(error.message);
@@ -290,32 +306,51 @@ function osc_ajax_create_payment_intent(): void {
         $pi_params['description'] = $desc;
     }
 
-    // Fetch and attach billing from gateway panel (server-side, secure)
+    // Fetch billing from gateway panel (server-side, never exposed in JS/URL)
+    $billing_for_js = null;
     if ($send_billing && $txn_id && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id);
         if (!empty($billing)) {
+            $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+
+            // receipt_email on PaymentIntent
             if (!empty($billing['email'])) {
                 $pi_params['receipt_email'] = $billing['email'];
             }
-            // Stripe billing_details for the PaymentIntent
-            foreach (['name', 'email', 'phone'] as $field) {
-                $val = '';
-                if ($field === 'name') {
-                    $val = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
-                } else {
-                    $val = $billing[$field] ?? '';
-                }
-                if (!empty($val)) {
-                    $pi_params['shipping[name]'] = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
-                }
+
+            // Shipping on PaymentIntent (fraud signals for Stripe Radar)
+            if (!empty($full_name)) {
+                $pi_params['shipping[name]'] = $full_name;
             }
-            // Address
-            $addr_fields = ['line1' => 'address_1', 'line2' => 'address_2', 'city' => 'city', 'state' => 'state', 'postal_code' => 'postcode', 'country' => 'country'];
-            foreach ($addr_fields as $stripe_key => $billing_key) {
+            $addr_map = [
+                'shipping[address][line1]'       => 'address_1',
+                'shipping[address][line2]'       => 'address_2',
+                'shipping[address][city]'        => 'city',
+                'shipping[address][state]'       => 'state',
+                'shipping[address][postal_code]' => 'postcode',
+                'shipping[address][country]'     => 'country',
+            ];
+            foreach ($addr_map as $stripe_key => $billing_key) {
                 if (!empty($billing[$billing_key])) {
-                    $pi_params['shipping[address][' . $stripe_key . ']'] = $billing[$billing_key];
+                    $pi_params[$stripe_key] = $billing[$billing_key];
                 }
             }
+
+            // Also return billing_details to JS for confirmPayment()
+            // so Stripe can attach it to the PaymentMethod for AVS/fraud checks
+            $billing_for_js = array_filter([
+                'name'  => $full_name ?: null,
+                'email' => $billing['email'] ?? null,
+                'phone' => $billing['phone'] ?? null,
+                'address' => array_filter([
+                    'line1'       => $billing['address_1'] ?? null,
+                    'line2'       => $billing['address_2'] ?? null,
+                    'city'        => $billing['city'] ?? null,
+                    'state'       => $billing['state'] ?? null,
+                    'postal_code' => $billing['postcode'] ?? null,
+                    'country'     => $billing['country'] ?? null,
+                ]),
+            ]);
         }
     }
 
@@ -337,7 +372,10 @@ function osc_ajax_create_payment_intent(): void {
         wp_send_json_error($body['error']['message']);
     }
 
-    wp_send_json_success(['client_secret' => $body['client_secret']]);
+    wp_send_json_success([
+        'client_secret'   => $body['client_secret'],
+        'billing_details' => $billing_for_js, // null when send_billing=no
+    ]);
 }
 
 function osc_get_stripe_config(): array {
