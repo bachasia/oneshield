@@ -173,12 +173,11 @@ function osc_handle_checkout_by_id(string $checkout_id): void {
  * @return array|WP_Error Session payload array or WP_Error on failure.
  */
 function osc_resolve_checkout_session(string $checkout_id): array|\WP_Error {
-    $site_id = (int) osc_site_id();
-    $payload = ['site_id' => $site_id];
-
     $response = wp_remote_get(osc_gateway_url() . '/api/checkout-sessions/' . rawurlencode($checkout_id), [
         'timeout' => 10,
-        'headers' => osc_build_headers($payload),
+        // GET /checkout-sessions/{id} does not send request body/query payload.
+        // Sign an empty payload so HMAC verification matches Request::all() on Laravel.
+        'headers' => osc_build_headers([]),
     ]);
 
     if (is_wp_error($response)) {
