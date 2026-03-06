@@ -8,11 +8,17 @@ function osp_enqueue_scripts(): void {
         return;
     }
 
+    $checkout_js_ver = OSP_VERSION;
+    $checkout_js_path = OSP_PLUGIN_DIR . 'assets/js/checkout.js';
+    if (file_exists($checkout_js_path)) {
+        $checkout_js_ver .= '.' . (string) filemtime($checkout_js_path);
+    }
+
     wp_enqueue_script(
         'oneshield-paygates-checkout',
         OSP_PLUGIN_URL . 'assets/js/checkout.js',
         ['jquery'],
-        OSP_VERSION,
+        $checkout_js_ver,
         true
     );
 

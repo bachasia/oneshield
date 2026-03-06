@@ -256,6 +256,23 @@
         }, 30000);
     });
 
+    // WooCommerce may submit checkout without a direct button click
+    // (e.g. pressing Enter). Enforce OneShield confirm flow in that path too.
+    $(document.body).on('checkout_place_order_os_stripe checkout_place_order_os_paypal', function () {
+        var gateway = getActiveOspGateway();
+        if (!gateway) return true;
+
+        if (state[gateway] && state[gateway].confirmed) {
+            return true;
+        }
+
+        if (!isConfirming) {
+            $('#place_order').trigger('click');
+        }
+
+        return false;
+    });
+
     // ── Hide loading overlay when iframe finishes loading ───────────────────
 
     function attachIframeLoadHandlers() {

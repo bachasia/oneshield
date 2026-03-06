@@ -280,7 +280,10 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     return;
                 }
 
-                if (paymentIntent && paymentIntent.status === 'succeeded') {
+                // Treat both "succeeded" and "requires_capture" as a successful
+                // authorization from checkout perspective. "requires_capture" is
+                // returned when capture_method=manual.
+                if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
                     // Notify tracking (non-blocking)
                     fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
                         method: 'POST',
@@ -300,6 +303,19 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         transaction_id: paymentIntent.id,
                         order_id:       orderData.order_id,
                     }, '*');
+                } else {
+                    // Explicitly notify parent on unexpected status so checkout
+                    // overlay can be closed and customer can retry.
+                    var statusMsg = paymentIntent && paymentIntent.status
+                        ? ('Payment status: ' + paymentIntent.status)
+                        : 'Payment not completed. Please try again.';
+                    showError(statusMsg);
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'payment_error',
+                        message: statusMsg,
+                    }, '*');
+                    btn.disabled = false;
                 }
             }
 
