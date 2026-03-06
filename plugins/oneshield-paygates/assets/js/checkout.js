@@ -32,6 +32,7 @@
         paypal: { confirmed: false, txnId: '' },
     };
     var isConfirming = false;
+    var confirmTimeoutId = null;
 
     // ── Loading overlay ─────────────────────────────────────────────────────
 
@@ -183,7 +184,10 @@
         // Re-submit the WC checkout form to complete the order
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
         if (form) {
-            $(form).submit();
+            // Keep success state visible briefly so customers see clear feedback.
+            setTimeout(function () {
+                $(form).submit();
+            }, 650);
         }
     });
 
@@ -249,7 +253,10 @@
         }
 
         // Re-enable button + hide overlay after timeout in case iframe never responds
-        setTimeout(function () {
+        if (confirmTimeoutId) {
+            clearTimeout(confirmTimeoutId);
+        }
+        confirmTimeoutId = setTimeout(function () {
             $btn.prop('disabled', false).css('opacity', '');
             isConfirming = false;
             hideOverlay();
@@ -295,7 +302,22 @@
         state.paypal.confirmed = false;
         state.paypal.txnId     = '';
         isConfirming = false;
+        if (confirmTimeoutId) {
+            clearTimeout(confirmTimeoutId);
+            confirmTimeoutId = null;
+        }
         hideOverlay();
+    });
+
+    // WooCommerce emits checkout_error on validation/server errors.
+    $(document.body).on('checkout_error', function () {
+        isConfirming = false;
+        if (confirmTimeoutId) {
+            clearTimeout(confirmTimeoutId);
+            confirmTimeoutId = null;
+        }
+        hideOverlay();
+        $('#place_order').prop('disabled', false).css('opacity', '');
     });
 
     // ── Utilities ───────────────────────────────────────────────────────────
