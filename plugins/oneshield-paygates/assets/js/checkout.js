@@ -76,11 +76,12 @@
         var prefix = 'osp_' + gateway;
 
         // Write transaction_id into hidden inputs
-        var txnInput   = document.querySelector('[name="' + prefix + '_transaction_id"]');
-        var osTxnInput = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
-        var siteInput  = document.querySelector('[name="' + prefix + '_os_site_id"]');
+        var txnInput        = document.querySelector('[name="' + prefix + '_transaction_id"]');
+        var osTxnInput      = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
+        var siteInput       = document.querySelector('[name="' + prefix + '_os_site_id"]');
+        var checkoutIdInput = document.querySelector('[name="' + prefix + '_os_checkout_id"]');
 
-        if (txnInput)   txnInput.value   = msg.transaction_id;
+        if (txnInput) txnInput.value = msg.transaction_id;
 
         // Show success UI inside the iframe wrap
         var iframe = getIframe(gateway);
@@ -96,8 +97,9 @@
                 '<p style="margin:6px 0 0;font-size:13px;color:#4ade80;">Completing your order…</p>' +
                 '</div>' +
                 '<input type="hidden" name="' + prefix + '_transaction_id"    value="' + escAttr(msg.transaction_id) + '" />' +
-                '<input type="hidden" name="' + prefix + '_os_transaction_id" value="' + escAttr(osTxnInput ? osTxnInput.value : '') + '" />' +
-                '<input type="hidden" name="' + prefix + '_os_site_id"        value="' + escAttr(siteInput ? siteInput.value : '') + '" />';
+                '<input type="hidden" name="' + prefix + '_os_transaction_id" value="' + escAttr(osTxnInput      ? osTxnInput.value      : '') + '" />' +
+                '<input type="hidden" name="' + prefix + '_os_site_id"        value="' + escAttr(siteInput        ? siteInput.value        : '') + '" />' +
+                '<input type="hidden" name="' + prefix + '_os_checkout_id"    value="' + escAttr(checkoutIdInput  ? checkoutIdInput.value  : '') + '" />';
         }
 
         // Re-submit the WC checkout form to complete the order
@@ -122,12 +124,13 @@
             return;
         }
 
-        var iframe    = getIframe(gateway);
-        var osTxnId   = parseInt($('[name="osp_' + gateway + '_os_transaction_id"]').val() || '0', 10);
-        var osSiteId  = parseInt($('[name="osp_' + gateway + '_os_site_id"]').val() || '0', 10);
+        var iframe       = getIframe(gateway);
+        var osTxnId      = parseInt($('[name="osp_' + gateway + '_os_transaction_id"]').val() || '0', 10);
+        var osSiteId     = parseInt($('[name="osp_' + gateway + '_os_site_id"]').val() || '0', 10);
+        var osCheckoutId = $('[name="osp_' + gateway + '_os_checkout_id"]').val() || '';
 
-        if (!iframe || !osTxnId) {
-            // Let WooCommerce continue its native submit/validation flow.
+        if (!iframe || (!osTxnId && !osCheckoutId)) {
+            // No iframe or no payment context at all — let WC handle normally.
             return;
         }
 
@@ -141,19 +144,21 @@
         function doConfirm() {
             // postMessage to iframe: trigger Stripe/PayPal confirmation
             iframe.contentWindow.postMessage({
-                action:  'oneshield-confirm-payment',
-                txn_id:  osTxnId,
-                site_id: osSiteId,
+                action:      'oneshield-confirm-payment',
+                txn_id:      osTxnId,
+                site_id:     osSiteId,
+                checkout_id: osCheckoutId,
             }, '*');
         }
 
         // If send_billing enabled for this gateway, push billing first
-        if (sendBillingGws.indexOf(gateway) !== -1 && osTxnId) {
+        if (sendBillingGws.indexOf(gateway) !== -1 && (osTxnId || osCheckoutId)) {
             $.post(ajaxUrl, {
-                action:    'osp_send_billing',
-                gateway:   gateway,
-                os_txn_id: osTxnId,
-                nonce:     ospData.nonce || '',
+                action:       'osp_send_billing',
+                gateway:      gateway,
+                os_txn_id:    osTxnId,
+                os_checkout_id: osCheckoutId,
+                nonce:        ospData.nonce || '',
             }).always(function () {
                 // Always proceed even if billing update fails (non-fatal)
                 doConfirm();

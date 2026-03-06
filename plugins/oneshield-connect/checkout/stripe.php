@@ -92,6 +92,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 send_billing:         <?php echo $send_billing ? 'true' : 'false'; ?>,
                 txn_id:               <?php echo (int) $txn_id; ?>,
                 os_site_id:           <?php echo (int) $os_site_id; ?>,
+                checkout_id:          '<?php echo esc_js(sanitize_text_field($_GET['checkout_id'] ?? '')); ?>',
             };
 
             let elements, paymentElement;
@@ -112,6 +113,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             send_billing:         orderData.send_billing ? 'yes' : 'no',
                             txn_id:               orderData.txn_id,
                             os_site_id:           orderData.os_site_id,
+                            checkout_id:          orderData.checkout_id,
                         }),
                     });
 
@@ -192,9 +194,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 if (event.data.site_id) {
                     orderData.os_site_id = parseInt(event.data.site_id, 10) || orderData.os_site_id;
                 }
+                // checkout_id mode: store for billing fetch
+                if (event.data.checkout_id) {
+                    orderData.checkout_id = event.data.checkout_id;
+                }
 
                 // Billing may only be available now (sent at Place Order time).
-                if (orderData.send_billing && orderData.txn_id && orderData.os_site_id) {
+                if (orderData.send_billing && (orderData.txn_id || orderData.checkout_id) && orderData.os_site_id) {
                     await refreshBillingDetails();
                 }
 
@@ -207,9 +213,10 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action:     'osc_get_billing_details',
-                            txn_id:     orderData.txn_id,
-                            os_site_id: orderData.os_site_id,
+                            action:      'osc_get_billing_details',
+                            txn_id:      orderData.txn_id,
+                            os_site_id:  orderData.os_site_id,
+                            checkout_id: orderData.checkout_id || '',
                         }),
                     });
 
@@ -322,6 +329,7 @@ function osc_ajax_create_payment_intent(): void {
     $send_billing         = ($_POST['send_billing'] ?? 'no') === 'yes';
     $txn_id               = (int) ($_POST['txn_id'] ?? 0);
     $os_site_id           = (int) ($_POST['os_site_id'] ?? 0);
+    $checkout_id          = sanitize_text_field($_POST['checkout_id'] ?? '');
 
     if ($amount <= 0) {
         wp_send_json_error('Invalid amount');
@@ -361,8 +369,8 @@ function osc_ajax_create_payment_intent(): void {
 
     // Fetch billing from gateway panel (server-side, never exposed in JS/URL)
     $billing_for_js = null;
-    if ($send_billing && $txn_id && $os_site_id) {
-        $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id);
+    if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
+        $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
         if (!empty($billing)) {
             $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
 
@@ -432,14 +440,15 @@ function osc_ajax_create_payment_intent(): void {
 }
 
 function osc_ajax_get_billing_details(): void {
-    $txn_id     = (int) ($_POST['txn_id'] ?? 0);
-    $os_site_id = (int) ($_POST['os_site_id'] ?? 0);
+    $txn_id      = (int) ($_POST['txn_id'] ?? 0);
+    $os_site_id  = (int) ($_POST['os_site_id'] ?? 0);
+    $checkout_id = sanitize_text_field($_POST['checkout_id'] ?? '');
 
-    if (!$txn_id || !$os_site_id) {
+    if (!$txn_id && !$checkout_id) {
         wp_send_json_success(['billing_details' => null]);
     }
 
-    $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id);
+    $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
     if (empty($billing)) {
         wp_send_json_success(['billing_details' => null]);
     }
@@ -472,18 +481,24 @@ function osc_get_stripe_config(): array {
 }
 
 /**
- * Fetch billing details from the gateway panel for a given transaction.
+ * Fetch billing details from the gateway panel for a given transaction or checkout session.
  * Called server-side (PHP) — no PII in URLs or JS.
  *
+ * @param int    $txn_id      Legacy transaction ID (0 when using checkout_id mode)
+ * @param int    $site_id     Shield site ID
+ * @param string $checkout_id Checkout session UUID (checkout_id mode)
  * @return array|null Billing data array, or null on failure.
  */
-function osc_fetch_billing_from_gateway(int $txn_id, int $site_id): ?array {
+function osc_fetch_billing_from_gateway(int $txn_id, int $site_id, string $checkout_id = ''): ?array {
     if (!osc_is_connected()) {
         return null;
     }
 
-    // Prefer checkout_id if available (checkout_id mode — no txn_id yet)
-    $checkout_id = isset($_GET['checkout_id']) ? sanitize_text_field($_GET['checkout_id']) : '';
+    // checkout_id mode: use checkout_id instead of transaction_id
+    // Fallback to $_GET checkout_id when called from page context (not AJAX)
+    if (empty($checkout_id)) {
+        $checkout_id = isset($_GET['checkout_id']) ? sanitize_text_field($_GET['checkout_id']) : '';
+    }
 
     $payload = $checkout_id
         ? ['checkout_id' => $checkout_id, 'site_id' => $site_id]
