@@ -146,35 +146,23 @@ class PaygatesController extends Controller
             ], 503);
         }
 
-        // Create a pending transaction record
-        $transaction = Transaction::create([
-            'site_id'            => $site->id,
-            'order_id'           => $validated['order_id'],
-            'amount'             => $validated['amount'],
-            'currency'           => strtoupper($validated['currency']),
-            'gateway'            => $validated['gateway'],
-            'status'             => 'pending',
-            'money_site_domain'  => parse_url($request->header('Origin', ''), PHP_URL_HOST) ?? 'unknown',
-            'billing_data'       => !empty($validated['billing']) ? $validated['billing'] : null,
-        ]);
+        $moneySiteDomain = parse_url($request->header('Origin', ''), PHP_URL_HOST) ?? 'unknown';
 
-        // One-time token for this checkout session (signed with site_key)
-        $checkoutToken = $this->hmacService->sign(
-            ['transaction_id' => $transaction->id, 'order_id' => $validated['order_id']],
-            $site->site_key
-        );
-
-        // ── Phase 1: Dual mode ────────────────────────────────────────────
-        // When CHECKOUT_ID_ENABLED=true, create a checkout_session and return
-        // a short iframe URL with only checkout_id (no sensitive params).
-        // Otherwise fall back to legacy full-param URL.
+        // ── Phase 1: Dual mode (CHECKOUT_ID_ENABLED=true) ─────────────────
+        // Create a checkout_session to hold payment context + billing (encrypted).
+        // No Transaction record is created here — it will be created only when
+        // payment completes or fails (confirm endpoint / webhook).
         $checkoutIdEnabled = config('oneshield.checkout_id_enabled', false);
 
         if ($checkoutIdEnabled) {
             $amountMinor   = (int) round((float) $validated['amount'] * 100);
             $amountDisplay = number_format((float) $validated['amount'], 2, '.', '');
+            $extraParams   = $validated['extra_params'] ?? [];
 
-            $extraParams = $validated['extra_params'] ?? [];
+            $checkoutToken = $this->hmacService->sign(
+                ['order_id' => $validated['order_id'], 'site_id' => $site->id],
+                $site->site_key
+            );
 
             $session = $this->sessionService->create($user, $site, [
                 'gateway'            => $validated['gateway'],
@@ -189,28 +177,39 @@ class PaygatesController extends Controller
                 'description_format' => $extraParams['description_format'] ?? null,
                 'billing'            => $validated['billing'] ?? null,
                 'meta'               => [
-                    'transaction_id' => $transaction->id,
-                    'site_id'        => $site->id,
-                    'txn_id'         => $transaction->id,
+                    'money_site_domain' => $moneySiteDomain,
+                    'site_id'           => $site->id,
                 ],
             ]);
 
-            // Link session → transaction
-            $session->update(['transaction_id' => $transaction->id]);
-
             return response()->json([
-                'site_id'        => $site->id,
-                'transaction_id' => $transaction->id,
-                'checkout_id'    => $session->id,
-                'iframe_url'     => $this->sessionService->buildIframeUrl($site, $session->id),
-                'token'          => $checkoutToken,
-                'expires_at'     => $session->expires_at->toIso8601String(),
+                'site_id'    => $site->id,
+                'checkout_id' => $session->id,
+                'iframe_url' => $this->sessionService->buildIframeUrl($site, $session->id),
+                'token'      => $checkoutToken,
+                'expires_at' => $session->expires_at->toIso8601String(),
             ]);
         }
 
-        // ── Legacy mode (Phase 1 fallback / Phase 0) ──────────────────────
-        // Merge transaction_id + site_id into extra_params so shield site
-        // can retrieve billing data from the gateway panel via /api/connect/billing
+        // ── Legacy mode ───────────────────────────────────────────────────
+        // Create a pending Transaction immediately so the shield site can fetch
+        // billing via /api/connect/billing using txn_id in the iframe URL.
+        $transaction = Transaction::create([
+            'site_id'            => $site->id,
+            'order_id'           => $validated['order_id'],
+            'amount'             => $validated['amount'],
+            'currency'           => strtoupper($validated['currency']),
+            'gateway'            => $validated['gateway'],
+            'status'             => 'pending',
+            'money_site_domain'  => $moneySiteDomain,
+            'billing_data'       => !empty($validated['billing']) ? $validated['billing'] : null,
+        ]);
+
+        $checkoutToken = $this->hmacService->sign(
+            ['transaction_id' => $transaction->id, 'order_id' => $validated['order_id']],
+            $site->site_key
+        );
+
         $extraParams = array_merge($validated['extra_params'] ?? [], [
             'txn_id'  => (string) $transaction->id,
             'site_id' => (string) $site->id,
@@ -235,9 +234,8 @@ class PaygatesController extends Controller
     }
 
     /**
-     * Update billing data on an existing pending transaction.
-     * Called by process_payment() after WC creates the order — at this point
-     * billing is final (user has confirmed checkout).
+     * Update billing data on an existing pending transaction or checkout session.
+     * Called by process_payment() after WC creates the order — billing is final.
      * POST /api/paygates/update-billing
      */
     public function updateBilling(Request $request): JsonResponse
@@ -245,7 +243,8 @@ class PaygatesController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'transaction_id'     => 'required|integer',
+            'transaction_id'     => 'nullable|integer',
+            'checkout_id'        => 'nullable|string',
             'billing'            => 'required|array',
             'billing.first_name' => 'nullable|string|max:100',
             'billing.last_name'  => 'nullable|string|max:100',
@@ -259,14 +258,25 @@ class PaygatesController extends Controller
             'billing.country'    => 'nullable|string|size:2',
         ]);
 
+        $billing = array_filter($validated['billing']);
+
+        // checkout_id mode: update billing on checkout_session
+        if (!empty($validated['checkout_id'])) {
+            $session = \App\Models\CheckoutSession::where('id', $validated['checkout_id'])
+                ->where('user_id', $user->id)
+                ->firstOrFail();
+
+            $session->update(['billing_snapshot' => $billing]);
+            return response()->json(['success' => true]);
+        }
+
+        // Legacy mode: update billing on pending transaction
         $transaction = Transaction::whereHas('site', fn ($q) => $q->where('user_id', $user->id))
             ->where('id', $validated['transaction_id'])
             ->where('status', 'pending')
             ->firstOrFail();
 
-        $transaction->update([
-            'billing_data' => array_filter($validated['billing']),
-        ]);
+        $transaction->update(['billing_data' => $billing]);
 
         return response()->json(['success' => true]);
     }
@@ -274,18 +284,70 @@ class PaygatesController extends Controller
     /**
      * Confirm a completed payment.
      * POST /api/paygates/confirm
+     *
+     * In checkout_id mode: creates the Transaction record now (not at get-site time).
+     * In legacy mode: updates the existing pending Transaction.
      */
     public function confirm(Request $request): JsonResponse
     {
         $user = $request->user();
 
         $validated = $request->validate([
-            'site_id'               => 'required|integer',
-            'order_id'              => 'required|string',
+            'site_id'                => 'required|integer',
+            'order_id'               => 'required|string',
             'gateway_transaction_id' => 'required|string',
-            'status'                => 'required|in:completed,failed',
+            'status'                 => 'required|in:completed,failed',
+            'gateway'                => 'nullable|in:paypal,stripe,airwallex',
+            'amount'                 => 'nullable|numeric|min:0.01',
+            'currency'               => 'nullable|string|size:3',
+            'checkout_id'            => 'nullable|string',
         ]);
 
+        $site = \App\Models\ShieldSite::where('id', $validated['site_id'])
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        // ── checkout_id mode: create Transaction now ──────────────────────
+        if (!empty($validated['checkout_id'])) {
+            $session = \App\Models\CheckoutSession::where('id', $validated['checkout_id'])
+                ->where('user_id', $user->id)
+                ->first();
+
+            // Resolve amount/currency from session if not provided
+            $amount   = $validated['amount']   ?? ($session ? $session->amount_minor / 100 : 0);
+            $currency = $validated['currency'] ?? ($session ? strtoupper($session->currency) : 'USD');
+            $gateway  = $validated['gateway']  ?? ($session?->gateway ?? 'stripe');
+
+            $billing = $session?->billing_snapshot;
+
+            $transaction = Transaction::create([
+                'site_id'                => $site->id,
+                'order_id'               => $validated['order_id'],
+                'amount'                 => $amount,
+                'currency'               => strtoupper($currency),
+                'gateway'                => $gateway,
+                'status'                 => $validated['status'],
+                'gateway_transaction_id' => $validated['gateway_transaction_id'],
+                'money_site_domain'      => $session?->meta['money_site_domain'] ?? 'unknown',
+                'billing_data'           => $billing ?: null,
+            ]);
+
+            // Link session → transaction and mark complete/cancelled
+            if ($session) {
+                $session->update(['transaction_id' => $transaction->id]);
+                if ($validated['status'] === 'completed') {
+                    $session->markCompleted($validated['gateway_transaction_id']);
+                }
+            }
+
+            return response()->json([
+                'success'        => true,
+                'transaction_id' => $transaction->id,
+                'status'         => $transaction->status,
+            ]);
+        }
+
+        // ── Legacy mode: update existing pending Transaction ──────────────
         $transaction = Transaction::whereHas('site', fn ($q) => $q->where('user_id', $user->id))
             ->where('order_id', $validated['order_id'])
             ->where('status', 'pending')

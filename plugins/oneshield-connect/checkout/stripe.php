@@ -469,7 +469,13 @@ function osc_fetch_billing_from_gateway(int $txn_id, int $site_id): ?array {
         return null;
     }
 
-    $payload  = ['transaction_id' => $txn_id, 'site_id' => $site_id];
+    // Prefer checkout_id if available (checkout_id mode — no txn_id yet)
+    $checkout_id = isset($_GET['checkout_id']) ? sanitize_text_field($_GET['checkout_id']) : '';
+
+    $payload = $checkout_id
+        ? ['checkout_id' => $checkout_id, 'site_id' => $site_id]
+        : ['transaction_id' => $txn_id, 'site_id' => $site_id];
+
     $response = wp_remote_post(osc_gateway_url() . '/api/connect/billing', [
         'timeout' => 8,
         'headers' => osc_build_headers($payload),

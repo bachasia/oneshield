@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CheckoutSession;
 use App\Models\ShieldSite;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
@@ -98,21 +99,34 @@ class ConnectController extends Controller
     }
 
     /**
-     * Get billing details for a transaction.
+     * Get billing details for a transaction or checkout session.
      * POST /api/connect/billing
      *
-     * Called by shield site AJAX when creating PaymentIntent,
-     * to get billing data stored by the money site at checkout time.
-     * Requires the shield site to authenticate via HMAC (site_key).
+     * Called by shield site AJAX when creating PaymentIntent.
+     * Supports both legacy (transaction_id) and checkout_id mode.
      */
     public function billing(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'transaction_id' => 'required|integer',
+            'transaction_id' => 'nullable|integer',
             'site_id'        => 'required|integer',
+            'checkout_id'    => 'nullable|string',
         ]);
 
-        // Verify the shield site owns this transaction
+        // checkout_id mode: fetch billing from checkout_session
+        if (!empty($validated['checkout_id'])) {
+            $session = CheckoutSession::where('id', $validated['checkout_id'])
+                ->where('site_id', $validated['site_id'])
+                ->first();
+
+            if (!$session) {
+                return response()->json(['billing' => null]);
+            }
+
+            return response()->json(['billing' => $session->billing_snapshot]);
+        }
+
+        // Legacy mode: fetch billing from transaction
         $transaction = Transaction::where('id', $validated['transaction_id'])
             ->where('site_id', $validated['site_id'])
             ->first();

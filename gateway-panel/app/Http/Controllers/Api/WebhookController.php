@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CheckoutSession;
 use App\Models\ShieldSite;
 use App\Models\Transaction;
 use App\Services\SiteRouterService;
@@ -48,16 +49,52 @@ class WebhookController extends Controller
                 ->where('order_id', $orderId)
                 ->first();
 
-            if ($transaction && $transaction->status === 'pending') {
-                $transaction->update([
+            if ($transaction) {
+                // Legacy: update existing pending record
+                if ($transaction->status === 'pending') {
+                    $transaction->update([
+                        'status'                 => $status,
+                        'gateway_transaction_id' => $txnId,
+                        'raw_response'           => $payload,
+                    ]);
+
+                    if ($status === 'completed') {
+                        $this->siteRouter->recordSuccess($site);
+                    } elseif ($status === 'failed') {
+                        $this->siteRouter->recordFailure($site);
+                    }
+                }
+            } elseif (in_array($status, ['completed', 'failed'])) {
+                // checkout_id mode: create transaction now
+                $session = CheckoutSession::where('site_id', $siteId)
+                    ->where('order_ref', $orderId)
+                    ->whereIn('status', ['created', 'processing'])
+                    ->latest()
+                    ->first();
+
+                $transaction = Transaction::create([
+                    'site_id'                => $siteId,
+                    'order_id'               => $orderId,
+                    'amount'                 => $session ? $session->amount_minor / 100 : (float) ($payload['mc_gross'] ?? 0),
+                    'currency'               => strtoupper($session?->currency ?? ($payload['mc_currency'] ?? 'USD')),
+                    'gateway'                => 'paypal',
                     'status'                 => $status,
                     'gateway_transaction_id' => $txnId,
+                    'money_site_domain'      => $session?->meta['money_site_domain'] ?? 'unknown',
+                    'billing_data'           => $session?->billing_snapshot ?: null,
                     'raw_response'           => $payload,
                 ]);
 
+                if ($session) {
+                    $session->update(['transaction_id' => $transaction->id]);
+                    if ($status === 'completed') {
+                        $session->markCompleted($txnId);
+                    }
+                }
+
                 if ($status === 'completed') {
                     $this->siteRouter->recordSuccess($site);
-                } elseif ($status === 'failed') {
+                } else {
                     $this->siteRouter->recordFailure($site);
                 }
             }
@@ -101,16 +138,47 @@ class WebhookController extends Controller
             $orderId = $object['metadata']['order_id'] ?? null;
 
             if ($txnId && $orderId) {
+                // Try to find existing transaction (legacy mode — created at get-site time)
                 $transaction = Transaction::where('site_id', $siteId)
                     ->where('order_id', $orderId)
                     ->first();
 
-                if ($transaction && $transaction->status === 'pending') {
-                    $transaction->update([
+                if ($transaction) {
+                    // Legacy: update existing pending record
+                    if ($transaction->status === 'pending') {
+                        $transaction->update([
+                            'status'                 => 'completed',
+                            'gateway_transaction_id' => $txnId,
+                            'raw_response'           => $payload,
+                        ]);
+                        $this->siteRouter->recordSuccess($site);
+                    }
+                } else {
+                    // checkout_id mode: create transaction now from checkout_session
+                    $session = \App\Models\CheckoutSession::where('site_id', $siteId)
+                        ->where('order_ref', $orderId)
+                        ->whereIn('status', ['created', 'processing'])
+                        ->latest()
+                        ->first();
+
+                    $transaction = Transaction::create([
+                        'site_id'                => $siteId,
+                        'order_id'               => $orderId,
+                        'amount'                 => $session ? $session->amount_minor / 100 : ($object['amount'] ?? 0) / 100,
+                        'currency'               => strtoupper($session?->currency ?? ($object['currency'] ?? 'USD')),
+                        'gateway'                => 'stripe',
                         'status'                 => 'completed',
                         'gateway_transaction_id' => $txnId,
+                        'money_site_domain'      => $session?->meta['money_site_domain'] ?? 'unknown',
+                        'billing_data'           => $session?->billing_snapshot ?: null,
                         'raw_response'           => $payload,
                     ]);
+
+                    if ($session) {
+                        $session->update(['transaction_id' => $transaction->id]);
+                        $session->markCompleted($txnId, $txnId);
+                    }
+
                     $this->siteRouter->recordSuccess($site);
                 }
             }
@@ -119,12 +187,38 @@ class WebhookController extends Controller
             $orderId = $object['metadata']['order_id'] ?? null;
 
             if ($txnId && $orderId) {
+                // Try legacy first
                 $updated = Transaction::where('site_id', $siteId)
                     ->where('order_id', $orderId)
                     ->where('status', 'pending')
-                    ->update(['status' => 'failed', 'raw_response' => $payload]);
+                    ->update(['status' => 'failed', 'gateway_transaction_id' => $txnId, 'raw_response' => $payload]);
 
                 if ($updated) {
+                    $this->siteRouter->recordFailure($site);
+                } else {
+                    // checkout_id mode: create failed transaction
+                    $session = \App\Models\CheckoutSession::where('site_id', $siteId)
+                        ->where('order_ref', $orderId)
+                        ->whereIn('status', ['created', 'processing'])
+                        ->latest()
+                        ->first();
+
+                    $transaction = Transaction::create([
+                        'site_id'                => $siteId,
+                        'order_id'               => $orderId,
+                        'amount'                 => $session ? $session->amount_minor / 100 : ($object['amount'] ?? 0) / 100,
+                        'currency'               => strtoupper($session?->currency ?? ($object['currency'] ?? 'USD')),
+                        'gateway'                => 'stripe',
+                        'status'                 => 'failed',
+                        'gateway_transaction_id' => $txnId,
+                        'money_site_domain'      => $session?->meta['money_site_domain'] ?? 'unknown',
+                        'raw_response'           => $payload,
+                    ]);
+
+                    if ($session) {
+                        $session->update(['transaction_id' => $transaction->id]);
+                    }
+
                     $this->siteRouter->recordFailure($site);
                 }
             }
