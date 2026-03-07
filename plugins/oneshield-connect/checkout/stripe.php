@@ -615,16 +615,11 @@ function osc_ajax_create_payment_intent(): void {
         $pi_params['return_url']     = get_site_url() . '/';
     }
 
-    $stripe_idempotency_key = hash('sha256', implode('|', [
-        'osp_pi', $order_id, (string) $amount, strtolower($currency), $capture_method, (string) $os_site_id,
-    ]));
-
     $response = wp_remote_post('https://api.stripe.com/v1/payment_intents', [
         'timeout' => 15,
         'headers' => [
-            'Authorization'   => 'Bearer ' . $secret_key,
-            'Content-Type'    => 'application/x-www-form-urlencoded',
-            'Idempotency-Key' => $stripe_idempotency_key,
+            'Authorization' => 'Bearer ' . $secret_key,
+            'Content-Type'  => 'application/x-www-form-urlencoded',
         ],
         'body' => http_build_query($pi_params),
     ]);
