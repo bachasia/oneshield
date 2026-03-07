@@ -596,6 +596,11 @@ function osc_ajax_create_payment_intent(): void {
 
     // Extract shipping fields — may differ from billing
     $shipping = $billing['shipping'] ?? [];
+    error_log(sprintf(
+        '[OneShield] create_pi shipping: has_shipping=%s keys=%s',
+        empty($shipping) ? 'NO' : 'YES',
+        empty($shipping) ? 'none' : implode(',', array_keys($shipping))
+    ));
     $ship_first     = trim($shipping['first_name'] ?? $first);
     $ship_last      = trim($shipping['last_name']  ?? $last);
     $ship_full_name = trim("$ship_first $ship_last") ?: $full_name;
@@ -606,6 +611,13 @@ function osc_ajax_create_payment_intent(): void {
     $ship_state     = trim($shipping['state']      ?? '');
     $ship_postcode  = trim($shipping['postcode']   ?? '');
     $ship_country   = strtoupper(trim($shipping['country'] ?? ''));
+    error_log(sprintf(
+        '[OneShield] create_pi shipping_parsed: name=%s address1=%s city=%s country=%s',
+        $ship_full_name ?: '(empty)',
+        $ship_address1  ?: '(empty)',
+        $ship_city      ?: '(empty)',
+        $ship_country   ?: '(empty)'
+    ));
 
     // ── Create or retrieve Stripe Customer ───────────────────────────────────
     $customer_id = '';
