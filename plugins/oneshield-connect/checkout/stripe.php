@@ -428,7 +428,10 @@ function osc_ajax_create_payment_intent(): void {
     // Description
     if (!empty($description_format)) {
         $desc = str_replace('[order_id]', $order_id, $description_format);
-        $desc = str_replace('[rand_str]', substr(bin2hex(random_bytes(4)), 0, 8), $desc);
+        // [rand_str] must be deterministic per order_id so it matches when the
+        // same Stripe Idempotency-Key is reused on retry (same key = same body).
+        $rand_str = substr(hash('sha256', 'osp_rand|' . $order_id . '|' . $os_site_id), 0, 8);
+        $desc = str_replace('[rand_str]', $rand_str, $desc);
         $pi_params['description'] = $desc;
     }
 
