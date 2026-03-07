@@ -539,6 +539,39 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         return (bool) ($body['success'] ?? false);
     }
 
+    /**
+     * Patch Stripe PaymentIntent metadata with the real WooCommerce order ID.
+     *
+     * Must be called after process_payment() has the actual WC order ID —
+     * at iframe render time only a temporary checkout-uuid is known.
+     *
+     * Relays via Gateway Panel → shield site AJAX (shield site holds the Stripe secret key).
+     * Fire-and-forget: a failure here is non-fatal; it only affects Stripe dashboard display.
+     *
+     * @param string $checkout_id  Checkout session UUID
+     * @param int    $wc_order_id  Real WooCommerce order ID
+     */
+    public function patch_pi_order_id(string $checkout_id, int $wc_order_id): void {
+        if (empty($this->gateway_url) || empty($this->token_secret) || empty($checkout_id) || !$wc_order_id) {
+            return;
+        }
+
+        $payload = [
+            'checkout_id' => $checkout_id,
+            'wc_order_id' => (string) $wc_order_id,
+        ];
+
+        $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/patch-order-id', [
+            'timeout' => 8,
+            'headers' => $this->sign_request($payload),
+            'body'    => json_encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->log('patch_pi_order_id error: ' . $response->get_error_message());
+        }
+    }
+
     protected function log(string $message): void {
         if ($this->get_option('debug') === 'yes') {
             wc_get_logger()->info('[OneShield ' . strtoupper($this->gateway_name) . '] ' . $message, ['source' => 'oneshield-paygates']);

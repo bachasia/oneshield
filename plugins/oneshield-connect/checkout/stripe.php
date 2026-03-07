@@ -502,6 +502,11 @@ add_action('wp_ajax_osc_get_billing_details', 'osc_ajax_get_billing_details');
 add_action('wp_ajax_nopriv_osc_update_payment_intent', 'osc_ajax_update_payment_intent');
 add_action('wp_ajax_osc_update_payment_intent', 'osc_ajax_update_payment_intent');
 
+// AJAX: Patch PI metadata[wc_order_id] after WooCommerce order is created.
+// Called by Gateway Panel relay after process_payment() confirms the order ID.
+add_action('wp_ajax_nopriv_osc_patch_pi_wc_order', 'osc_ajax_patch_pi_wc_order');
+add_action('wp_ajax_osc_patch_pi_wc_order', 'osc_ajax_patch_pi_wc_order');
+
 function osc_ajax_create_payment_intent(): void {
     $amount               = (int) ($_POST['amount'] ?? 0);
     $currency             = sanitize_text_field($_POST['currency'] ?? 'usd');
@@ -906,6 +911,69 @@ function osc_get_stripe_config(): array {
         'secret_key'      => osc_get_option('stripe_secret_key', ''),
         'mode'            => osc_get_option('stripe_mode', 'test'),
     ];
+}
+
+/**
+ * AJAX: Patch PaymentIntent metadata[wc_order_id] after WooCommerce creates the order.
+ *
+ * Called by the Gateway Panel relay once process_payment() has the real WC order ID.
+ * The shield site holds the Stripe secret key — money site never touches it directly.
+ *
+ * POST params:
+ *   pi_id        — Stripe PaymentIntent ID (pi_xxx)
+ *   wc_order_id  — WooCommerce order ID (integer)
+ *   site_key     — HMAC pre-shared key for this shield site (basic auth)
+ */
+function osc_ajax_patch_pi_wc_order(): void {
+    // Verify request comes from Gateway Panel using this site's site_key.
+    $site_key    = sanitize_text_field($_POST['site_key']    ?? '');
+    $pi_id       = sanitize_text_field($_POST['pi_id']       ?? '');
+    $wc_order_id = sanitize_text_field($_POST['wc_order_id'] ?? '');
+
+    $expected_key = osc_get_option('site_key', '');
+
+    if (empty($site_key) || empty($expected_key) || !hash_equals($expected_key, $site_key)) {
+        wp_send_json_error('Unauthorized', 401);
+    }
+
+    if (empty($pi_id) || !str_starts_with($pi_id, 'pi_')) {
+        wp_send_json_error('Invalid pi_id');
+    }
+
+    if (empty($wc_order_id)) {
+        wp_send_json_error('Missing wc_order_id');
+    }
+
+    $config     = osc_get_stripe_config();
+    $secret_key = $config['secret_key'] ?? '';
+    if (empty($secret_key)) {
+        wp_send_json_error('Stripe not configured');
+    }
+
+    $response = wp_remote_post('https://api.stripe.com/v1/payment_intents/' . rawurlencode($pi_id), [
+        'timeout' => 10,
+        'headers' => [
+            'Authorization' => 'Bearer ' . $secret_key,
+            'Content-Type'  => 'application/x-www-form-urlencoded',
+        ],
+        'body' => http_build_query([
+            'metadata[wc_order_id]' => $wc_order_id,
+            'metadata[order_id]'    => $wc_order_id, // overwrite the temp checkout-uuid
+        ]),
+    ]);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error($response->get_error_message());
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+
+    if ($code >= 400) {
+        wp_send_json_error($body['error']['message'] ?? 'Stripe PI patch failed HTTP ' . $code);
+    }
+
+    wp_send_json_success(['patched' => true, 'pi_id' => $pi_id, 'wc_order_id' => $wc_order_id]);
 }
 
 /**

@@ -368,6 +368,81 @@ class PaygatesController extends Controller
     }
 
     /**
+     * Patch a Stripe PaymentIntent with the real WooCommerce order ID.
+     * POST /api/paygates/patch-order-id
+     *
+     * Called by process_payment() after WC creates the order so the
+     * Stripe dashboard shows the real order number instead of checkout UUID.
+     *
+     * Flow:
+     *  1. Look up CheckoutSession to get stripe_payment_intent_id + site
+     *  2. Relay a signed AJAX call to the shield site's osc_patch_pi_wc_order handler
+     *  3. Also update the Transaction.order_id with the real WC order ID
+     */
+    public function patchOrderId(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'checkout_id' => 'required|string',
+            'wc_order_id' => 'required|string|max:100',
+        ]);
+
+        // Look up session — must belong to this user
+        $session = \App\Models\CheckoutSession::where('id', $validated['checkout_id'])
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$session) {
+            return response()->json(['error' => 'checkout_session_not_found'], 404);
+        }
+
+        $piId = $session->stripe_payment_intent_id ?? $session->gateway_transaction_id ?? null;
+
+        if (empty($piId) || !str_starts_with($piId, 'pi_')) {
+            // No PI on record yet — nothing to patch, succeed silently
+            return response()->json(['success' => true, 'skipped' => true]);
+        }
+
+        // Update Transaction.order_id if linked
+        if ($session->transaction_id) {
+            \App\Models\Transaction::where('id', $session->transaction_id)
+                ->update(['order_id' => $validated['wc_order_id']]);
+        }
+
+        // Relay to shield site via its WordPress AJAX endpoint
+        $site = $session->site;
+        if (!$site || empty($site->url) || empty($site->site_key)) {
+            return response()->json(['success' => true, 'skipped' => true, 'reason' => 'site_url_missing']);
+        }
+
+        $ajaxUrl = rtrim($site->url, '/') . '/wp-admin/admin-ajax.php';
+
+        $relayResp = \Illuminate\Support\Facades\Http::timeout(8)->asForm()->post($ajaxUrl, [
+            'action'      => 'osc_patch_pi_wc_order',
+            'pi_id'       => $piId,
+            'wc_order_id' => $validated['wc_order_id'],
+            'site_key'    => $site->site_key,
+        ]);
+
+        if ($relayResp->failed()) {
+            return response()->json([
+                'success' => false,
+                'error'   => 'shield_relay_failed',
+                'status'  => $relayResp->status(),
+            ], 502);
+        }
+
+        $relayBody = $relayResp->json();
+
+        return response()->json([
+            'success'     => (bool) ($relayBody['success'] ?? false),
+            'pi_id'       => $piId,
+            'wc_order_id' => $validated['wc_order_id'],
+        ]);
+    }
+
+    /**
      * Connection status check for the Paygates plugin settings page.
      * GET /api/paygates/status
      *

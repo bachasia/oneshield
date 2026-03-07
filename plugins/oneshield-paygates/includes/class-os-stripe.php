@@ -210,6 +210,11 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
         if (!empty($os_checkout_id)) {
             $order->update_meta_data('_os_checkout_id', $os_checkout_id);
             $order->save();
+
+            // Patch Stripe PI metadata with the real WC order ID (fire-and-forget).
+            // The iframe received a temp checkout-uuid as order_id; this corrects it
+            // on the Stripe dashboard so operators can cross-reference by WC order number.
+            $this->patch_pi_order_id($os_checkout_id, (int) $order_id);
         }
 
         WC()->cart->empty_cart();
