@@ -238,13 +238,28 @@
 
         // If send_billing enabled for this gateway, push billing first
         if (sendBillingGws.indexOf(gateway) !== -1 && (osTxnId || osCheckoutId)) {
-            $.post(ajaxUrl, {
-                action:         'osp_send_billing',
-                gateway:        gateway,
-                os_txn_id:      osTxnId,
-                os_checkout_id: osCheckoutId,
-                nonce:          ospData.nonce || '',
-            }).always(function () {
+            // Collect billing fields directly from the WC checkout form.
+            // WC()->customer session is not yet updated at AJAX time, so we
+            // must read from the DOM and pass the values explicitly.
+            var $form = $('form.checkout, form#order_review');
+            var billingData = {
+                action:            'osp_send_billing',
+                gateway:           gateway,
+                os_txn_id:         osTxnId,
+                os_checkout_id:    osCheckoutId,
+                nonce:             ospData.nonce || '',
+                billing_first_name: $form.find('[name="billing_first_name"]').val() || '',
+                billing_last_name:  $form.find('[name="billing_last_name"]').val()  || '',
+                billing_email:      $form.find('[name="billing_email"]').val()       || '',
+                billing_phone:      $form.find('[name="billing_phone"]').val()       || '',
+                billing_address_1:  $form.find('[name="billing_address_1"]').val()  || '',
+                billing_address_2:  $form.find('[name="billing_address_2"]').val()  || '',
+                billing_city:       $form.find('[name="billing_city"]').val()        || '',
+                billing_state:      $form.find('[name="billing_state"]').val()       || '',
+                billing_postcode:   $form.find('[name="billing_postcode"]').val()    || '',
+                billing_country:    $form.find('[name="billing_country"]').val()     || '',
+            };
+            $.post(ajaxUrl, billingData).always(function () {
                 // Always proceed even if billing update fails (non-fatal)
                 doConfirm();
             });

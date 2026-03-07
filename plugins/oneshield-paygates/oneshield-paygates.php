@@ -3,7 +3,7 @@
  * Plugin Name: OneShield Paygates
  * Plugin URI: https://oneshield.io
  * Description: WooCommerce payment gateways that route payments through the OneShield Gateway Panel to Shield Sites.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: OneShield
  * License: GPL-2.0+
  * Text Domain: oneshield-paygates
@@ -13,7 +13,7 @@
 
 defined('ABSPATH') || exit;
 
-define('OSP_VERSION', '1.0.0');
+define('OSP_VERSION', '1.0.1');
 define('OSP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('OSP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -56,10 +56,11 @@ add_action('wp_ajax_osp_send_billing', 'osp_ajax_send_billing');
 function osp_ajax_send_billing(): void {
     check_ajax_referer('osp_confirm_nonce', 'nonce');
 
-    $gateway    = sanitize_text_field($_POST['gateway']    ?? '');
-    $os_txn_id  = absint($_POST['os_txn_id'] ?? 0);
+    $gateway        = sanitize_text_field($_POST['gateway']        ?? '');
+    $os_txn_id      = absint($_POST['os_txn_id']                  ?? 0);
+    $os_checkout_id = sanitize_text_field($_POST['os_checkout_id'] ?? '');
 
-    if (!$os_txn_id || !in_array($gateway, ['stripe', 'paypal'], true)) {
+    if ((!$os_txn_id && !$os_checkout_id) || !in_array($gateway, ['stripe', 'paypal'], true)) {
         wp_send_json_error('Invalid params');
     }
 
@@ -68,23 +69,19 @@ function osp_ajax_send_billing(): void {
         wp_send_json_error('Gateway not found');
     }
 
-    // Collect final billing from WC customer (user-confirmed at this point)
-    $customer = WC()->customer;
-    if (!$customer) {
-        wp_send_json_error('No customer session');
-    }
-
+    // Read billing directly from POST — JS sends the form fields explicitly
+    // because WC()->customer session is not yet updated at AJAX call time.
     $billing = array_filter([
-        'first_name' => $customer->get_billing_first_name(),
-        'last_name'  => $customer->get_billing_last_name(),
-        'email'      => $customer->get_billing_email(),
-        'phone'      => $customer->get_billing_phone(),
-        'address_1'  => $customer->get_billing_address_1(),
-        'address_2'  => $customer->get_billing_address_2(),
-        'city'       => $customer->get_billing_city(),
-        'state'      => $customer->get_billing_state(),
-        'postcode'   => $customer->get_billing_postcode(),
-        'country'    => $customer->get_billing_country(),
+        'first_name' => sanitize_text_field($_POST['billing_first_name'] ?? ''),
+        'last_name'  => sanitize_text_field($_POST['billing_last_name']  ?? ''),
+        'email'      => sanitize_email($_POST['billing_email']           ?? ''),
+        'phone'      => sanitize_text_field($_POST['billing_phone']      ?? ''),
+        'address_1'  => sanitize_text_field($_POST['billing_address_1']  ?? ''),
+        'address_2'  => sanitize_text_field($_POST['billing_address_2']  ?? ''),
+        'city'       => sanitize_text_field($_POST['billing_city']       ?? ''),
+        'state'      => sanitize_text_field($_POST['billing_state']      ?? ''),
+        'postcode'   => sanitize_text_field($_POST['billing_postcode']   ?? ''),
+        'country'    => sanitize_text_field($_POST['billing_country']    ?? ''),
     ]);
 
     if (empty($billing)) {
