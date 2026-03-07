@@ -357,28 +357,46 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 }
 
                 var clientSecret = piData.data.client_secret;
+                var piStatus     = piData.data.pi_status || '';
+                var piId         = piData.data.pi_id     || '';
 
-                // ── Step 5: confirm payment with client_secret ─────────────────
-                var result;
-                try {
-                    result = await stripe.confirmPayment({
-                        clientSecret: clientSecret,
-                        confirmParams: {
-                            payment_method: pmId,
-                            return_url: window.location.href,
-                        },
-                        redirect: 'if_required',
-                    });
-                } catch (err) {
-                    var thrownMsg = (err && err.message) ? err.message : 'Payment confirmation failed.';
-                    showError(thrownMsg);
-                    btn.disabled = false;
-                    window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: thrownMsg }, '*');
-                    return;
+                // ── Step 5: confirm payment ────────────────────────────────────
+                // When the server created the PI with confirm=true it may have
+                // already transitioned to succeeded / requires_capture.
+                // In that case skip stripe.confirmPayment() — calling it again
+                // on an already-confirmed PI causes a "This PaymentIntent's
+                // payment_method was not provided" / invalid state error.
+                var error, paymentIntent;
+
+                var alreadyDone = (piStatus === 'succeeded' || piStatus === 'requires_capture');
+
+                if (alreadyDone) {
+                    // PI confirmed server-side — synthesise a paymentIntent object
+                    // so the success handler below works identically.
+                    error         = null;
+                    paymentIntent = { id: piId, status: piStatus };
+                } else {
+                    // PI needs client-side 3DS / redirect confirmation
+                    var result;
+                    try {
+                        result = await stripe.confirmPayment({
+                            clientSecret: clientSecret,
+                            confirmParams: {
+                                payment_method: pmId,
+                                return_url: window.location.href,
+                            },
+                            redirect: 'if_required',
+                        });
+                    } catch (err) {
+                        var thrownMsg = (err && err.message) ? err.message : 'Payment confirmation failed.';
+                        showError(thrownMsg);
+                        btn.disabled = false;
+                        window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: thrownMsg }, '*');
+                        return;
+                    }
+                    error         = result.error;
+                    paymentIntent = result.paymentIntent;
                 }
-
-                var error = result.error;
-                var paymentIntent = result.paymentIntent;
 
                 if (error) {
                     showError(error.message);
@@ -637,6 +655,8 @@ function osc_ajax_create_payment_intent(): void {
 
     wp_send_json_success([
         'client_secret'   => $body['client_secret'],
+        'pi_status'       => $body['status'] ?? '',
+        'pi_id'           => $body['id']     ?? '',
         'billing_details' => $billing_for_js,
     ]);
 }
