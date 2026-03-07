@@ -137,19 +137,16 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
-                        // Never render any billing fields — all collected from WC form
+                        // Only hide country — collected from WC billing form.
+                        // All other fields (name, email, phone, address) are
+                        // collected by Stripe Elements itself. Hiding everything
+                        // requires passing all fields to createPaymentMethod which
+                        // is error-prone; country is the only field we can reliably
+                        // pre-supply from WooCommerce.
                         fields: {
                             billingDetails: {
-                                name:    'never',
-                                email:   'never',
-                                phone:   'never',
                                 address: {
-                                    line1:       'never',
-                                    line2:       'never',
-                                    city:        'never',
-                                    state:       'never',
-                                    postalCode:  'never',
-                                    country:     'never',
+                                    country: 'never',
                                 },
                             },
                         },
@@ -299,38 +296,22 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     return;
                 }
 
-                // ── Step 2: build billing_details from gateway panel data ─────
-                var bd = orderData.billing_details || null;
-                var billingDetails = null;
-
-                if (bd && (bd.name || bd.email)) {
-                    billingDetails = {};
-                    if (bd.name)  billingDetails.name  = bd.name;
-                    if (bd.email) billingDetails.email = bd.email;
-                    if (bd.phone) billingDetails.phone = bd.phone;
-
-                    var addrObj = {};
-                    if (bd.address) {
-                        var addr = bd.address;
-                        // address.line1 must be non-empty for AVS — fallback to 'NONE' per mecom pattern
-                        addrObj.line1       = addr.line1 || 'NONE';
-                        if (addr.line2)       addrObj.line2       = addr.line2;
-                        if (addr.city)        addrObj.city        = addr.city;
-                        if (addr.state)       addrObj.state       = addr.state;
-                        if (addr.postal_code) addrObj.postal_code = addr.postal_code;
-                        addrObj.country     = addr.country || orderData.prefill_country || '';
-                    } else if (orderData.prefill_country) {
-                        addrObj = { line1: 'NONE', country: orderData.prefill_country };
-                    }
-                    if (Object.keys(addrObj).length) billingDetails.address = addrObj;
-                } else if (orderData.prefill_country) {
-                    billingDetails = { address: { line1: 'NONE', country: orderData.prefill_country } };
-                }
+                // ── Step 2: build billing_details for createPaymentMethod ─────
+                // Only address.country needs to be supplied manually — all other
+                // billing fields (name, email, phone, line1, city, state, zip)
+                // are collected by Stripe Elements and passed automatically.
+                var country = (orderData.billing_details && orderData.billing_details.address && orderData.billing_details.address.country)
+                    ? orderData.billing_details.address.country
+                    : (orderData.prefill_country || '');
 
                 // ── Step 3: create PaymentMethod client-side ──────────────────
+                var pmParams = {};
+                if (country) {
+                    pmParams = { billing_details: { address: { country: country } } };
+                }
                 var pmResult = await stripe.createPaymentMethod({
                     elements: elements,
-                    params: billingDetails ? { billing_details: billingDetails } : {},
+                    params: pmParams,
                 });
                 if (pmResult.error) {
                     showError(pmResult.error.message);
