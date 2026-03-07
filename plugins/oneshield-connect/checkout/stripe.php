@@ -266,21 +266,22 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 // Use fetched billing if available, otherwise fall back to a
                 // placeholder so Stripe does not throw a validation error.
                 var bd = orderData.billing_details || {};
-                // Stripe requires ALL billing_details fields to be explicit
-                // strings (not undefined/null) when fields.billingDetails='never'.
-                var billingDetails = {
-                    name:  bd.name  || 'Guest',
-                    email: bd.email || '',
-                    phone: bd.phone || '',
-                    address: {
-                        line1:       (bd.address && bd.address.line1)       || '',
-                        line2:       (bd.address && bd.address.line2)       || '',
-                        city:        (bd.address && bd.address.city)        || '',
-                        state:       (bd.address && bd.address.state)       || '',
-                        postal_code: (bd.address && bd.address.postal_code) || '',
-                        country:     (bd.address && bd.address.country)     || '',
-                    },
-                };
+                // Stripe rejects empty strings for some address fields (e.g. country)
+                // and rejects undefined/missing for name. Strategy:
+                //   - name: always a non-empty string (fallback 'Guest')
+                //   - all other fields: omit entirely if falsy (Stripe accepts absence)
+                var billingDetails = { name: bd.name || 'Guest' };
+                if (bd.email) billingDetails.email = bd.email;
+                if (bd.phone) billingDetails.phone = bd.phone;
+                var addr = bd.address || {};
+                var addrObj = {};
+                if (addr.line1)       addrObj.line1       = addr.line1;
+                if (addr.line2)       addrObj.line2       = addr.line2;
+                if (addr.city)        addrObj.city        = addr.city;
+                if (addr.state)       addrObj.state       = addr.state;
+                if (addr.postal_code) addrObj.postal_code = addr.postal_code;
+                if (addr.country)     addrObj.country     = addr.country;
+                if (Object.keys(addrObj).length) billingDetails.address = addrObj;
 
                 var confirmOpts = {
                     elements: elements,
