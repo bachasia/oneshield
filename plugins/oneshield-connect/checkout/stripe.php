@@ -534,6 +534,11 @@ function osc_ajax_create_payment_intent(): void {
 
     // Fetch billing — available at this point (osp_send_billing already called)
     $billing = null;
+    // In checkout_id mode the iframe URL carries no site_id — fall back to this
+    // shield site's own registered site_id from the plugin config.
+    if (!$os_site_id) {
+        $os_site_id = (int) osc_site_id();
+    }
     if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
     }
@@ -687,6 +692,11 @@ function osc_ajax_get_billing_details(): void {
 
     if (!$txn_id && !$checkout_id) {
         wp_send_json_success(['billing_details' => null]);
+    }
+
+    // In checkout_id mode the JS may not know the site_id — use this site's own ID.
+    if (!$os_site_id) {
+        $os_site_id = (int) osc_site_id();
     }
 
     $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
