@@ -467,19 +467,7 @@ function osc_ajax_create_payment_intent(): void {
 
             // Only return billing_details to JS for confirmPayment()
             // so Stripe can attach it to the PaymentMethod for AVS/fraud checks.
-            $billing_for_js = array_filter([
-                'name'  => $full_name ?: null,
-                'email' => $billing['email'] ?? null,
-                'phone' => $billing['phone'] ?? null,
-                'address' => array_filter([
-                    'line1'       => $billing['address_1'] ?? null,
-                    'line2'       => $billing['address_2'] ?? null,
-                    'city'        => $billing['city'] ?? null,
-                    'state'       => $billing['state'] ?? null,
-                    'postal_code' => $billing['postcode'] ?? null,
-                    'country'     => $billing['country'] ?? null,
-                ]),
-            ]);
+            $billing_for_js = osc_build_billing_for_js($billing);
         }
     }
 
@@ -531,21 +519,7 @@ function osc_ajax_get_billing_details(): void {
         wp_send_json_success(['billing_details' => null]);
     }
 
-    $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
-
-    $billing_for_js = array_filter([
-        'name'  => $full_name ?: null,
-        'email' => $billing['email'] ?? null,
-        'phone' => $billing['phone'] ?? null,
-        'address' => array_filter([
-            'line1'       => $billing['address_1'] ?? null,
-            'line2'       => $billing['address_2'] ?? null,
-            'city'        => $billing['city'] ?? null,
-            'state'       => $billing['state'] ?? null,
-            'postal_code' => $billing['postcode'] ?? null,
-            'country'     => $billing['country'] ?? null,
-        ]),
-    ]);
+    $billing_for_js = osc_build_billing_for_js($billing);
 
     wp_send_json_success(['billing_details' => $billing_for_js]);
 }
@@ -594,4 +568,50 @@ function osc_fetch_billing_from_gateway(int $txn_id, int $site_id, string $check
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
     return $body['billing'] ?? null;
+}
+
+/**
+ * Build a billing_details array safe to send to Stripe via JS confirmPayment().
+ *
+ * Rules:
+ *  - name:    always present, fallback 'Guest' (Stripe requires it when billingDetails='never')
+ *  - others:  omit entirely if empty — Stripe rejects empty string for country and
+ *             other non-nullable fields, so we must not include them at all.
+ */
+function osc_build_billing_for_js(array $billing): array {
+    $first = trim($billing['first_name'] ?? '');
+    $last  = trim($billing['last_name']  ?? '');
+    $name  = trim("$first $last") ?: ($billing['name'] ?? '');
+
+    $result = [
+        'name' => $name ?: 'Guest',
+    ];
+
+    if (!empty($billing['email'])) {
+        $result['email'] = $billing['email'];
+    }
+    if (!empty($billing['phone'])) {
+        $result['phone'] = $billing['phone'];
+    }
+
+    $addr = [];
+    $addr_map = [
+        'line1'       => 'address_1',
+        'line2'       => 'address_2',
+        'city'        => 'city',
+        'state'       => 'state',
+        'postal_code' => 'postcode',
+        'country'     => 'country',
+    ];
+    foreach ($addr_map as $stripe_key => $billing_key) {
+        $val = trim($billing[$billing_key] ?? '');
+        if ($val !== '') {
+            $addr[$stripe_key] = $val;
+        }
+    }
+    if (!empty($addr)) {
+        $result['address'] = $addr;
+    }
+
+    return $result;
 }
