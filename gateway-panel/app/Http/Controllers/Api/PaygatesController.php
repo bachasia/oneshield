@@ -274,6 +274,14 @@ class PaygatesController extends Controller
         $billing  = array_filter($validated['billing']);
         $shipping = array_filter($validated['shipping'] ?? []);
 
+        \Illuminate\Support\Facades\Log::debug('[OneShield] updateBilling', [
+            'checkout_id'    => $validated['checkout_id'] ?? null,
+            'billing_keys'   => array_keys($billing),
+            'shipping_keys'  => array_keys($shipping),
+            'ship_address1'  => $shipping['address_1'] ?? '(empty)',
+            'ship_country'   => $shipping['country']   ?? '(empty)',
+        ]);
+
         // checkout_id mode: update billing on checkout_session
         if (!empty($validated['checkout_id'])) {
             $session = \App\Models\CheckoutSession::where('id', $validated['checkout_id'])
@@ -284,6 +292,7 @@ class PaygatesController extends Controller
             if (!empty($shipping)) {
                 $snapshot['shipping'] = $shipping;
             }
+            \Illuminate\Support\Facades\Log::debug('[OneShield] updateBilling snapshot has_shipping=' . (isset($snapshot['shipping']) ? 'YES' : 'NO'));
             $session->update(['billing_snapshot' => $snapshot]);
             return response()->json(['success' => true]);
         }
