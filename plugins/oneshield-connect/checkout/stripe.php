@@ -581,6 +581,7 @@ function osc_ajax_create_payment_intent(): void {
         error_log('[OneShield] create_pi billing_fetch SKIPPED — condition not met');
     }
 
+    // Extract billing fields
     $first     = trim($billing['first_name'] ?? '');
     $last      = trim($billing['last_name']  ?? '');
     $full_name = trim("$first $last") ?: ($billing['name'] ?? '');
@@ -592,6 +593,19 @@ function osc_ajax_create_payment_intent(): void {
     $state     = trim($billing['state']      ?? '');
     $postcode  = trim($billing['postcode']   ?? '');
     $country   = strtoupper(trim($billing['country'] ?? ''));
+
+    // Extract shipping fields — may differ from billing
+    $shipping = $billing['shipping'] ?? [];
+    $ship_first     = trim($shipping['first_name'] ?? $first);
+    $ship_last      = trim($shipping['last_name']  ?? $last);
+    $ship_full_name = trim("$ship_first $ship_last") ?: $full_name;
+    $ship_phone     = trim($shipping['phone']      ?? $phone);
+    $ship_address1  = trim($shipping['address_1']  ?? '');
+    $ship_address2  = trim($shipping['address_2']  ?? '');
+    $ship_city      = trim($shipping['city']       ?? '');
+    $ship_state     = trim($shipping['state']      ?? '');
+    $ship_postcode  = trim($shipping['postcode']   ?? '');
+    $ship_country   = strtoupper(trim($shipping['country'] ?? ''));
 
     // ── Create or retrieve Stripe Customer ───────────────────────────────────
     $customer_id = '';
@@ -668,16 +682,16 @@ function osc_ajax_create_payment_intent(): void {
         if (!empty(trim($desc))) $pi_params['description'] = trim($desc);
     }
 
-    // shipping
-    if ($full_name && $address1) {
-        $pi_params['shipping[name]']                      = $full_name;
-        $pi_params['shipping[address][line1]']            = $address1;
-        if ($address2) $pi_params['shipping[address][line2]']        = $address2;
-        if ($city)     $pi_params['shipping[address][city]']         = $city;
-        if ($state)    $pi_params['shipping[address][state]']        = $state;
-        if ($postcode) $pi_params['shipping[address][postal_code]']  = $postcode;
-        if ($country)  $pi_params['shipping[address][country]']      = $country;
-        if ($phone)    $pi_params['shipping[phone]']                 = $phone;
+    // shipping — use dedicated shipping address if provided, else fall back to billing
+    if ($ship_full_name && $ship_address1) {
+        $pi_params['shipping[name]']                      = $ship_full_name;
+        $pi_params['shipping[address][line1]']            = $ship_address1;
+        if ($ship_address2) $pi_params['shipping[address][line2]']        = $ship_address2;
+        if ($ship_city)     $pi_params['shipping[address][city]']         = $ship_city;
+        if ($ship_state)    $pi_params['shipping[address][state]']        = $ship_state;
+        if ($ship_postcode) $pi_params['shipping[address][postal_code]']  = $ship_postcode;
+        if ($ship_country)  $pi_params['shipping[address][country]']      = $ship_country;
+        if ($ship_phone)    $pi_params['shipping[phone]']                 = $ship_phone;
     }
 
     // metadata

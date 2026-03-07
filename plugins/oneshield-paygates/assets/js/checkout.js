@@ -277,6 +277,16 @@
                 billing_state:      $form.find('[name="billing_state"]').val()       || '',
                 billing_postcode:   $form.find('[name="billing_postcode"]').val()    || '',
                 billing_country:    $form.find('[name="billing_country"]').val()     || '',
+                // Shipping address — may differ from billing
+                shipping_first_name: $form.find('[name="shipping_first_name"]').val() || $form.find('[name="billing_first_name"]').val() || '',
+                shipping_last_name:  $form.find('[name="shipping_last_name"]').val()  || $form.find('[name="billing_last_name"]').val()  || '',
+                shipping_phone:      $form.find('[name="shipping_phone"]').val()      || $form.find('[name="billing_phone"]').val()      || '',
+                shipping_address_1:  $form.find('[name="shipping_address_1"]').val()  || $form.find('[name="billing_address_1"]').val()  || '',
+                shipping_address_2:  $form.find('[name="shipping_address_2"]').val()  || $form.find('[name="billing_address_2"]').val()  || '',
+                shipping_city:       $form.find('[name="shipping_city"]').val()       || $form.find('[name="billing_city"]').val()       || '',
+                shipping_state:      $form.find('[name="shipping_state"]').val()      || $form.find('[name="billing_state"]').val()      || '',
+                shipping_postcode:   $form.find('[name="shipping_postcode"]').val()   || $form.find('[name="billing_postcode"]').val()   || '',
+                shipping_country:    $form.find('[name="shipping_country"]').val()    || $form.find('[name="billing_country"]').val()    || '',
             };
             $.post(ajaxUrl, billingData).always(function () {
                 // Always proceed even if billing update fails (non-fatal)

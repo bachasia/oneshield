@@ -258,9 +258,21 @@ class PaygatesController extends Controller
             'billing.state'      => 'nullable|string|max:100',
             'billing.postcode'   => 'nullable|string|max:20',
             'billing.country'    => 'nullable|string|size:2',
+            // Shipping address — may differ from billing
+            'shipping'            => 'nullable|array',
+            'shipping.first_name' => 'nullable|string|max:100',
+            'shipping.last_name'  => 'nullable|string|max:100',
+            'shipping.phone'      => 'nullable|string|max:30',
+            'shipping.address_1'  => 'nullable|string|max:255',
+            'shipping.address_2'  => 'nullable|string|max:255',
+            'shipping.city'       => 'nullable|string|max:100',
+            'shipping.state'      => 'nullable|string|max:100',
+            'shipping.postcode'   => 'nullable|string|max:20',
+            'shipping.country'    => 'nullable|string|size:2',
         ]);
 
-        $billing = array_filter($validated['billing']);
+        $billing  = array_filter($validated['billing']);
+        $shipping = array_filter($validated['shipping'] ?? []);
 
         // checkout_id mode: update billing on checkout_session
         if (!empty($validated['checkout_id'])) {
@@ -268,7 +280,11 @@ class PaygatesController extends Controller
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
-            $session->update(['billing_snapshot' => $billing]);
+            $snapshot = $billing;
+            if (!empty($shipping)) {
+                $snapshot['shipping'] = $shipping;
+            }
+            $session->update(['billing_snapshot' => $snapshot]);
             return response()->json(['success' => true]);
         }
 
@@ -278,7 +294,11 @@ class PaygatesController extends Controller
             ->where('status', 'pending')
             ->firstOrFail();
 
-        $transaction->update(['billing_data' => $billing]);
+        $data = $billing;
+        if (!empty($shipping)) {
+            $data['shipping'] = $shipping;
+        }
+        $transaction->update(['billing_data' => $data]);
 
         return response()->json(['success' => true]);
     }

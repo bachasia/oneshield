@@ -84,12 +84,25 @@ function osp_ajax_send_billing(): void {
         'country'    => sanitize_text_field($_POST['billing_country']    ?? ''),
     ]);
 
+    // Shipping address — may differ from billing
+    $shipping = array_filter([
+        'first_name' => sanitize_text_field($_POST['shipping_first_name'] ?? ''),
+        'last_name'  => sanitize_text_field($_POST['shipping_last_name']  ?? ''),
+        'phone'      => sanitize_text_field($_POST['shipping_phone']      ?? ''),
+        'address_1'  => sanitize_text_field($_POST['shipping_address_1']  ?? ''),
+        'address_2'  => sanitize_text_field($_POST['shipping_address_2']  ?? ''),
+        'city'       => sanitize_text_field($_POST['shipping_city']       ?? ''),
+        'state'      => sanitize_text_field($_POST['shipping_state']      ?? ''),
+        'postcode'   => sanitize_text_field($_POST['shipping_postcode']   ?? ''),
+        'country'    => sanitize_text_field($_POST['shipping_country']    ?? ''),
+    ]);
+
     if (empty($billing)) {
         // send_billing may be disabled — just confirm success so JS can proceed
         wp_send_json_success(['skipped' => true]);
     }
 
-    $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing, $os_checkout_id);
+    $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing, $os_checkout_id, $shipping);
     if ($result) {
         wp_send_json_success();
     } else {
