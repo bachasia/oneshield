@@ -44,8 +44,8 @@ class CheckoutSessionService
     {
         $idempotencyKey = $data['idempotency_key'] ?? null;
 
-        // Idempotency: return existing active session for the same key
         if ($idempotencyKey) {
+            // Return existing ACTIVE session for the same key (idempotency)
             $existing = CheckoutSession::where('idempotency_key', $idempotencyKey)
                 ->where('user_id', $user->id)
                 ->active()
@@ -54,6 +54,12 @@ class CheckoutSessionService
             if ($existing) {
                 return $existing;
             }
+
+            // Session with this key exists but is no longer active (expired/completed/cancelled).
+            // Null-out the old key so the unique constraint allows creating a fresh session.
+            CheckoutSession::where('idempotency_key', $idempotencyKey)
+                ->where('user_id', $user->id)
+                ->update(['idempotency_key' => null]);
         }
 
         return CheckoutSession::create([
