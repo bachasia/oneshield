@@ -372,9 +372,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     return;
                 }
 
-                // Debug: log billing fetch result to console
+                // Debug: send _debug info to parent so it's visible in main page console
                 if (piData.data && piData.data._debug) {
-                    console.log('[OneShield] create_payment_intent debug:', piData.data._debug);
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'debug',
+                        _debug: piData.data._debug,
+                    }, '*');
                 }
 
                 var clientSecret = piData.data.client_secret;

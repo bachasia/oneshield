@@ -160,6 +160,12 @@
         if (!event.data || event.data.source !== 'oneshield-connect') return;
         var msg = event.data;
 
+        // Debug messages from iframe — log to main page console
+        if (msg.action === 'debug') {
+            console.log('[OneShield DEBUG]', JSON.stringify(msg._debug, null, 2));
+            return;
+        }
+
         if (msg.status !== 'success' || !msg.transaction_id) return;
 
         var gateway = msg.gateway; // 'stripe' or 'paypal'
