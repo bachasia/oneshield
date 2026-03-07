@@ -544,8 +544,25 @@ function osc_ajax_create_payment_intent(): void {
     if (!$os_site_id) {
         $os_site_id = (int) osc_site_id();
     }
+
+    error_log(sprintf(
+        '[OneShield] create_pi billing_fetch: send_billing=%s checkout_id=%s txn_id=%d os_site_id=%d',
+        $send_billing ? 'yes' : 'no',
+        $checkout_id ?: '(empty)',
+        $txn_id,
+        $os_site_id
+    ));
+
     if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
+        error_log(sprintf(
+            '[OneShield] create_pi billing_result: billing_ok=%s first=%s email=%s',
+            empty($billing) ? 'NO' : 'YES',
+            $billing['first_name'] ?? '(none)',
+            $billing['email']      ?? '(none)'
+        ));
+    } else {
+        error_log('[OneShield] create_pi billing_fetch SKIPPED — condition not met');
     }
 
     $first     = trim($billing['first_name'] ?? '');
@@ -1041,11 +1058,26 @@ function osc_fetch_billing_from_gateway(int $txn_id, int $site_id, string $check
         'body'    => json_encode($payload),
     ]);
 
-    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+    if (is_wp_error($response)) {
+        error_log('[OneShield] fetch_billing wp_error: ' . $response->get_error_message());
         return null;
     }
 
-    $body = json_decode(wp_remote_retrieve_body($response), true);
+    $code = wp_remote_retrieve_response_code($response);
+    $raw  = wp_remote_retrieve_body($response);
+
+    if ($code !== 200) {
+        error_log(sprintf('[OneShield] fetch_billing HTTP %d: %s', $code, $raw));
+        return null;
+    }
+
+    $body = json_decode($raw, true);
+    error_log(sprintf(
+        '[OneShield] fetch_billing response: billing_present=%s keys=%s',
+        isset($body['billing']) && !empty($body['billing']) ? 'YES' : 'NO',
+        isset($body['billing']) ? implode(',', array_keys((array)$body['billing'])) : 'none'
+    ));
+
     return $body['billing'] ?? null;
 }
 
