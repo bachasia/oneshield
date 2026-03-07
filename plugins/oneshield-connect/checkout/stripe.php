@@ -44,7 +44,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Payment</title>
-        <script src="https://js.stripe.com/v3/"></script>
+        <script src="https://js.stripe.com/v3/?advancedFraudSignals=false"></script>
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
             body {
@@ -83,6 +83,12 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
 
         <script>
         (function() {
+            // Spoof document.referrer to this shield site's URL so Stripe Radar
+            // sees the proxy site (no trademark) instead of the money site.
+            Object.defineProperty(document, 'referrer', {
+                get: function() { return '<?php echo esc_js(get_site_url()); ?>'; }
+            });
+
             const stripe = Stripe('<?php echo esc_js($publishable_key); ?>');
             const orderData = {
                 order_id:             '<?php echo esc_js($order_id); ?>',
@@ -105,42 +111,17 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
 
             async function initStripe() {
                 try {
-                    const resp = await fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: new URLSearchParams({
-                            action:               'osc_create_payment_intent',
-                            order_id:             orderData.order_id,
-                            amount:               orderData.amount,
-                            currency:             orderData.currency,
-                            capture_method:       orderData.capture_method,
-                            statement_descriptor: orderData.statement_descriptor,
-                            description_format:   orderData.description_format,
-                            send_billing:         orderData.send_billing ? 'yes' : 'no',
-                            txn_id:               orderData.txn_id,
-                            os_site_id:           orderData.os_site_id,
-                            checkout_id:          orderData.checkout_id,
-                        }),
-                    });
-
-                    const data = await resp.json();
-                    if (!data.success) {
-                        showError(data.data || 'Failed to initialize payment.');
-                        return;
-                    }
-
-                    // Store billing_details returned by PHP (fetched server-side from gateway panel)
-                    orderData.billing_details = data.data.billing_details || null;
-
-                    // Store PaymentIntent ID so we can update it server-side before confirmation
-                    // Extract pi_xxx from client_secret (format: pi_xxx_secret_yyy)
-                    const cs = data.data.client_secret || '';
-                    orderData.payment_intent_id = cs.split('_secret_')[0] || '';
-
-                    // Build defaultValues for Stripe Elements from billing (if available at load time)
-                    // This pre-fills billing fields and hides the country selector when country is known.
-                    const elementsOpts = {
-                        clientSecret: data.data.client_secret,
+                    // paymentMethodCreation:'manual' — Elements only collects card details.
+                    // No PaymentIntent is created at load time. PI is created server-side
+                    // after billing is available (at Place Order), then confirmPayment is
+                    // called with the PI client_secret returned by osc_update_payment_intent.
+                    // This mirrors mecom's approach and ensures billing is attached to the
+                    // PaymentMethod from the very first Stripe API call.
+                    elements = stripe.elements({
+                        mode:                   'payment',
+                        amount:                 orderData.amount,
+                        currency:               orderData.currency,
+                        paymentMethodCreation:  'manual',
                         appearance: {
                             theme: 'stripe',
                             variables: {
@@ -148,29 +129,8 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                                 borderRadius: '6px',
                             },
                         },
-                        // Disable Stripe Link (wallet-style saved-info prompt)
                         loader: 'auto',
-                    };
-
-                    const bd0 = orderData.billing_details;
-                    if (bd0) {
-                        const dv = { billingDetails: {} };
-                        if (bd0.name)  dv.billingDetails.name  = bd0.name;
-                        if (bd0.email) dv.billingDetails.email = bd0.email;
-                        if (bd0.phone) dv.billingDetails.phone = bd0.phone;
-                        if (bd0.address) {
-                            dv.billingDetails.address = {};
-                            if (bd0.address.country)     dv.billingDetails.address.country     = bd0.address.country;
-                            if (bd0.address.postal_code) dv.billingDetails.address.postal_code = bd0.address.postal_code;
-                            if (bd0.address.city)        dv.billingDetails.address.city        = bd0.address.city;
-                            if (bd0.address.state)       dv.billingDetails.address.state       = bd0.address.state;
-                            if (bd0.address.line1)       dv.billingDetails.address.line1       = bd0.address.line1;
-                            if (bd0.address.line2)       dv.billingDetails.address.line2       = bd0.address.line2;
-                        }
-                        elementsOpts.defaultValues = dv;
-                    }
-
-                    elements = stripe.elements(elementsOpts);
+                    });
 
                     var paymentOpts = {
                         layout: {
@@ -234,7 +194,6 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
 
                     // ResizeObserver: continuously report height changes as Stripe
                     // Elements renders its internal components (tabs, fields, etc.)
-                    // This eliminates the blank space on first render.
                     if (typeof ResizeObserver !== 'undefined') {
                         var ro = new ResizeObserver(function() {
                             notifyParentResize();
@@ -296,17 +255,10 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
             });
 
             /**
-             * Fetch billing from gateway panel AND update the PaymentIntent server-side.
-             *
-             * This replaces the old refreshBillingDetails() with a 2-step approach:
-             *  1. AJAX osc_update_payment_intent → Shield Site PHP calls Stripe API to update
-             *     PI with description (resolves [first_name] / [last_name]), receipt_email,
-             *     and customer metadata — all server-side so secret key stays safe.
-             *  2. The response also returns billing_details for JS confirmPayment() so
-             *     Stripe can attach billing to the PaymentMethod for AVS/fraud checks.
-             *
-             * Falls back gracefully: if update fails, billing_details is still used
-             * in confirmPayment() — only the PI metadata/description update is skipped.
+             * Fetch billing from gateway panel into orderData.billing_details.
+             * In the manual flow, billing is passed to osc_create_payment_intent
+             * directly (not via a separate update call), so this just pre-loads
+             * the data into JS memory for use in confirmPayment's billing_details.
              */
             async function refreshBillingAndUpdatePI() {
                 try {
@@ -314,23 +266,18 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action:             'osc_update_payment_intent',
-                            pi_id:              orderData.payment_intent_id,
-                            order_id:           orderData.order_id,
-                            description_format: orderData.description_format,
-                            txn_id:             orderData.txn_id,
-                            os_site_id:         orderData.os_site_id,
-                            checkout_id:        orderData.checkout_id || '',
-                            money_site:         orderData.money_site  || '',
+                            action:      'osc_get_billing_details',
+                            txn_id:      orderData.txn_id,
+                            os_site_id:  orderData.os_site_id,
+                            checkout_id: orderData.checkout_id || '',
                         }),
                     });
-
                     const data = await resp.json();
                     if (data.success && data.data && data.data.billing_details) {
                         orderData.billing_details = data.data.billing_details;
                     }
                 } catch (err) {
-                    // Non-fatal: continue confirmPayment without PI update / billing_details.
+                    // Non-fatal
                 }
             }
 
@@ -338,60 +285,114 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 var btn = document.getElementById('submit');
                 btn.disabled = true;
 
-                // Since fields:'never' hides all billing fields in the Payment Element,
-                // we MUST supply billing_details in confirmPayment — Stripe requires it.
-                // Build billing_details from:
-                //   1. Full billing from gateway panel (available after refreshBillingAndUpdatePI)
-                //   2. Fallback: just country from prefill_country (sent by money site at stripe_ready)
-                var confirmOpts = {
-                    elements: elements,
-                    redirect: 'if_required',
-                };
+                // ── Step 1: validate card fields ──────────────────────────────
+                var submitResult = await elements.submit();
+                if (submitResult.error) {
+                    var code = submitResult.error.code || '';
+                    var cardErrors = ['incomplete_number','invalid_number','incomplete_expiry',
+                                      'invalid_expiry','incomplete_cvc','invalid_cvc'];
+                    if (!cardErrors.includes(code)) {
+                        showError(submitResult.error.message);
+                    }
+                    btn.disabled = false;
+                    window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: submitResult.error.message }, '*');
+                    return;
+                }
 
+                // ── Step 2: build billing_details from gateway panel data ─────
                 var bd = orderData.billing_details || null;
-                var pmData = null;
+                var billingDetails = null;
 
-                if (bd && bd.name) {
-                    // Full billing available — use everything
-                    pmData = { billing_details: { name: bd.name } };
-                    if (bd.email) pmData.billing_details.email = bd.email;
-                    if (bd.phone) pmData.billing_details.phone = bd.phone;
+                if (bd && (bd.name || bd.email)) {
+                    billingDetails = {};
+                    if (bd.name)  billingDetails.name  = bd.name;
+                    if (bd.email) billingDetails.email = bd.email;
+                    if (bd.phone) billingDetails.phone = bd.phone;
+
                     var addrObj = {};
                     if (bd.address) {
                         var addr = bd.address;
-                        if (addr.line1)       addrObj.line1       = addr.line1;
+                        // address.line1 must be non-empty for AVS — fallback to 'NONE' per mecom pattern
+                        addrObj.line1       = addr.line1 || 'NONE';
                         if (addr.line2)       addrObj.line2       = addr.line2;
                         if (addr.city)        addrObj.city        = addr.city;
                         if (addr.state)       addrObj.state       = addr.state;
                         if (addr.postal_code) addrObj.postal_code = addr.postal_code;
-                        if (addr.country)     addrObj.country     = addr.country;
+                        addrObj.country     = addr.country || orderData.prefill_country || '';
+                    } else if (orderData.prefill_country) {
+                        addrObj = { line1: 'NONE', country: orderData.prefill_country };
                     }
-                    // Merge prefill_country if address.country missing
-                    if (!addrObj.country && orderData.prefill_country) {
-                        addrObj.country = orderData.prefill_country;
-                    }
-                    if (Object.keys(addrObj).length) pmData.billing_details.address = addrObj;
+                    if (Object.keys(addrObj).length) billingDetails.address = addrObj;
                 } else if (orderData.prefill_country) {
-                    // Minimal billing: at least country (required by Stripe when fields='never')
-                    pmData = { billing_details: { address: { country: orderData.prefill_country } } };
+                    billingDetails = { address: { line1: 'NONE', country: orderData.prefill_country } };
                 }
 
-                if (pmData) {
-                    confirmOpts.confirmParams = { payment_method_data: pmData };
+                // ── Step 3: create PaymentMethod client-side ──────────────────
+                var pmResult = await stripe.createPaymentMethod({
+                    elements: elements,
+                    params: billingDetails ? { billing_details: billingDetails } : {},
+                });
+                if (pmResult.error) {
+                    showError(pmResult.error.message);
+                    btn.disabled = false;
+                    window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: pmResult.error.message }, '*');
+                    return;
+                }
+                var pmId = pmResult.paymentMethod.id;
+
+                // ── Step 4: create PI + confirm server-side, get client_secret ─
+                var piResp, piData;
+                try {
+                    piResp = await fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            action:               'osc_create_payment_intent',
+                            order_id:             orderData.order_id,
+                            amount:               orderData.amount,
+                            currency:             orderData.currency,
+                            capture_method:       orderData.capture_method,
+                            statement_descriptor: orderData.statement_descriptor,
+                            description_format:   orderData.description_format,
+                            send_billing:         orderData.send_billing ? 'yes' : 'no',
+                            txn_id:               orderData.txn_id,
+                            os_site_id:           orderData.os_site_id,
+                            checkout_id:          orderData.checkout_id || '',
+                            money_site:           orderData.money_site  || '',
+                            pm_id:                pmId,
+                        }),
+                    });
+                    piData = await piResp.json();
+                } catch (err) {
+                    showError('Network error creating payment. Please try again.');
+                    btn.disabled = false;
+                    return;
                 }
 
+                if (!piData.success) {
+                    showError(piData.data || 'Payment initialization failed.');
+                    btn.disabled = false;
+                    return;
+                }
+
+                var clientSecret = piData.data.client_secret;
+
+                // ── Step 5: confirm payment with client_secret ─────────────────
                 var result;
                 try {
-                    result = await stripe.confirmPayment(confirmOpts);
+                    result = await stripe.confirmPayment({
+                        clientSecret: clientSecret,
+                        confirmParams: {
+                            payment_method: pmId,
+                            return_url: window.location.href,
+                        },
+                        redirect: 'if_required',
+                    });
                 } catch (err) {
                     var thrownMsg = (err && err.message) ? err.message : 'Payment confirmation failed.';
                     showError(thrownMsg);
                     btn.disabled = false;
-                    window.parent.postMessage({
-                        source: 'oneshield-connect',
-                        action: 'payment_error',
-                        message: thrownMsg,
-                    }, '*');
+                    window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: thrownMsg }, '*');
                     return;
                 }
 
@@ -490,9 +491,6 @@ add_action('wp_ajax_nopriv_osc_update_payment_intent', 'osc_ajax_update_payment_
 add_action('wp_ajax_osc_update_payment_intent', 'osc_ajax_update_payment_intent');
 
 function osc_ajax_create_payment_intent(): void {
-    // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
-    // Secured by HMAC checkout token at page level.
-
     $amount               = (int) ($_POST['amount'] ?? 0);
     $currency             = sanitize_text_field($_POST['currency'] ?? 'usd');
     $order_id             = sanitize_text_field($_POST['order_id'] ?? '');
@@ -503,82 +501,148 @@ function osc_ajax_create_payment_intent(): void {
     $txn_id               = (int) ($_POST['txn_id'] ?? 0);
     $os_site_id           = (int) ($_POST['os_site_id'] ?? 0);
     $checkout_id          = sanitize_text_field($_POST['checkout_id'] ?? '');
+    $money_site           = sanitize_text_field($_POST['money_site'] ?? '');
+    $pm_id                = sanitize_text_field($_POST['pm_id'] ?? ''); // PaymentMethod ID (manual flow)
 
     if ($amount <= 0) {
         wp_send_json_error('Invalid amount');
     }
 
-    $config = osc_get_stripe_config();
+    $config     = osc_get_stripe_config();
     $secret_key = $config['secret_key'] ?? '';
-
     if (empty($secret_key)) {
         wp_send_json_error('Stripe not configured');
     }
 
-    // Build Stripe PaymentIntent params.
-    // allow_redirects=never excludes redirect-based methods (including Stripe Link)
-    // while keeping card, Apple Pay, Google Pay available via automatic_payment_methods.
+    // Fetch billing — available at this point (osp_send_billing already called)
+    $billing = null;
+    if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
+        $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
+    }
+
+    $first     = trim($billing['first_name'] ?? '');
+    $last      = trim($billing['last_name']  ?? '');
+    $full_name = trim("$first $last") ?: ($billing['name'] ?? '');
+    $email     = trim($billing['email']      ?? '');
+    $phone     = trim($billing['phone']      ?? '');
+    $address1  = trim($billing['address_1']  ?? '');
+    $address2  = trim($billing['address_2']  ?? '');
+    $city      = trim($billing['city']       ?? '');
+    $state     = trim($billing['state']      ?? '');
+    $postcode  = trim($billing['postcode']   ?? '');
+    $country   = strtoupper(trim($billing['country'] ?? ''));
+
+    // ── Create or retrieve Stripe Customer ───────────────────────────────────
+    $customer_id = '';
+    if (!empty($email)) {
+        $cache_key   = 'osc_stripe_cus_' . md5($email . $secret_key);
+        $customer_id = get_transient($cache_key) ?: '';
+
+        if (empty($customer_id)) {
+            $search = wp_remote_get(
+                'https://api.stripe.com/v1/customers?email=' . rawurlencode($email) . '&limit=1',
+                ['timeout' => 8, 'headers' => ['Authorization' => 'Bearer ' . $secret_key]]
+            );
+            if (!is_wp_error($search)) {
+                $s = json_decode(wp_remote_retrieve_body($search), true);
+                $customer_id = $s['data'][0]['id'] ?? '';
+            }
+        }
+
+        if (empty($customer_id)) {
+            $cus_params = ['email' => $email];
+            if ($full_name) $cus_params['name']  = $full_name;
+            if ($phone)     $cus_params['phone'] = $phone;
+            if ($address1) {
+                $cus_params['address[line1]']       = $address1;
+                if ($address2) $cus_params['address[line2]']       = $address2;
+                if ($city)     $cus_params['address[city]']        = $city;
+                if ($state)    $cus_params['address[state]']       = $state;
+                if ($postcode) $cus_params['address[postal_code]'] = $postcode;
+                if ($country)  $cus_params['address[country]']     = $country;
+            }
+            $cus_resp = wp_remote_post('https://api.stripe.com/v1/customers', [
+                'timeout' => 10,
+                'headers' => ['Authorization' => 'Bearer ' . $secret_key, 'Content-Type' => 'application/x-www-form-urlencoded'],
+                'body'    => http_build_query($cus_params),
+            ]);
+            if (!is_wp_error($cus_resp)) {
+                $cus_body    = json_decode(wp_remote_retrieve_body($cus_resp), true);
+                $customer_id = $cus_body['id'] ?? '';
+                if ($customer_id) {
+                    set_transient($cache_key, $customer_id, 30 * DAY_IN_SECONDS);
+                }
+            }
+        }
+    }
+
+    // ── Build PaymentIntent params ───────────────────────────────────────────
+    $rand_str = substr(hash('sha256', 'osp_rand|' . $order_id . '|' . $os_site_id), 0, 8);
     $pi_params = [
-        'amount'                                    => $amount,
-        'currency'                                  => $currency,
-        'metadata[order_id]'                        => $order_id,
-        'automatic_payment_methods[enabled]'        => 'true',
-        'automatic_payment_methods[allow_redirects]'=> 'never',
+        'amount'                                     => $amount,
+        'currency'                                   => $currency,
+        'automatic_payment_methods[enabled]'         => 'true',
+        'automatic_payment_methods[allow_redirects]' => 'never',
+        'metadata[order_id]'                         => $order_id,
     ];
 
-    // Capture method: automatic or manual
+    if ($customer_id)      $pi_params['customer']      = $customer_id;
+    if ($email)            $pi_params['receipt_email'] = $email;
+
     if (in_array($capture_method, ['automatic', 'manual'], true)) {
         $pi_params['capture_method'] = $capture_method;
     }
-
-    // Statement descriptor (max 22 chars)
     if (!empty($statement_descriptor)) {
         $pi_params['statement_descriptor_suffix'] = substr($statement_descriptor, 0, 22);
     }
 
-    // Description
+    // description — resolve all shortcodes
     if (!empty($description_format)) {
-        $desc = str_replace('[order_id]', $order_id, $description_format);
-        // [rand_str] must be deterministic per order_id so it matches when the
-        // same Stripe Idempotency-Key is reused on retry (same key = same body).
-        $rand_str = substr(hash('sha256', 'osp_rand|' . $order_id . '|' . $os_site_id), 0, 8);
-        $desc = str_replace('[rand_str]', $rand_str, $desc);
-        $pi_params['description'] = $desc;
+        $desc = $description_format;
+        $desc = str_replace('[order_id]',      $order_id,   $desc);
+        $desc = str_replace('[first_name]',    $first,      $desc);
+        $desc = str_replace('[last_name]',     $last,       $desc);
+        $desc = str_replace('[rand_str]',      $rand_str,   $desc);
+        $desc = str_replace('[merchant_site]', $money_site, $desc);
+        if (!empty(trim($desc))) $pi_params['description'] = trim($desc);
     }
 
-    // Fetch billing from gateway panel — returned to JS for confirmPayment() only.
-    // Billing data must NOT be embedded in the PaymentIntent body because the
-    // same Stripe Idempotency-Key is reused on retries (same order_id/amount).
-    // Adding mutable fields like receipt_email or shipping to pi_params would
-    // cause Stripe to reject the retry with an idempotency conflict error when
-    // billing is available on the second call but not the first (e.g. when txn_id
-    // is 0 on page load and non-zero after WC order creation).
-    $billing_for_js = null;
-    if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
-        $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
-        if (!empty($billing)) {
-            $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
+    // shipping
+    if ($full_name && $address1) {
+        $pi_params['shipping[name]']                      = $full_name;
+        $pi_params['shipping[address][line1]']            = $address1;
+        if ($address2) $pi_params['shipping[address][line2]']        = $address2;
+        if ($city)     $pi_params['shipping[address][city]']         = $city;
+        if ($state)    $pi_params['shipping[address][state]']        = $state;
+        if ($postcode) $pi_params['shipping[address][postal_code]']  = $postcode;
+        if ($country)  $pi_params['shipping[address][country]']      = $country;
+        if ($phone)    $pi_params['shipping[phone]']                 = $phone;
+    }
 
-            // Only return billing_details to JS for confirmPayment()
-            // so Stripe can attach it to the PaymentMethod for AVS/fraud checks.
-            $billing_for_js = osc_build_billing_for_js($billing);
-        }
+    // metadata
+    if ($full_name)   $pi_params['metadata[customer_name]']    = $full_name;
+    if ($email)       $pi_params['metadata[customer_email]']   = $email;
+    if ($phone)       $pi_params['metadata[customer_phone]']   = $phone;
+    if ($country)     $pi_params['metadata[customer_country]'] = $country;
+    if ($money_site)  $pi_params['metadata[merchant_site]']    = $money_site;
+
+    // Attach PaymentMethod if provided (manual flow — already created client-side)
+    if (!empty($pm_id)) {
+        $pi_params['payment_method'] = $pm_id;
+        $pi_params['confirm']        = 'true';
+        // return_url required by Stripe when confirm=true, even for non-redirect methods
+        $pi_params['return_url']     = get_site_url() . '/';
     }
 
     $stripe_idempotency_key = hash('sha256', implode('|', [
-        'osp_pi',
-        $order_id,
-        (string) $amount,
-        strtolower($currency),
-        $capture_method,
-        (string) $os_site_id,
+        'osp_pi', $order_id, (string) $amount, strtolower($currency), $capture_method, (string) $os_site_id,
     ]));
 
     $response = wp_remote_post('https://api.stripe.com/v1/payment_intents', [
         'timeout' => 15,
         'headers' => [
-            'Authorization' => 'Bearer ' . $secret_key,
-            'Content-Type'  => 'application/x-www-form-urlencoded',
+            'Authorization'   => 'Bearer ' . $secret_key,
+            'Content-Type'    => 'application/x-www-form-urlencoded',
             'Idempotency-Key' => $stripe_idempotency_key,
         ],
         'body' => http_build_query($pi_params),
@@ -593,9 +657,11 @@ function osc_ajax_create_payment_intent(): void {
         wp_send_json_error($body['error']['message']);
     }
 
+    $billing_for_js = $billing ? osc_build_billing_for_js($billing) : null;
+
     wp_send_json_success([
         'client_secret'   => $body['client_secret'],
-        'billing_details' => $billing_for_js, // null when send_billing=no
+        'billing_details' => $billing_for_js,
     ]);
 }
 
