@@ -176,13 +176,30 @@
 
         var prefix = 'osp_' + gateway;
 
-        // Write transaction_id into hidden inputs
-        var txnInput        = document.querySelector('[name="' + prefix + '_transaction_id"]');
+        // Write transaction_id into ALL matching hidden inputs (there may be
+        // duplicates if WC re-rendered the payment section).
+        document.querySelectorAll('[name="' + prefix + '_transaction_id"]').forEach(function(el) {
+            el.value = msg.transaction_id;
+        });
+
+        // Also ensure a fresh input exists directly in the form so WC AJAX
+        // serialize always picks it up, regardless of any re-renders.
+        var form = document.getElementById('order_review') || document.querySelector('form.checkout');
+        if (form) {
+            // Remove any existing osp txn input injected by previous calls
+            var existing = form.querySelector('#osp_txn_injected_' + gateway);
+            if (existing) existing.remove();
+            var injected = document.createElement('input');
+            injected.type  = 'hidden';
+            injected.id    = 'osp_txn_injected_' + gateway;
+            injected.name  = prefix + '_transaction_id';
+            injected.value = msg.transaction_id;
+            form.appendChild(injected);
+        }
+
         var osTxnInput      = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
         var siteInput       = document.querySelector('[name="' + prefix + '_os_site_id"]');
         var checkoutIdInput = document.querySelector('[name="' + prefix + '_os_checkout_id"]');
-
-        if (txnInput) txnInput.value = msg.transaction_id;
 
         // Show success overlay before re-submitting
         showOverlaySuccess();
@@ -206,13 +223,23 @@
                 '<input type="hidden" name="' + prefix + '_os_checkout_id"    value="' + escAttr(checkoutIdInput  ? checkoutIdInput.value  : '') + '" />';
         }
 
-        // Re-submit the WC checkout form to complete the order
+        // Re-submit the WC checkout form to complete the order.
+        // Use a very short delay (100ms) just to let the success UI paint.
+        // IMPORTANT: block WC's updated_checkout event so it cannot re-render
+        // payment fields and wipe the hidden inputs we just wrote.
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
         if (form) {
-            // Keep success state visible briefly so customers see clear feedback.
             setTimeout(function () {
+                // Detach WC's checkout update handler temporarily so a stray
+                // updated_checkout event cannot replace the payment field HTML
+                // (and wipe osp_stripe_transaction_id) while we are submitting.
+                $(document.body).off('updated_checkout');
+
+                // Submit via WC's own AJAX checkout by triggering the form.
+                // state[gateway].confirmed = true ensures our click-intercept
+                // handler lets this through without blocking it again.
                 $(form).submit();
-            }, 650);
+            }, 100);
         }
     });
 
