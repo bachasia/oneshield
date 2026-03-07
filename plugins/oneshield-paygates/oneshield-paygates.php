@@ -85,6 +85,8 @@ function osp_ajax_send_billing(): void {
     ]);
 
     // Shipping address — may differ from billing
+    // When WC "ship to same address" is selected, shipping_* inputs are hidden/absent.
+    // In that case fall back to billing address for shipping.
     $shipping = array_filter([
         'first_name' => sanitize_text_field($_POST['shipping_first_name'] ?? ''),
         'last_name'  => sanitize_text_field($_POST['shipping_last_name']  ?? ''),
@@ -96,6 +98,21 @@ function osp_ajax_send_billing(): void {
         'postcode'   => sanitize_text_field($_POST['shipping_postcode']   ?? ''),
         'country'    => sanitize_text_field($_POST['shipping_country']    ?? ''),
     ]);
+
+    // If shipping address is empty, use billing as shipping
+    if (empty($shipping) && !empty($billing)) {
+        $shipping = array_filter([
+            'first_name' => $billing['first_name'] ?? '',
+            'last_name'  => $billing['last_name']  ?? '',
+            'phone'      => $billing['phone']       ?? '',
+            'address_1'  => $billing['address_1']   ?? '',
+            'address_2'  => $billing['address_2']   ?? '',
+            'city'       => $billing['city']        ?? '',
+            'state'      => $billing['state']       ?? '',
+            'postcode'   => $billing['postcode']    ?? '',
+            'country'    => $billing['country']     ?? '',
+        ]);
+    }
 
     if (empty($billing)) {
         // send_billing may be disabled — just confirm success so JS can proceed
