@@ -89,7 +89,7 @@ function osp_ajax_send_billing(): void {
         wp_send_json_success(['skipped' => true]);
     }
 
-    $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing);
+    $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing, $os_checkout_id);
     if ($result) {
         wp_send_json_success();
     } else {

@@ -75,6 +75,7 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
                     . '[first_name] : Firstname of customer<br/>'
                     . '[last_name] : Lastname of customer<br/>'
                     . '[rand_str] : Random n characters.<br/>'
+                    . '[merchant_site] : Domain of the money site (e.g. example.com)<br/>'
                     . 'Leave blank to use OneShield default format.',
                     'oneshield-paygates'
                 ),

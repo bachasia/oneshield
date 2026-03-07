@@ -467,21 +467,27 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
     }
 
     /**
-     * Send (or update) billing data on a pending transaction.
+     * Send (or update) billing data on a pending transaction or checkout session.
      * Called just before the user confirms payment — billing is final at this point.
      *
-     * @param int   $os_txn_id Transaction ID on the gateway panel
-     * @param array $billing   Billing fields array
+     * @param int    $os_txn_id   Transaction ID on the gateway panel (0 when using checkout_id)
+     * @param array  $billing     Billing fields array
+     * @param string $checkout_id Checkout session UUID (checkout_id mode, empty for legacy)
      */
-    public function send_billing_to_panel(int $os_txn_id, array $billing): bool {
+    public function send_billing_to_panel(int $os_txn_id, array $billing, string $checkout_id = ''): bool {
         if (empty($this->gateway_url) || empty($this->token_secret)) {
             return false;
         }
 
-        $payload = [
-            'transaction_id' => $os_txn_id,
-            'billing'        => $billing,
-        ];
+        $payload = ['billing' => $billing];
+
+        if (!empty($checkout_id)) {
+            $payload['checkout_id'] = $checkout_id;
+        } elseif ($os_txn_id > 0) {
+            $payload['transaction_id'] = $os_txn_id;
+        } else {
+            return false; // Nothing to identify the transaction
+        }
 
         $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/update-billing', [
             'timeout' => 8,
