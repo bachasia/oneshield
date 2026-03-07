@@ -129,6 +129,25 @@
             if (f) f.style.height = Math.max(msg.height, 50) + 'px';
         }
 
+        // When iframe Stripe Elements is ready, push billing_country immediately
+        // so the Payment Element can use it in confirmPayment billing_details.
+        // This runs before the user clicks Place Order, giving the iframe the
+        // country it needs without waiting for osp_send_billing AJAX.
+        if (msg.action === 'stripe_ready') {
+            var readyGateway = getActiveOspGateway();
+            var readyIframe  = readyGateway ? getIframe(readyGateway) : null;
+            if (readyIframe) {
+                var $form   = $('form.checkout, form#order_review');
+                var country = $form.find('[name="billing_country"]').val() || '';
+                if (country) {
+                    readyIframe.contentWindow.postMessage({
+                        action:          'oneshield-prefill-billing',
+                        billing_country: country,
+                    }, '*');
+                }
+            }
+        }
+
         // Hide overlay if iframe reports an error
         if (msg.action === 'payment_error') {
             hideOverlay();

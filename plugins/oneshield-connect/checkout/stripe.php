@@ -175,6 +175,23 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
+                        // Never render the country field — country is collected from
+                        // the WooCommerce billing form and passed via confirmPayment().
+                        fields: {
+                            billingDetails: {
+                                name:    'never',
+                                email:   'never',
+                                phone:   'never',
+                                address: {
+                                    line1:       'never',
+                                    line2:       'never',
+                                    city:        'never',
+                                    state:       'never',
+                                    postalCode:  'never',
+                                    country:     'never',
+                                },
+                            },
+                        },
                         wallets: {
                             applePay:  <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
                             googlePay: <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
@@ -200,6 +217,11 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         document.getElementById('loading').classList.add('hidden');
                         document.getElementById('payment-form').style.display = 'block';
                         notifyParentResize();
+                        // Ask parent to send billing_country immediately
+                        window.parent.postMessage({
+                            source: 'oneshield-connect',
+                            action: 'stripe_ready',
+                        }, '*');
                     });
 
                     paymentElement.on('change', function() {
@@ -231,6 +253,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
             // Also listen for postMessage from money site to trigger confirmation
             window.addEventListener('message', async function(event) {
                 if (!event.data || event.data.action !== 'oneshield-confirm-payment') {
+                    // Handle early billing_country prefill sent by money site after stripe_ready
+                    if (event.data && event.data.action === 'oneshield-prefill-billing') {
+                        if (event.data.billing_country) {
+                            // Store prefilled country; used in confirmPayment billing_details
+                            orderData.prefill_country = event.data.billing_country;
+                        }
+                    }
                     return;
                 }
 
@@ -307,23 +336,26 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 var btn = document.getElementById('submit');
                 btn.disabled = true;
 
-                // Stripe Elements now collects billing_details itself (fields default = 'auto').
-                // We optionally pass pre-filled billing from the WC form as confirmParams
-                // so Stripe can pre-populate / attach to the PaymentMethod for AVS checks.
-                // If billing is unavailable we omit confirmParams entirely — Stripe will
-                // use whatever was entered in the Payment Element.
+                // Since fields:'never' hides all billing fields in the Payment Element,
+                // we MUST supply billing_details in confirmPayment — Stripe requires it.
+                // Build billing_details from:
+                //   1. Full billing from gateway panel (available after refreshBillingAndUpdatePI)
+                //   2. Fallback: just country from prefill_country (sent by money site at stripe_ready)
                 var confirmOpts = {
                     elements: elements,
                     redirect: 'if_required',
                 };
 
                 var bd = orderData.billing_details || null;
+                var pmData = null;
+
                 if (bd && bd.name) {
-                    var pmData = { billing_details: { name: bd.name } };
+                    // Full billing available — use everything
+                    pmData = { billing_details: { name: bd.name } };
                     if (bd.email) pmData.billing_details.email = bd.email;
                     if (bd.phone) pmData.billing_details.phone = bd.phone;
+                    var addrObj = {};
                     if (bd.address) {
-                        var addrObj = {};
                         var addr = bd.address;
                         if (addr.line1)       addrObj.line1       = addr.line1;
                         if (addr.line2)       addrObj.line2       = addr.line2;
@@ -331,8 +363,18 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                         if (addr.state)       addrObj.state       = addr.state;
                         if (addr.postal_code) addrObj.postal_code = addr.postal_code;
                         if (addr.country)     addrObj.country     = addr.country;
-                        if (Object.keys(addrObj).length) pmData.billing_details.address = addrObj;
                     }
+                    // Merge prefill_country if address.country missing
+                    if (!addrObj.country && orderData.prefill_country) {
+                        addrObj.country = orderData.prefill_country;
+                    }
+                    if (Object.keys(addrObj).length) pmData.billing_details.address = addrObj;
+                } else if (orderData.prefill_country) {
+                    // Minimal billing: at least country (required by Stripe when fields='never')
+                    pmData = { billing_details: { address: { country: orderData.prefill_country } } };
+                }
+
+                if (pmData) {
                     confirmOpts.confirmParams = { payment_method_data: pmData };
                 }
 
