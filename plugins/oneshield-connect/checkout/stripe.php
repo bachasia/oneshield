@@ -746,13 +746,18 @@ function osc_ajax_create_payment_intent(): void {
         'pi_status'       => $body['status'] ?? '',
         'pi_id'           => $body['id']     ?? '',
         'billing_details' => $billing_for_js,
-        // Debug: expose why billing may be null — remove after diagnosis
+        // Debug: expose billing + shipping fetch status
         '_debug' => [
-            'send_billing' => $send_billing,
-            'checkout_id'  => $checkout_id,
-            'txn_id'       => $txn_id,
-            'os_site_id'   => $os_site_id,
-            'billing_ok'   => !empty($billing),
+            'send_billing'   => $send_billing,
+            'checkout_id'    => $checkout_id,
+            'txn_id'         => $txn_id,
+            'os_site_id'     => $os_site_id,
+            'billing_ok'     => !empty($billing),
+            'has_shipping'   => !empty($shipping),
+            'ship_name'      => $ship_full_name ?: '(empty)',
+            'ship_address1'  => $ship_address1  ?: '(empty)',
+            'ship_city'      => $ship_city      ?: '(empty)',
+            'ship_country'   => $ship_country   ?: '(empty)',
         ],
     ]);
 }
