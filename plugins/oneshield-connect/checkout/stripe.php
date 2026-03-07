@@ -142,9 +142,6 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
-                        fields: {
-                            billingDetails: 'never',
-                        },
                         wallets: {
                             applePay:  <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
                             googlePay: <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
@@ -260,38 +257,34 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 var btn = document.getElementById('submit');
                 btn.disabled = true;
 
-                // When fields.billingDetails is set to 'never', Stripe requires
-                // billing_details to always be passed in confirmPayment() — even
-                // if empty. At minimum, billing_details.name must be present.
-                // Use fetched billing if available, otherwise fall back to a
-                // placeholder so Stripe does not throw a validation error.
-                var bd = orderData.billing_details || {};
-                // Stripe rejects empty strings for some address fields (e.g. country)
-                // and rejects undefined/missing for name. Strategy:
-                //   - name: always a non-empty string (fallback 'Guest')
-                //   - all other fields: omit entirely if falsy (Stripe accepts absence)
-                var billingDetails = { name: bd.name || 'Guest' };
-                if (bd.email) billingDetails.email = bd.email;
-                if (bd.phone) billingDetails.phone = bd.phone;
-                var addr = bd.address || {};
-                var addrObj = {};
-                if (addr.line1)       addrObj.line1       = addr.line1;
-                if (addr.line2)       addrObj.line2       = addr.line2;
-                if (addr.city)        addrObj.city        = addr.city;
-                if (addr.state)       addrObj.state       = addr.state;
-                if (addr.postal_code) addrObj.postal_code = addr.postal_code;
-                if (addr.country)     addrObj.country     = addr.country;
-                if (Object.keys(addrObj).length) billingDetails.address = addrObj;
-
+                // Stripe Elements now collects billing_details itself (fields default = 'auto').
+                // We optionally pass pre-filled billing from the WC form as confirmParams
+                // so Stripe can pre-populate / attach to the PaymentMethod for AVS checks.
+                // If billing is unavailable we omit confirmParams entirely — Stripe will
+                // use whatever was entered in the Payment Element.
                 var confirmOpts = {
                     elements: elements,
                     redirect: 'if_required',
-                    confirmParams: {
-                        payment_method_data: {
-                            billing_details: billingDetails,
-                        },
-                    },
                 };
+
+                var bd = orderData.billing_details || null;
+                if (bd && bd.name) {
+                    var pmData = { billing_details: { name: bd.name } };
+                    if (bd.email) pmData.billing_details.email = bd.email;
+                    if (bd.phone) pmData.billing_details.phone = bd.phone;
+                    if (bd.address) {
+                        var addrObj = {};
+                        var addr = bd.address;
+                        if (addr.line1)       addrObj.line1       = addr.line1;
+                        if (addr.line2)       addrObj.line2       = addr.line2;
+                        if (addr.city)        addrObj.city        = addr.city;
+                        if (addr.state)       addrObj.state       = addr.state;
+                        if (addr.postal_code) addrObj.postal_code = addr.postal_code;
+                        if (addr.country)     addrObj.country     = addr.country;
+                        if (Object.keys(addrObj).length) pmData.billing_details.address = addrObj;
+                    }
+                    confirmOpts.confirmParams = { payment_method_data: pmData };
+                }
 
                 var result;
                 try {
