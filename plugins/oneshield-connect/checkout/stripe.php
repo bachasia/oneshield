@@ -515,12 +515,15 @@ function osc_ajax_create_payment_intent(): void {
         wp_send_json_error('Stripe not configured');
     }
 
-    // Build Stripe PaymentIntent params
+    // Build Stripe PaymentIntent params.
+    // allow_redirects=never excludes redirect-based methods (including Stripe Link)
+    // while keeping card, Apple Pay, Google Pay available via automatic_payment_methods.
     $pi_params = [
-        'amount'   => $amount,
-        'currency' => $currency,
-        'metadata[order_id]' => $order_id,
-        'automatic_payment_methods[enabled]' => 'true',
+        'amount'                                    => $amount,
+        'currency'                                  => $currency,
+        'metadata[order_id]'                        => $order_id,
+        'automatic_payment_methods[enabled]'        => 'true',
+        'automatic_payment_methods[allow_redirects]'=> 'never',
     ];
 
     // Capture method: automatic or manual
