@@ -212,8 +212,8 @@ class CheckoutSessionController extends Controller
     // ── POST /api/checkout-sessions/{id}/complete ─────────────────────────
 
     /**
-     * Mark a session as completed (called internally / from webhook flow).
-     * Typically invoked by WebhookController after payment success.
+     * Mark a session as completed and create a Transaction record.
+     * Called by money site plugin (process_payment) after Stripe confirms.
      */
     public function complete(Request $request, string $id): JsonResponse
     {
@@ -236,6 +236,26 @@ class CheckoutSessionController extends Controller
             return response()->json(['error' => 'checkout_session_not_completable:' . $session->status], 422);
         }
 
+        // Create Transaction record so the Panel dashboard shows this payment
+        $billing  = $session->billing_snapshot ?? [];
+        $shipping = $billing['shipping'] ?? [];
+        unset($billing['shipping']); // keep billing_data clean
+
+        $transaction = \App\Models\Transaction::create([
+            'site_id'                => $session->site_id,
+            'order_id'               => $session->order_ref,
+            'amount'                 => number_format($session->amount_minor / 100, 2, '.', ''),
+            'currency'               => strtoupper($session->currency),
+            'gateway'                => $session->gateway,
+            'status'                 => 'completed',
+            'gateway_transaction_id' => $validated['gateway_transaction_id'],
+            'money_site_domain'      => $session->meta['money_site_domain'] ?? null,
+            'billing_data'           => !empty($billing) ? $billing : null,
+        ]);
+
+        // Link transaction back to session
+        $session->update(['transaction_id' => $transaction->id]);
+
         $session = $this->sessionService->complete(
             $session,
             $validated['gateway_transaction_id'],
@@ -243,9 +263,10 @@ class CheckoutSessionController extends Controller
         );
 
         return response()->json([
-            'checkout_id' => $session->id,
-            'status'      => $session->status,
-            'completed_at' => $session->completed_at?->toIso8601String(),
+            'checkout_id'    => $session->id,
+            'status'         => $session->status,
+            'transaction_id' => $transaction->id,
+            'completed_at'   => $session->completed_at?->toIso8601String(),
         ]);
     }
 
