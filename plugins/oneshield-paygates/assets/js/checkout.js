@@ -166,27 +166,36 @@
             return;
         }
 
+        console.log('[OneShield] postMessage received:', JSON.stringify({
+            status:         msg.status,
+            gateway:        msg.gateway,
+            transaction_id: msg.transaction_id,
+            action:         msg.action,
+        }));
+
         if (msg.status !== 'success' || !msg.transaction_id) return;
 
         var gateway = msg.gateway; // 'stripe' or 'paypal'
-        if (!gateway || !state[gateway]) return;
+        if (!gateway || !state[gateway]) {
+            console.log('[OneShield] gateway not found in state:', gateway, state);
+            return;
+        }
 
         state[gateway].confirmed = true;
         state[gateway].txnId     = msg.transaction_id;
 
         var prefix = 'osp_' + gateway;
 
-        // Write transaction_id into ALL matching hidden inputs (there may be
-        // duplicates if WC re-rendered the payment section).
+        // Write transaction_id into ALL matching hidden inputs
         document.querySelectorAll('[name="' + prefix + '_transaction_id"]').forEach(function(el) {
             el.value = msg.transaction_id;
         });
 
-        // Also ensure a fresh input exists directly in the form so WC AJAX
+        // Inject a fresh input directly into the form so WC AJAX
         // serialize always picks it up, regardless of any re-renders.
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
+        console.log('[OneShield] form found:', !!form, 'injecting txn_id:', msg.transaction_id);
         if (form) {
-            // Remove any existing osp txn input injected by previous calls
             var existing = form.querySelector('#osp_txn_injected_' + gateway);
             if (existing) existing.remove();
             var injected = document.createElement('input');
@@ -195,6 +204,7 @@
             injected.name  = prefix + '_transaction_id';
             injected.value = msg.transaction_id;
             form.appendChild(injected);
+            console.log('[OneShield] injected input appended to form');
         }
 
         var osTxnInput      = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
@@ -228,8 +238,13 @@
         // IMPORTANT: block WC's updated_checkout event so it cannot re-render
         // payment fields and wipe the hidden inputs we just wrote.
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
+        console.log('[OneShield] re-submit: form found:', !!form);
         if (form) {
             setTimeout(function () {
+                // Verify the injected input is still present before submitting
+                var injectedCheck = form.querySelector('#osp_txn_injected_' + gateway);
+                console.log('[OneShield] re-submit: injected input still present:', !!injectedCheck, 'value:', injectedCheck ? injectedCheck.value : 'N/A');
+
                 // Detach WC's checkout update handler temporarily so a stray
                 // updated_checkout event cannot replace the payment field HTML
                 // (and wipe osp_stripe_transaction_id) while we are submitting.
@@ -238,8 +253,11 @@
                 // Submit via WC's own AJAX checkout by triggering the form.
                 // state[gateway].confirmed = true ensures our click-intercept
                 // handler lets this through without blocking it again.
+                console.log('[OneShield] re-submit: calling $(form).submit()');
                 $(form).submit();
             }, 100);
+        } else {
+            console.log('[OneShield] re-submit: NO FORM FOUND — order cannot be submitted!');
         }
     });
 
