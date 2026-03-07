@@ -914,21 +914,24 @@ function osc_get_stripe_config(): array {
 }
 
 /**
- * AJAX: Patch PaymentIntent metadata[wc_order_id] after WooCommerce creates the order.
+ * AJAX: Patch PaymentIntent metadata + description with the real WooCommerce order ID.
  *
  * Called by the Gateway Panel relay once process_payment() has the real WC order ID.
  * The shield site holds the Stripe secret key — money site never touches it directly.
  *
  * POST params:
  *   pi_id        — Stripe PaymentIntent ID (pi_xxx)
- *   wc_order_id  — WooCommerce order ID (integer)
- *   site_key     — HMAC pre-shared key for this shield site (basic auth)
+ *   wc_order_id  — WooCommerce order ID (integer as string)
+ *   site_key     — This shield site's site_key (HMAC pre-shared secret)
+ *   description  — (optional) Already-resolved description string with WC order ID
+ *                  substituted in. Panel builds this from description_format + billing.
  */
 function osc_ajax_patch_pi_wc_order(): void {
     // Verify request comes from Gateway Panel using this site's site_key.
     $site_key    = sanitize_text_field($_POST['site_key']    ?? '');
     $pi_id       = sanitize_text_field($_POST['pi_id']       ?? '');
     $wc_order_id = sanitize_text_field($_POST['wc_order_id'] ?? '');
+    $description = sanitize_text_field($_POST['description'] ?? '');
 
     $expected_key = osc_get_option('site_key', '');
 
@@ -950,16 +953,24 @@ function osc_ajax_patch_pi_wc_order(): void {
         wp_send_json_error('Stripe not configured');
     }
 
+    $patch = [
+        'metadata[wc_order_id]' => $wc_order_id,
+        'metadata[order_id]'    => $wc_order_id, // overwrite the temp checkout-uuid
+    ];
+
+    // Also correct the description if the format contained [order_id].
+    // Panel resolves the full description with WC order ID before relaying here.
+    if (!empty($description)) {
+        $patch['description'] = $description;
+    }
+
     $response = wp_remote_post('https://api.stripe.com/v1/payment_intents/' . rawurlencode($pi_id), [
         'timeout' => 10,
         'headers' => [
             'Authorization' => 'Bearer ' . $secret_key,
             'Content-Type'  => 'application/x-www-form-urlencoded',
         ],
-        'body' => http_build_query([
-            'metadata[wc_order_id]' => $wc_order_id,
-            'metadata[order_id]'    => $wc_order_id, // overwrite the temp checkout-uuid
-        ]),
+        'body' => http_build_query($patch),
     ]);
 
     if (is_wp_error($response)) {

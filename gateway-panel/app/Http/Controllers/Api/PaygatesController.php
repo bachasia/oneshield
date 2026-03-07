@@ -418,12 +418,38 @@ class PaygatesController extends Controller
 
         $ajaxUrl = rtrim($site->url, '/') . '/wp-admin/admin-ajax.php';
 
-        $relayResp = \Illuminate\Support\Facades\Http::timeout(8)->asForm()->post($ajaxUrl, [
+        // Build the resolved description so [order_id] uses the real WC order number.
+        // Panel has all the data: description_format (from session) + billing (from snapshot).
+        $resolvedDescription = '';
+        $descFormat = $session->description_format ?? '';
+        if (!empty($descFormat)) {
+            $billing   = $session->billing_snapshot ?? [];
+            $first     = trim($billing['first_name'] ?? '');
+            $last      = trim($billing['last_name']  ?? '');
+            $wcOrderId = $validated['wc_order_id'];
+            $randStr   = substr(hash('sha256', 'osp_rand|' . $wcOrderId . '|' . ($session->site_id ?? '')), 0, 8);
+            $moneySite = $session->meta['money_site_domain'] ?? '';
+
+            $desc = $descFormat;
+            $desc = str_replace('[order_id]',      $wcOrderId,  $desc);
+            $desc = str_replace('[first_name]',    $first,      $desc);
+            $desc = str_replace('[last_name]',     $last,       $desc);
+            $desc = str_replace('[rand_str]',      $randStr,    $desc);
+            $desc = str_replace('[merchant_site]', $moneySite,  $desc);
+            $resolvedDescription = trim($desc);
+        }
+
+        $relayPayload = [
             'action'      => 'osc_patch_pi_wc_order',
             'pi_id'       => $piId,
             'wc_order_id' => $validated['wc_order_id'],
             'site_key'    => $site->site_key,
-        ]);
+        ];
+        if (!empty($resolvedDescription)) {
+            $relayPayload['description'] = $resolvedDescription;
+        }
+
+        $relayResp = \Illuminate\Support\Facades\Http::timeout(8)->asForm()->post($ajaxUrl, $relayPayload);
 
         if ($relayResp->failed()) {
             return response()->json([
