@@ -161,16 +161,16 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
     }
 
     /**
-     * Validate that the payment has been completed inside the iframe.
+     * Validate fields — skip client-side check here.
+     *
+     * The real validation (transaction_id present) is done in process_payment().
+     * validate_fields() runs before the iframe has a chance to post its success
+     * message on the *first* form submit (which JS intercepts and cancels).
+     * On the re-submit after iframe success the transaction_id IS present, but
+     * a premature check here would fire on every submit attempt and show a
+     * confusing error on the very first click.
      */
     public function validate_fields(): bool {
-        $txn_id = sanitize_text_field($_POST['osp_stripe_transaction_id'] ?? '');
-
-        if (empty($txn_id)) {
-            wc_add_notice(__('Please complete the card payment in the form above before placing the order.', 'oneshield-paygates'), 'error');
-            return false;
-        }
-
         return true;
     }
 
