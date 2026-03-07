@@ -396,6 +396,19 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     }
                     error         = result.error;
                     paymentIntent = result.paymentIntent;
+
+                    // Safety net: Stripe embeds the PaymentIntent in error.payment_intent
+                    // when the PI is already confirmed (race between server-side confirm=true
+                    // and this client-side confirmPayment call). If that PI is in a terminal
+                    // success state, treat the whole call as a success.
+                    if (error && !paymentIntent && error.payment_intent) {
+                        var embeddedPi     = error.payment_intent;
+                        var embeddedStatus = embeddedPi.status || '';
+                        if (embeddedStatus === 'succeeded' || embeddedStatus === 'requires_capture') {
+                            error         = null;
+                            paymentIntent = embeddedPi;
+                        }
+                    }
                 }
 
                 if (error) {
