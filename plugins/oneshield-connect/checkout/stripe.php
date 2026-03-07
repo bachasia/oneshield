@@ -297,17 +297,33 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 }
 
                 // ── Step 2: build billing_details for createPaymentMethod ─────
-                // Only address.country needs to be supplied manually — all other
-                // billing fields (name, email, phone, line1, city, state, zip)
-                // are collected by Stripe Elements and passed automatically.
-                var country = (orderData.billing_details && orderData.billing_details.address && orderData.billing_details.address.country)
-                    ? orderData.billing_details.address.country
-                    : (orderData.prefill_country || '');
+                // Pass all available billing fields collected server-side from
+                // the Gateway Panel (name, email, phone, full address).
+                // If billing wasn't fetched yet (send_billing was false in URL
+                // but billing IS available), try one more fetch now.
+                if ((!orderData.billing_details || Object.keys(orderData.billing_details).length === 0)
+                    && (orderData.txn_id || orderData.checkout_id) && orderData.os_site_id) {
+                    await refreshBillingAndUpdatePI();
+                }
+
+                var bd = (orderData.billing_details && typeof orderData.billing_details === 'object')
+                    ? orderData.billing_details : {};
+
+                // Ensure country is present — fall back to prefill_country
+                // which was pushed by checkout.js via oneshield-prefill-billing.
+                if (!bd.address) bd.address = {};
+                if (!bd.address.country) {
+                    bd.address.country = orderData.prefill_country || '';
+                }
+                // Remove empty address object so Stripe doesn't reject it
+                if (!bd.address.country && Object.keys(bd.address).length === 0) {
+                    delete bd.address;
+                }
 
                 // ── Step 3: create PaymentMethod client-side ──────────────────
                 var pmParams = {};
-                if (country) {
-                    pmParams = { billing_details: { address: { country: country } } };
+                if (Object.keys(bd).length > 0) {
+                    pmParams = { billing_details: bd };
                 }
                 var pmResult = await stripe.createPaymentMethod({
                     elements: elements,
