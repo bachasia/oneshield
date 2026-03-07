@@ -148,6 +148,8 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                                 borderRadius: '6px',
                             },
                         },
+                        // Disable Stripe Link (wallet-style saved-info prompt)
+                        loader: 'auto',
                     };
 
                     const bd0 = orderData.billing_details;
@@ -175,8 +177,7 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             type: 'tabs',
                             defaultCollapsed: false,
                         },
-                        // Never render the country field — country is collected from
-                        // the WooCommerce billing form and passed via confirmPayment().
+                        // Never render any billing fields — all collected from WC form
                         fields: {
                             billingDetails: {
                                 name:    'never',
@@ -196,12 +197,13 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                             applePay:  <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
                             googlePay: <?php echo $enable_wallets ? "'auto'" : "'never'"; ?>,
                         },
-                        // Hide "Save my info" / Stripe Link prompt
+                        // Disable all "Save info" prompts including Stripe Link
                         terms: {
                             card:         'never',
                             applePay:     'never',
                             googlePay:    'never',
                             paypal:       'never',
+                            link:         'never',
                             auBecsDebit:  'never',
                             bancontact:   'never',
                             ideal:        'never',
