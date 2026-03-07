@@ -266,11 +266,20 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 // Use fetched billing if available, otherwise fall back to a
                 // placeholder so Stripe does not throw a validation error.
                 var bd = orderData.billing_details || {};
+                // Stripe requires ALL billing_details fields to be explicit
+                // strings (not undefined/null) when fields.billingDetails='never'.
                 var billingDetails = {
                     name:  bd.name  || 'Guest',
-                    email: bd.email || undefined,
-                    phone: bd.phone || undefined,
-                    address: bd.address || undefined,
+                    email: bd.email || '',
+                    phone: bd.phone || '',
+                    address: {
+                        line1:       (bd.address && bd.address.line1)       || '',
+                        line2:       (bd.address && bd.address.line2)       || '',
+                        city:        (bd.address && bd.address.city)        || '',
+                        state:       (bd.address && bd.address.state)       || '',
+                        postal_code: (bd.address && bd.address.postal_code) || '',
+                        country:     (bd.address && bd.address.country)     || '',
+                    },
                 };
 
                 var confirmOpts = {
