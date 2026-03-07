@@ -136,7 +136,8 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
 
         // Pass send_billing flag so the iframe knows whether to fetch billing
         // from the Gateway Panel and attach it to the PaymentIntent.
-        if ($this->get_option('send_billing', 'yes') === 'yes') {
+        // Default is ON — only skip if the admin explicitly saved the checkbox as unchecked.
+        if ($this->get_option('send_billing', 'yes') !== 'no') {
             $params['send_billing'] = 'yes';
         }
 
