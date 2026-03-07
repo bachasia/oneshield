@@ -435,38 +435,21 @@ function osc_ajax_create_payment_intent(): void {
         $pi_params['description'] = $desc;
     }
 
-    // Fetch billing from gateway panel (server-side, never exposed in JS/URL)
+    // Fetch billing from gateway panel — returned to JS for confirmPayment() only.
+    // Billing data must NOT be embedded in the PaymentIntent body because the
+    // same Stripe Idempotency-Key is reused on retries (same order_id/amount).
+    // Adding mutable fields like receipt_email or shipping to pi_params would
+    // cause Stripe to reject the retry with an idempotency conflict error when
+    // billing is available on the second call but not the first (e.g. when txn_id
+    // is 0 on page load and non-zero after WC order creation).
     $billing_for_js = null;
     if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
         if (!empty($billing)) {
             $full_name = trim(($billing['first_name'] ?? '') . ' ' . ($billing['last_name'] ?? ''));
 
-            // receipt_email on PaymentIntent
-            if (!empty($billing['email'])) {
-                $pi_params['receipt_email'] = $billing['email'];
-            }
-
-            // Shipping on PaymentIntent (fraud signals for Stripe Radar)
-            if (!empty($full_name)) {
-                $pi_params['shipping[name]'] = $full_name;
-            }
-            $addr_map = [
-                'shipping[address][line1]'       => 'address_1',
-                'shipping[address][line2]'       => 'address_2',
-                'shipping[address][city]'        => 'city',
-                'shipping[address][state]'       => 'state',
-                'shipping[address][postal_code]' => 'postcode',
-                'shipping[address][country]'     => 'country',
-            ];
-            foreach ($addr_map as $stripe_key => $billing_key) {
-                if (!empty($billing[$billing_key])) {
-                    $pi_params[$stripe_key] = $billing[$billing_key];
-                }
-            }
-
-            // Also return billing_details to JS for confirmPayment()
-            // so Stripe can attach it to the PaymentMethod for AVS/fraud checks
+            // Only return billing_details to JS for confirmPayment()
+            // so Stripe can attach it to the PaymentMethod for AVS/fraud checks.
             $billing_for_js = array_filter([
                 'name'  => $full_name ?: null,
                 'email' => $billing['email'] ?? null,
