@@ -598,7 +598,10 @@ function osc_ajax_create_payment_intent(): void {
     $postcode  = trim($billing['postcode']   ?? '');
     $country   = strtoupper(trim($billing['country'] ?? ''));
 
-    // Extract shipping fields — may differ from billing
+    // Extract shipping fields — may differ from billing.
+    // When the customer ships to the same address (WC default), no separate
+    // shipping block is stored — fall back to billing fields so Stripe always
+    // receives a shipping object (improves AVS/risk scoring).
     $shipping = $billing['shipping'] ?? [];
     error_log(sprintf(
         '[OneShield] create_pi shipping: has_shipping=%s keys=%s',
@@ -609,12 +612,13 @@ function osc_ajax_create_payment_intent(): void {
     $ship_last      = trim($shipping['last_name']  ?? $last);
     $ship_full_name = trim("$ship_first $ship_last") ?: $full_name;
     $ship_phone     = trim($shipping['phone']      ?? $phone);
-    $ship_address1  = trim($shipping['address_1']  ?? '');
-    $ship_address2  = trim($shipping['address_2']  ?? '');
-    $ship_city      = trim($shipping['city']       ?? '');
-    $ship_state     = trim($shipping['state']      ?? '');
-    $ship_postcode  = trim($shipping['postcode']   ?? '');
-    $ship_country   = strtoupper(trim($shipping['country'] ?? ''));
+    // Fallback to billing address when no dedicated shipping address exists
+    $ship_address1  = trim($shipping['address_1']  ?? $address1);
+    $ship_address2  = trim($shipping['address_2']  ?? $address2);
+    $ship_city      = trim($shipping['city']       ?? $city);
+    $ship_state     = trim($shipping['state']      ?? $state);
+    $ship_postcode  = trim($shipping['postcode']   ?? $postcode);
+    $ship_country   = strtoupper(trim($shipping['country'] ?? $country));
     error_log(sprintf(
         '[OneShield] create_pi shipping_parsed: name=%s address1=%s city=%s country=%s',
         $ship_full_name ?: '(empty)',
