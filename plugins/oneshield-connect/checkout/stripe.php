@@ -356,6 +356,11 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     return;
                 }
 
+                // Debug: log billing fetch result to console
+                if (piData.data && piData.data._debug) {
+                    console.log('[OneShield] create_payment_intent debug:', piData.data._debug);
+                }
+
                 var clientSecret = piData.data.client_secret;
                 var piStatus     = piData.data.pi_status || '';
                 var piId         = piData.data.pi_id     || '';
@@ -682,6 +687,14 @@ function osc_ajax_create_payment_intent(): void {
         'pi_status'       => $body['status'] ?? '',
         'pi_id'           => $body['id']     ?? '',
         'billing_details' => $billing_for_js,
+        // Debug: expose why billing may be null — remove after diagnosis
+        '_debug' => [
+            'send_billing' => $send_billing,
+            'checkout_id'  => $checkout_id,
+            'txn_id'       => $txn_id,
+            'os_site_id'   => $os_site_id,
+            'billing_ok'   => !empty($billing),
+        ],
     ]);
 }
 
