@@ -260,21 +260,28 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 var btn = document.getElementById('submit');
                 btn.disabled = true;
 
+                // When fields.billingDetails is set to 'never', Stripe requires
+                // billing_details to always be passed in confirmPayment() — even
+                // if empty. At minimum, billing_details.name must be present.
+                // Use fetched billing if available, otherwise fall back to a
+                // placeholder so Stripe does not throw a validation error.
+                var bd = orderData.billing_details || {};
+                var billingDetails = {
+                    name:  bd.name  || 'Guest',
+                    email: bd.email || undefined,
+                    phone: bd.phone || undefined,
+                    address: bd.address || undefined,
+                };
+
                 var confirmOpts = {
                     elements: elements,
                     redirect: 'if_required',
-                };
-
-                // Attach billing_details to PaymentMethod for AVS / fraud checks.
-                // billingDetails:'never' hides fields in the UI but we still need
-                // to supply them programmatically so Stripe Radar has the data.
-                if (orderData.billing_details) {
-                    confirmOpts.confirmParams = {
+                    confirmParams: {
                         payment_method_data: {
-                            billing_details: orderData.billing_details,
+                            billing_details: billingDetails,
                         },
-                    };
-                }
+                    },
+                };
 
                 var result;
                 try {
