@@ -29,20 +29,53 @@
               {{ transaction.gateway }}
             </span>
             <!-- Status badge -->
-            <span :class="statusClass(transaction.status)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold capitalize">
-              <span class="w-1.5 h-1.5 rounded-full" :class="statusDot(transaction.status)"></span>
-              {{ transaction.status }}
+            <span :class="statusClass(currentStatus)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold capitalize">
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusDot(currentStatus)"></span>
+              {{ currentStatus }}
             </span>
           </div>
         </div>
 
-        <!-- Amount highlight -->
-        <div class="px-6 py-4 bg-gray-50/60 border-b border-gray-100">
-          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Amount</p>
-          <p class="text-3xl font-bold text-gray-900">
-            {{ transaction.currency }}
-            <span class="tabular-nums">{{ Number(transaction.amount).toFixed(2) }}</span>
-          </p>
+        <!-- Amount highlight + Refund button -->
+        <div class="px-6 py-4 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between gap-4">
+          <div>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Amount</p>
+            <p class="text-3xl font-bold text-gray-900">
+              {{ String(transaction.currency || '').toUpperCase() }}
+              <span class="tabular-nums">{{ Number(transaction.amount).toFixed(2) }}</span>
+            </p>
+          </div>
+
+          <!-- Refund button — only for completed Stripe transactions -->
+          <button
+            v-if="canRefund"
+            @click="showRefundModal = true"
+            :disabled="refunding"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-colors cursor-pointer
+                   text-red-600 border-red-200 bg-red-50 hover:bg-red-600 hover:text-white hover:border-red-600
+                   disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+            </svg>
+            {{ refunding ? 'Refunding…' : 'Refund' }}
+          </button>
+
+          <!-- Refunded label (after refund) -->
+          <span v-if="currentStatus === 'refunded'" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-500">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+            </svg>
+            Refunded
+          </span>
+        </div>
+
+        <!-- Error / success notice -->
+        <div v-if="refundError" class="mx-6 mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          {{ refundError }}
+        </div>
+        <div v-if="refundSuccess" class="mx-6 mt-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-sm text-green-700">
+          Refund processed successfully. Refund ID: <span class="font-mono">{{ refundSuccess }}</span>
         </div>
 
         <!-- Details grid -->
@@ -100,16 +133,100 @@
 
       </div>
     </div>
+
+    <!-- Refund Confirmation Modal -->
+    <Teleport to="body">
+      <div
+        v-if="showRefundModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="showRefundModal = false"
+      >
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+
+        <!-- Dialog -->
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 z-10">
+          <!-- Icon -->
+          <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+            </svg>
+          </div>
+
+          <h3 class="text-center text-base font-bold text-gray-900 mb-1">Confirm Refund</h3>
+          <p class="text-center text-sm text-gray-500 mb-5">
+            Refund <strong>{{ String(transaction.currency || '').toUpperCase() }} {{ Number(transaction.amount).toFixed(2) }}</strong>
+            to the customer? This action cannot be undone.
+          </p>
+
+          <div class="flex gap-3">
+            <button
+              @click="showRefundModal = false"
+              class="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              @click="submitRefund"
+              :disabled="refunding"
+              class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ refunding ? 'Processing…' : 'Yes, Refund' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </AppLayout>
 </template>
 
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({ transaction: Object });
 
+// ── Refund state ──────────────────────────────────────────────────────────────
+const currentStatus  = ref(props.transaction.status);
+const showRefundModal = ref(false);
+const refunding      = ref(false);
+const refundError    = ref('');
+const refundSuccess  = ref('');
+
+const canRefund = computed(() =>
+  currentStatus.value === 'completed' && props.transaction.gateway === 'stripe'
+);
+
+async function submitRefund() {
+  refunding.value  = true;
+  refundError.value  = '';
+  refundSuccess.value = '';
+
+  try {
+    const res = await axios.post(
+      `/transactions/${props.transaction.id}/refund`,
+      {},
+      { headers: { 'X-XSRF-TOKEN': getCsrfToken() } }
+    );
+    currentStatus.value  = 'refunded';
+    refundSuccess.value  = res.data.refund_id || 'OK';
+  } catch (err) {
+    refundError.value = err.response?.data?.error ?? 'Refund failed. Please try again.';
+  } finally {
+    refunding.value    = false;
+    showRefundModal.value = false;
+  }
+}
+
+function getCsrfToken() {
+  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
+
+// ── Billing / address helpers ─────────────────────────────────────────────────
 const billing = computed(() => props.transaction.billing_data ?? null);
 
 const customerName = computed(() => {
@@ -129,6 +246,7 @@ const billingAddress = computed(() => {
   return parts.length ? parts.join('\n') : null;
 });
 
+// ── Badge helpers ─────────────────────────────────────────────────────────────
 function statusClass(status) {
   return {
     pending:   'bg-yellow-100 text-yellow-700',

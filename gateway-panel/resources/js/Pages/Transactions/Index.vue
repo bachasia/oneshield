@@ -88,7 +88,7 @@
                 <div v-if="tx.billing_data?.email" class="text-xs text-gray-400 mt-0.5">{{ tx.billing_data.email }}</div>
               </td>
               <td class="px-5 py-3 font-semibold text-gray-900">
-                <span class="text-xs text-gray-400 mr-1">{{ tx.currency }}</span>{{ Number(tx.amount).toFixed(2) }}
+                <span class="text-xs text-gray-400 mr-1">{{ String(tx.currency || '').toUpperCase() }}</span>{{ Number(tx.amount).toFixed(2) }}
               </td>
               <td class="px-5 py-3">
                 <span

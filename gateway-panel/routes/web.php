@@ -73,6 +73,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
     Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::get('transactions/export/csv', [TransactionController::class, 'export'])->name('transactions.export');
     Route::get('transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
+    Route::post('transactions/{transaction}/refund', [TransactionController::class, 'refund'])->name('transactions.refund');
 
     // Settings
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
