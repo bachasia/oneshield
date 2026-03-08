@@ -245,16 +245,26 @@
 
         // Re-submit the WC checkout form to complete the order.
         // Use a very short delay (100ms) just to let the success UI paint.
-        // IMPORTANT: block WC's updated_checkout event so it cannot re-render
-        // payment fields and wipe the hidden inputs we just wrote.
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
         if (form) {
-            setTimeout(function () {
-                // Detach WC's checkout update handler temporarily so a stray
-                // updated_checkout event cannot replace the payment field HTML
-                // (and wipe osp_stripe_transaction_id) while we are submitting.
-                $(document.body).off('updated_checkout');
+            // If WC fires updated_checkout after we confirmed (e.g. coupon recalc),
+            // re-inject the transaction_id so it survives the DOM refresh.
+            $(document.body).on('updated_checkout.osp_protect', function () {
+                if (!state[gateway] || !state[gateway].confirmed || !state[gateway].txnId) return;
+                var f = document.getElementById('order_review') || document.querySelector('form.checkout');
+                if (!f) return;
+                var ex = f.querySelector('#osp_txn_injected_' + gateway);
+                if (!ex) {
+                    var inp = document.createElement('input');
+                    inp.type  = 'hidden';
+                    inp.id    = 'osp_txn_injected_' + gateway;
+                    inp.name  = 'osp_' + gateway + '_transaction_id';
+                    inp.value = state[gateway].txnId;
+                    f.appendChild(inp);
+                }
+            });
 
+            setTimeout(function () {
                 // Submit via WC's own AJAX checkout by triggering the form.
                 // state[gateway].confirmed = true ensures our click-intercept
                 // handler lets this through without blocking it again.
@@ -393,6 +403,8 @@
 
     $(document.body).on('updated_checkout', function () {
         attachIframeLoadHandlers();
+        // Remove the protect listener if checkout rebuilds before submission completes
+        $(document.body).off('updated_checkout.osp_protect');
         // Reset confirmed state when checkout rebuilds
         state.stripe.confirmed = false;
         state.stripe.txnId     = '';
