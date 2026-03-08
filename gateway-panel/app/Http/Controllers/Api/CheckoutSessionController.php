@@ -30,6 +30,11 @@ class CheckoutSessionController extends Controller
     {
         $user = $request->user();
 
+        \Illuminate\Support\Facades\Log::error('[OneShield] create_session', [
+            'meta'            => $request->input('meta'),
+            'idempotency_key' => $request->input('idempotency_key'),
+        ]);
+
         $validated = $request->validate([
             'gateway'            => 'required|in:paypal,stripe,airwallex',
             'order_ref'          => 'required|string|max:255',
