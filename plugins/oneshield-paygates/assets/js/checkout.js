@@ -148,9 +148,27 @@
             }
         }
 
-        // Hide overlay if iframe reports an error
+        // Hide overlay + reset state if iframe reports an error
         if (msg.action === 'payment_error') {
             hideOverlay();
+            isConfirming = false;
+            if (confirmTimeoutId) {
+                clearTimeout(confirmTimeoutId);
+                confirmTimeoutId = null;
+            }
+            // Re-enable Place Order button
+            $('#place_order').prop('disabled', false).css('opacity', '');
+            // Show error notice WC-style
+            var errMsg = msg.message || 'Payment failed. Please try again.';
+            var $notices = $('.woocommerce-notices-wrapper').first();
+            if ($notices.length) {
+                $notices.html(
+                    '<ul class="woocommerce-error" role="alert">' +
+                    '<li>' + $('<div>').text(errMsg).html() + '</li>' +
+                    '</ul>'
+                );
+                $('html, body').animate({ scrollTop: $notices.offset().top - 100 }, 400);
+            }
         }
     });
 
