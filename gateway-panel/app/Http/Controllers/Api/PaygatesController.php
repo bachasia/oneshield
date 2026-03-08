@@ -36,6 +36,8 @@ class PaygatesController extends Controller
             'idempotency_key'  => 'nullable|string|max:100',
             'extra_params'     => 'nullable|array',
             'extra_params.*'   => 'nullable|string|max:500',
+            'meta'                        => 'nullable|array',
+            'meta.money_site_domain'      => 'nullable|string|max:255',
             // Billing details — only accepted when send_billing is set
             'billing'                   => 'nullable|array',
             'billing.first_name'        => 'nullable|string|max:100',
@@ -147,7 +149,11 @@ class PaygatesController extends Controller
             ], 503);
         }
 
-        $moneySiteDomain = parse_url($request->header('Origin', ''), PHP_URL_HOST) ?? 'unknown';
+        // Prefer money_site_domain sent explicitly in payload meta (server-to-server
+        // requests have no Origin header). Fall back to Origin for browser requests.
+        $moneySiteDomain = $validated['meta']['money_site_domain']
+            ?? parse_url($request->header('Origin', ''), PHP_URL_HOST)
+            ?? 'unknown';
 
         // ── Phase 1: Dual mode (CHECKOUT_ID_ENABLED=true) ─────────────────
         // Create a checkout_session to hold payment context + billing (encrypted).
