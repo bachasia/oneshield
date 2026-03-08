@@ -970,8 +970,15 @@ function formatMoney(val) {
 }
 
 function webhookUrl(gateway) {
-  const base = window.location.origin;
-  return `${base}/api/webhook/${gateway}/${settingsSite.value?.id ?? '{site_id}'}`;
+  const siteUrl = settingsSite.value?.url ?? '';
+  if (!siteUrl) return '—';
+  const base = siteUrl.replace(/\/$/, '');
+  if (gateway === 'stripe') {
+    return `${base}/?os_stripe_webhook_event=1`;
+  }
+  // PayPal / future gateways keep the Panel-side IPN URL
+  const panelBase = window.location.origin;
+  return `${panelBase}/api/webhook/${gateway}/${settingsSite.value?.id ?? '{site_id}'}`;
 }
 
 function connectUrl() {
