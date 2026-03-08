@@ -65,6 +65,33 @@
           </div>
         </dl>
 
+        <!-- Customer Info -->
+        <div v-if="billing" class="border-t border-gray-100 px-6 py-5">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Customer</p>
+          <dl class="grid grid-cols-2 gap-x-6 gap-y-4">
+            <div v-if="customerName">
+              <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Name</dt>
+              <dd class="text-sm text-gray-900 font-medium">{{ customerName }}</dd>
+            </div>
+            <div v-if="billing.email">
+              <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Email</dt>
+              <dd class="text-sm text-gray-700">{{ billing.email }}</dd>
+            </div>
+            <div v-if="billing.phone">
+              <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Phone</dt>
+              <dd class="text-sm text-gray-700">{{ billing.phone }}</dd>
+            </div>
+            <div v-if="billing.country">
+              <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Country</dt>
+              <dd class="text-sm text-gray-700">{{ billing.country }}</dd>
+            </div>
+            <div v-if="billingAddress" class="col-span-2">
+              <dt class="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Billing Address</dt>
+              <dd class="text-sm text-gray-700 whitespace-pre-line">{{ billingAddress }}</dd>
+            </div>
+          </dl>
+        </div>
+
         <!-- Raw response -->
         <div v-if="transaction.raw_response" class="px-6 pb-6">
           <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Raw Response</p>
@@ -79,8 +106,28 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({ transaction: Object });
+const props = defineProps({ transaction: Object });
+
+const billing = computed(() => props.transaction.billing_data ?? null);
+
+const customerName = computed(() => {
+  if (!billing.value) return null;
+  const first = billing.value.first_name ?? '';
+  const last  = billing.value.last_name  ?? '';
+  return [first, last].filter(Boolean).join(' ') || null;
+});
+
+const billingAddress = computed(() => {
+  if (!billing.value) return null;
+  const parts = [
+    billing.value.address_1,
+    billing.value.address_2,
+    [billing.value.city, billing.value.state, billing.value.postcode].filter(Boolean).join(', '),
+  ].filter(Boolean);
+  return parts.length ? parts.join('\n') : null;
+});
 
 function statusClass(status) {
   return {

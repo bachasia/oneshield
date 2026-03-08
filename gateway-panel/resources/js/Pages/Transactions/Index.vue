@@ -56,6 +56,7 @@
             <tr class="bg-gray-50 border-b border-gray-200">
               <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
               <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Order ID</th>
+              <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
               <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
               <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Gateway</th>
               <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -66,7 +67,7 @@
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="transactions.data.length === 0">
-              <td colspan="8" class="px-5 py-14 text-center">
+              <td colspan="9" class="px-5 py-14 text-center">
                 <div class="flex flex-col items-center gap-2 text-gray-400">
                   <svg class="w-10 h-10 text-gray-200" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
                   <span class="text-sm font-medium text-gray-500">No transactions found</span>
@@ -82,6 +83,10 @@
             >
               <td class="px-5 py-3 text-xs text-gray-400 font-mono">#{{ tx.id }}</td>
               <td class="px-5 py-3 font-mono text-xs text-gray-700 font-medium">{{ tx.order_id }}</td>
+              <td class="px-5 py-3">
+                <div class="text-sm text-gray-800 font-medium leading-tight">{{ customerName(tx) }}</div>
+                <div v-if="tx.billing_data?.email" class="text-xs text-gray-400 mt-0.5">{{ tx.billing_data.email }}</div>
+              </td>
               <td class="px-5 py-3 font-semibold text-gray-900">
                 <span class="text-xs text-gray-400 mr-1">{{ tx.currency }}</span>{{ Number(tx.amount).toFixed(2) }}
               </td>
@@ -151,6 +156,11 @@ function resetFilters() {
   applyFilters();
 }
 
+function customerName(tx) {
+  const b = tx.billing_data;
+  if (!b) return '—';
+  return [b.first_name, b.last_name].filter(Boolean).join(' ') || '—';
+}
 function gatewayClass(g) {
   return {
     paypal:    'bg-blue-50 text-blue-700',
