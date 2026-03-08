@@ -274,7 +274,7 @@ class PaygatesController extends Controller
         $billing  = array_filter($validated['billing']);
         $shipping = array_filter($validated['shipping'] ?? []);
 
-        \Illuminate\Support\Facades\Log::debug('[OneShield] updateBilling', [
+        \Illuminate\Support\Facades\Log::error('[OneShield] updateBilling', [
             'checkout_id'    => $validated['checkout_id'] ?? null,
             'billing_keys'   => array_keys($billing),
             'shipping_keys'  => array_keys($shipping),
@@ -292,7 +292,7 @@ class PaygatesController extends Controller
             if (!empty($shipping)) {
                 $snapshot['shipping'] = $shipping;
             }
-            \Illuminate\Support\Facades\Log::debug('[OneShield] updateBilling snapshot has_shipping=' . (isset($snapshot['shipping']) ? 'YES' : 'NO'));
+            \Illuminate\Support\Facades\Log::error('[OneShield] updateBilling snapshot has_shipping=' . (isset($snapshot['shipping']) ? 'YES' : 'NO'));
             $session->update(['billing_snapshot' => $snapshot]);
             return response()->json(['success' => true]);
         }
