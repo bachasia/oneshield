@@ -573,7 +573,15 @@ function osc_ajax_create_payment_intent(): void {
         $os_site_id
     ));
 
-    if ($send_billing && ($txn_id || $checkout_id) && $os_site_id) {
+    // Always attempt to fetch billing when we have a checkout_id or txn_id —
+    // send_billing flag only controls JS-side prefetch, not server-side PI creation.
+    error_log(sprintf(
+        '[OneShield] create_pi billing_fetch: checkout_id=%s txn_id=%d os_site_id=%d',
+        $checkout_id ?: '(empty)',
+        $txn_id,
+        $os_site_id
+    ));
+    if (($txn_id || $checkout_id) && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
         error_log(sprintf(
             '[OneShield] create_pi billing_result: billing_ok=%s first=%s email=%s',
@@ -582,7 +590,7 @@ function osc_ajax_create_payment_intent(): void {
             $billing['email']      ?? '(none)'
         ));
     } else {
-        error_log('[OneShield] create_pi billing_fetch SKIPPED — condition not met');
+        error_log('[OneShield] create_pi billing_fetch SKIPPED — no checkout_id/txn_id or site_id');
     }
 
     // Extract billing fields
