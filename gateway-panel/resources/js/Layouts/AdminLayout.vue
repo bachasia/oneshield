@@ -79,7 +79,7 @@
     <div class="flex-1 flex flex-col min-w-0">
 
       <!-- Top bar -->
-      <header class="h-14 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
+      <header class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
         <div class="flex items-center gap-2 text-sm">
           <span class="text-slate-500">Admin</span>
           <svg class="w-3.5 h-3.5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
