@@ -195,6 +195,28 @@ class SuperAdminController extends Controller
 
     // ── Suspend / Unsuspend ──────────────────────────────────────────────
 
+    public function updateTenant(Request $request, User $tenant): RedirectResponse
+    {
+        abort_if($tenant->is_super_admin, 403);
+
+        $validated = $request->validate([
+            'name'                  => 'required|string|max:255',
+            'email'                 => 'required|email|max:255|unique:users,email,' . $tenant->id,
+            'password'              => 'nullable|string|min:8|confirmed',
+        ]);
+
+        $tenant->name  = $validated['name'];
+        $tenant->email = $validated['email'];
+
+        if (!empty($validated['password'])) {
+            $tenant->password = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        }
+
+        $tenant->save();
+
+        return back()->with('success', "Tenant \"{$tenant->name}\" updated successfully.");
+    }
+
     public function suspendTenant(Request $request, User $tenant): RedirectResponse
     {
         abort_if($tenant->is_super_admin, 404);

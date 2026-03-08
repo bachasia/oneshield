@@ -138,6 +138,59 @@
           </div>
         </div>
 
+        <!-- Edit Profile -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Edit Profile</h2>
+
+          <form @submit.prevent="updateProfile" class="space-y-3">
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1.5">Name</label>
+              <input
+                v-model="profileForm.name"
+                type="text"
+                required
+                class="w-full bg-slate-800 border border-slate-700 text-white text-sm px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1.5">Email</label>
+              <input
+                v-model="profileForm.email"
+                type="email"
+                required
+                class="w-full bg-slate-800 border border-slate-700 text-white text-sm px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-500 mb-1.5">New Password <span class="text-slate-600">(leave blank to keep)</span></label>
+              <input
+                v-model="profileForm.password"
+                type="password"
+                autocomplete="new-password"
+                placeholder="••••••••"
+                class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-600 text-sm px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div v-if="profileForm.password">
+              <label class="block text-[11px] text-slate-500 mb-1.5">Confirm Password</label>
+              <input
+                v-model="profileForm.password_confirmation"
+                type="password"
+                autocomplete="new-password"
+                placeholder="••••••••"
+                class="w-full bg-slate-800 border border-slate-700 text-white placeholder-slate-600 text-sm px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <button
+              type="submit"
+              :disabled="profileProcessing"
+              class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold py-2 rounded-xl transition-colors"
+            >
+              {{ profileProcessing ? 'Saving...' : 'Save Changes' }}
+            </button>
+          </form>
+        </div>
+
         <!-- Change Plan -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Change Plan</h2>
@@ -261,6 +314,27 @@ const props = defineProps({
   plans:   { type: Array, default: () => [] },
   stats:   { type: Object, required: true },
 });
+
+// Profile form
+const profileForm = reactive({
+  name:                  props.tenant.name,
+  email:                 props.tenant.email,
+  password:              '',
+  password_confirmation: '',
+});
+
+const profileProcessing = ref(false);
+
+function updateProfile() {
+  profileProcessing.value = true;
+  router.patch(`/admin/tenants/${props.tenant.id}/profile`, profileForm, {
+    onSuccess: () => {
+      profileForm.password              = '';
+      profileForm.password_confirmation = '';
+    },
+    onFinish: () => { profileProcessing.value = false; },
+  });
+}
 
 // Subscription form pre-filled with current values
 const subForm = reactive({

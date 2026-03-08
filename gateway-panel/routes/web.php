@@ -38,6 +38,7 @@ Route::middleware(['auth', 'super_admin'])->prefix('admin')->name('admin.')->gro
     Route::post('/tenants',                              [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
     Route::get('/tenants/{tenant}',                      [SuperAdminController::class, 'showTenant'])->name('tenants.show');
     Route::patch('/tenants/{tenant}/subscription',       [SuperAdminController::class, 'updateSubscription'])->name('tenants.subscription.update');
+    Route::patch('/tenants/{tenant}/profile',            [SuperAdminController::class, 'updateTenant'])->name('tenants.profile.update');
     Route::patch('/tenants/{tenant}/suspend',            [SuperAdminController::class, 'suspendTenant'])->name('tenants.suspend');
     Route::patch('/tenants/{tenant}/unsuspend',          [SuperAdminController::class, 'unsuspendTenant'])->name('tenants.unsuspend');
     Route::post('/tenants/{tenant}/impersonate',         [SuperAdminController::class, 'impersonate'])->name('tenants.impersonate');
