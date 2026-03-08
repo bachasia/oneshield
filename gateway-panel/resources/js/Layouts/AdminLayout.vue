@@ -12,7 +12,7 @@
           </svg>
         </div>
         <div>
-          <span class="text-sm font-bold text-white leading-none">OneShield</span>
+          <span class="text-sm font-bold text-white leading-none">OneShieldX</span>
           <p class="text-[10px] text-slate-400 leading-none mt-0.5">Super Admin</p>
         </div>
       </div>

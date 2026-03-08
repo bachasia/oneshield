@@ -5,7 +5,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 
 createInertiaApp({
-    title: (title) => `${title} - OneShield`,
+    title: (title) => `${title} - OneShieldX`,
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/${name}.vue`,

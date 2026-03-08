@@ -16,7 +16,7 @@
             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
           </svg>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900">OneShield</h1>
+        <h1 class="text-2xl font-bold text-gray-900">OneShieldX</h1>
         <p class="text-sm text-gray-500 mt-1">Payment Gateway Panel</p>
       </div>
 
@@ -111,7 +111,7 @@
 
       <!-- Footer -->
       <p class="text-center text-xs text-gray-400 mt-6">
-        OneShield Payment Gateway &copy; {{ new Date().getFullYear() }}
+        OneShieldX Payment Gateway &copy; {{ new Date().getFullYear() }}
       </p>
     </div>
   </div>
