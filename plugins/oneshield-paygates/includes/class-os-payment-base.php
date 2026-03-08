@@ -300,6 +300,18 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
         // Start at a height that covers Stripe Elements fully on first render.
         // ResizeObserver inside the iframe will adjust to exact height shortly after.
         $initial_height = $gateway === 'paypal' ? '120' : '380';
+
+        // Persist the shield site URL in WC session so process_payment() can
+        // save it to order meta for display in the WC orders list.
+        $raw_shield_url = $result['iframe_url'] ?? '';
+        $shield_domain  = '';
+        if (!empty($raw_shield_url)) {
+            $parsed = wp_parse_url($raw_shield_url);
+            $shield_domain = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+        }
+        if (WC()->session && !empty($shield_domain)) {
+            WC()->session->set('osp_' . $gateway . '_shield_url', $shield_domain);
+        }
         ?>
         <div class="osp-iframe-wrap" style="position:relative;margin-top:4px;">
 

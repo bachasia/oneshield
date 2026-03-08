@@ -178,3 +178,71 @@ function osp_get_gateway_instance(string $gateway): ?OS_Payment_Base {
     $key = $map[$gateway] ?? null;
     return $key ? ($instances[$key] ?? null) : null;
 }
+
+// ── Orders list: Shield URL column ──────────────────────────────────────────
+// Supports both WooCommerce HPOS (woocommerce_shop_order_list_table_columns)
+// and the legacy CPT list (manage_edit-shop_order_columns).
+
+add_filter('woocommerce_shop_order_list_table_columns', 'osp_add_shield_url_column');  // HPOS
+add_filter('manage_edit-shop_order_columns',            'osp_add_shield_url_column');  // Legacy
+
+function osp_add_shield_url_column(array $columns): array {
+    $new = [];
+    foreach ($columns as $key => $label) {
+        $new[$key] = $label;
+        // Insert after 'order_status'
+        if ($key === 'order_status') {
+            $new['osp_shield_url'] = __('Shield URL', 'oneshield-paygates');
+        }
+    }
+    // Fallback: append at end if order_status column not found
+    if (!array_key_exists('osp_shield_url', $new)) {
+        $new['osp_shield_url'] = __('Shield URL', 'oneshield-paygates');
+    }
+    return $new;
+}
+
+add_action('woocommerce_shop_order_list_table_custom_column', 'osp_render_shield_url_column', 10, 2); // HPOS
+add_action('manage_shop_order_posts_custom_column',           'osp_render_shield_url_column', 10, 2); // Legacy
+
+function osp_render_shield_url_column(string $column, $order_or_id): void {
+    if ($column !== 'osp_shield_url') {
+        return;
+    }
+
+    $order = ($order_or_id instanceof \WC_Order)
+        ? $order_or_id
+        : wc_get_order((int) $order_or_id);
+
+    if (!$order) {
+        return;
+    }
+
+    // Only show for OneShield gateways
+    $payment_method = $order->get_payment_method();
+    if (!in_array($payment_method, ['os_stripe', 'os_paypal'], true)) {
+        return;
+    }
+
+    $shield_url = $order->get_meta('_os_shield_url', true);
+    $gateway    = $order->get_meta('_os_shield_gateway', true);
+
+    if (empty($shield_url)) {
+        echo '<span style="color:#9ca3af;font-size:12px;">—</span>';
+        return;
+    }
+
+    $gateway_label = $gateway === 'paypal' ? 'PayPal' : 'Stripe';
+    $domain        = preg_replace('#^https?://#i', '', rtrim($shield_url, '/'));
+
+    printf(
+        '<span style="font-size:12px;line-height:1.4;">'
+        . '<span style="display:inline-block;background:#e0f2fe;color:#0369a1;border-radius:3px;padding:1px 5px;font-size:11px;font-weight:600;margin-bottom:3px;">[%s]</span><br>'
+        . '<a href="%s" target="_blank" style="color:#374151;text-decoration:none;" title="%s">%s</a>'
+        . '</span>',
+        esc_html($gateway_label),
+        esc_url($shield_url),
+        esc_attr($shield_url),
+        esc_html($domain)
+    );
+}

@@ -218,6 +218,17 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
             $this->patch_pi_order_id($os_checkout_id, (int) $order_id);
         }
 
+        // Persist the shield site URL on the order for display in the orders list.
+        if (WC()->session) {
+            $shield_url = (string) WC()->session->get('osp_stripe_shield_url', '');
+            if (!empty($shield_url)) {
+                $order->update_meta_data('_os_shield_url', $shield_url);
+                $order->update_meta_data('_os_shield_gateway', 'stripe');
+                $order->save();
+                WC()->session->__unset('osp_stripe_shield_url');
+            }
+        }
+
         WC()->cart->empty_cart();
 
         return [

@@ -105,6 +105,17 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             $txn_id
         ));
 
+        // Persist the shield site URL on the order for display in the orders list.
+        if (WC()->session) {
+            $shield_url = (string) WC()->session->get('osp_paypal_shield_url', '');
+            if (!empty($shield_url)) {
+                $order->update_meta_data('_os_shield_url', $shield_url);
+                $order->update_meta_data('_os_shield_gateway', 'paypal');
+                $order->save();
+                WC()->session->__unset('osp_paypal_shield_url');
+            }
+        }
+
         WC()->cart->empty_cart();
 
         return [
