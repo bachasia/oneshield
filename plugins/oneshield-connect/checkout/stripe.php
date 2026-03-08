@@ -283,16 +283,18 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                 btn.disabled = true;
 
                 // ── Step 1: validate card fields ──────────────────────────────
+                // elements.submit() triggers Stripe Elements' built-in validation.
+                // When a field is incomplete/invalid, Stripe renders the red error
+                // text beneath each field automatically — no extra UI needed here.
+                // We do NOT send payment_error to the parent for validation errors
+                // because the user only needs to fix the card fields in the iframe;
+                // notifying the money site would reset the overlay unnecessarily.
                 var submitResult = await elements.submit();
                 if (submitResult.error) {
-                    var code = submitResult.error.code || '';
-                    var cardErrors = ['incomplete_number','invalid_number','incomplete_expiry',
-                                      'invalid_expiry','incomplete_cvc','invalid_cvc'];
-                    if (!cardErrors.includes(code)) {
-                        showError(submitResult.error.message);
-                    }
+                    // Stripe already shows inline field errors. Just re-enable the
+                    // hidden submit button and bail — no postMessage to parent.
                     btn.disabled = false;
-                    window.parent.postMessage({ source: 'oneshield-connect', action: 'payment_error', message: submitResult.error.message }, '*');
+                    notifyParentResize(); // height may have changed with error text
                     return;
                 }
 
