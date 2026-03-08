@@ -372,15 +372,6 @@ function osc_render_stripe_checkout(string $order_id, string $token): void {
                     return;
                 }
 
-                // Debug: send _debug info to parent so it's visible in main page console
-                if (piData.data && piData.data._debug) {
-                    window.parent.postMessage({
-                        source: 'oneshield-connect',
-                        action: 'debug',
-                        _debug: piData.data._debug,
-                    }, '*');
-                }
-
                 var clientSecret = piData.data.client_secret;
                 var piStatus     = piData.data.pi_status || '';
                 var piId         = piData.data.pi_id     || '';
@@ -565,32 +556,10 @@ function osc_ajax_create_payment_intent(): void {
         $os_site_id = (int) osc_site_id();
     }
 
-    error_log(sprintf(
-        '[OneShield] create_pi billing_fetch: send_billing=%s checkout_id=%s txn_id=%d os_site_id=%d',
-        $send_billing ? 'yes' : 'no',
-        $checkout_id ?: '(empty)',
-        $txn_id,
-        $os_site_id
-    ));
-
     // Always attempt to fetch billing when we have a checkout_id or txn_id —
     // send_billing flag only controls JS-side prefetch, not server-side PI creation.
-    error_log(sprintf(
-        '[OneShield] create_pi billing_fetch: checkout_id=%s txn_id=%d os_site_id=%d',
-        $checkout_id ?: '(empty)',
-        $txn_id,
-        $os_site_id
-    ));
     if (($txn_id || $checkout_id) && $os_site_id) {
         $billing = osc_fetch_billing_from_gateway($txn_id, $os_site_id, $checkout_id);
-        error_log(sprintf(
-            '[OneShield] create_pi billing_result: billing_ok=%s first=%s email=%s',
-            empty($billing) ? 'NO' : 'YES',
-            $billing['first_name'] ?? '(none)',
-            $billing['email']      ?? '(none)'
-        ));
-    } else {
-        error_log('[OneShield] create_pi billing_fetch SKIPPED — no checkout_id/txn_id or site_id');
     }
 
     // Extract billing fields
@@ -611,11 +580,6 @@ function osc_ajax_create_payment_intent(): void {
     // shipping block is stored — fall back to billing fields so Stripe always
     // receives a shipping object (improves AVS/risk scoring).
     $shipping = $billing['shipping'] ?? [];
-    error_log(sprintf(
-        '[OneShield] create_pi shipping: has_shipping=%s keys=%s',
-        empty($shipping) ? 'NO' : 'YES',
-        empty($shipping) ? 'none' : implode(',', array_keys($shipping))
-    ));
     $ship_first     = trim($shipping['first_name'] ?? $first);
     $ship_last      = trim($shipping['last_name']  ?? $last);
     $ship_full_name = trim("$ship_first $ship_last") ?: $full_name;
@@ -627,13 +591,6 @@ function osc_ajax_create_payment_intent(): void {
     $ship_state     = trim($shipping['state']      ?? $state);
     $ship_postcode  = trim($shipping['postcode']   ?? $postcode);
     $ship_country   = strtoupper(trim($shipping['country'] ?? $country));
-    error_log(sprintf(
-        '[OneShield] create_pi shipping_parsed: name=%s address1=%s city=%s country=%s',
-        $ship_full_name ?: '(empty)',
-        $ship_address1  ?: '(empty)',
-        $ship_city      ?: '(empty)',
-        $ship_country   ?: '(empty)'
-    ));
 
     // ── Create or retrieve Stripe Customer ───────────────────────────────────
     $customer_id = '';
@@ -762,19 +719,6 @@ function osc_ajax_create_payment_intent(): void {
         'pi_status'       => $body['status'] ?? '',
         'pi_id'           => $body['id']     ?? '',
         'billing_details' => $billing_for_js,
-        // Debug: expose billing + shipping fetch status
-        '_debug' => [
-            'send_billing'   => $send_billing,
-            'checkout_id'    => $checkout_id,
-            'txn_id'         => $txn_id,
-            'os_site_id'     => $os_site_id,
-            'billing_ok'     => !empty($billing),
-            'has_shipping'   => !empty($shipping),
-            'ship_name'      => $ship_full_name ?: '(empty)',
-            'ship_address1'  => $ship_address1  ?: '(empty)',
-            'ship_city'      => $ship_city      ?: '(empty)',
-            'ship_country'   => $ship_country   ?: '(empty)',
-        ],
     ]);
 }
 
@@ -1130,16 +1074,10 @@ function osc_fetch_billing_from_gateway(int $txn_id, int $site_id, string $check
     $raw  = wp_remote_retrieve_body($response);
 
     if ($code !== 200) {
-        error_log(sprintf('[OneShield] fetch_billing HTTP %d: %s', $code, $raw));
         return null;
     }
 
     $body = json_decode($raw, true);
-    error_log(sprintf(
-        '[OneShield] fetch_billing response: billing_present=%s keys=%s',
-        isset($body['billing']) && !empty($body['billing']) ? 'YES' : 'NO',
-        isset($body['billing']) ? implode(',', array_keys((array)$body['billing'])) : 'none'
-    ));
 
     return $body['billing'] ?? null;
 }

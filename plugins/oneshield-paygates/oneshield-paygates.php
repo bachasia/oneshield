@@ -121,15 +121,7 @@ function osp_ajax_send_billing(): void {
 
     $result = $gateway_class->send_billing_to_panel($os_txn_id, $billing, $os_checkout_id, $shipping);
     if ($result) {
-        wp_send_json_success([
-            '_debug' => [
-                'billing_keys'   => array_keys($billing),
-                'shipping_keys'  => array_keys($shipping),
-                'ship_address1'  => $shipping['address_1'] ?? '(empty)',
-                'ship_city'      => $shipping['city']      ?? '(empty)',
-                'ship_country'   => $shipping['country']   ?? '(empty)',
-            ],
-        ]);
+        wp_send_json_success();
     } else {
         // Non-fatal: proceed anyway (payment still works, just without billing on PaymentMethod)
         wp_send_json_success(['warning' => 'billing_update_failed']);
