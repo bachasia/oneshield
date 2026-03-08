@@ -73,9 +73,12 @@ class ConnectController extends Controller
 
         if ($site->stripe_enabled && $site->hasGatewayCredentials('stripe')) {
             $credentials['stripe'] = [
-                'public_key'  => $site->stripe_public_key,
-                'secret_key'  => $site->stripe_secret_key,
-                'mode'        => $site->stripe_mode,
+                'public_key'     => $site->stripe_public_key,
+                'secret_key'     => $site->stripe_secret_key,
+                'mode'           => $site->stripe_mode,
+                // webhook_secret is pushed so the shield site can verify Stripe-Signature
+                // without requiring admin to enter it separately in the WP plugin settings.
+                'webhook_secret' => $site->stripe_webhook_secret ?? '',
             ];
         }
 

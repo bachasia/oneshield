@@ -121,6 +121,11 @@ function osc_sync_credentials(array $credentials): void {
         if (!empty($stripe['mode'])) {
             osc_update_option('stripe_mode', sanitize_text_field($stripe['mode']));
         }
+        // Sync webhook signing secret from Panel so admin only needs to configure it once.
+        // Empty string means Panel has no secret set — leave existing value unchanged.
+        if (!empty($stripe['webhook_secret'])) {
+            osc_update_option('stripe_webhook_secret', sanitize_text_field($stripe['webhook_secret']));
+        }
         osc_log('Stripe credentials synced from Panel');
     }
 

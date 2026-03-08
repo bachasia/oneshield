@@ -30,9 +30,7 @@ function osc_register_settings(): void {
     register_setting('oneshield_connect', 'oneshield_connect_authorize_key', [
         'sanitize_callback' => 'sanitize_text_field',
     ]);
-    register_setting('oneshield_connect', 'oneshield_connect_stripe_webhook_secret', [
-        'sanitize_callback' => 'sanitize_text_field',
-    ]);
+    // stripe_webhook_secret is synced automatically via heartbeat from Gateway Panel — not user-editable here
 }
 
 function osc_settings_page(): void {
@@ -82,12 +80,7 @@ function osc_settings_page(): void {
         $notice = '<div class="notice notice-success"><p>Disconnected from Gateway Panel.</p></div>';
     }
 
-    // Handle save webhook secret (when already connected)
-    if (isset($_POST['osc_save_webhook']) && check_admin_referer('osc_save_webhook_action')) {
-        $new_secret = sanitize_text_field($_POST['stripe_webhook_secret'] ?? '');
-        osc_update_option('stripe_webhook_secret', $new_secret);
-        $notice = '<div class="notice notice-success"><p>Stripe Webhook Secret saved.</p></div>';
-    }
+    // (webhook secret is synced automatically from Gateway Panel via heartbeat — no manual save needed)
 
     ?>
     <div class="wrap">
@@ -233,26 +226,24 @@ function osc_settings_page(): void {
                     </td>
                 </tr>
                 <tr>
-                    <th><label for="stripe_webhook_secret">Signing Secret</label></th>
+                    <th>Signing Secret</th>
                     <td>
-                        <form method="post">
-                            <?php wp_nonce_field('osc_save_webhook_action'); ?>
-                            <input
-                                type="password"
-                                id="stripe_webhook_secret"
-                                name="stripe_webhook_secret"
-                                value="<?php echo esc_attr(osc_get_option('stripe_webhook_secret', '')); ?>"
-                                placeholder="whsec_..."
-                                class="regular-text"
-                                autocomplete="new-password"
-                            />
-                            <p class="description">
-                                After adding the endpoint, Stripe shows a <strong>Signing secret</strong> (<code>whsec_xxx</code>).
-                                Paste it here. Used to verify that events come from Stripe.
+                        <?php $has_secret = !empty(osc_get_option('stripe_webhook_secret', '')); ?>
+                        <?php if ($has_secret): ?>
+                            <span style="color:green;font-weight:600;">&#10003; Configured</span>
+                            <p class="description" style="margin-top:4px;">
+                                Synced automatically from Gateway Panel. To change it, update the
+                                <strong>Stripe Webhook Signing Secret</strong> in your
+                                <a href="<?php echo esc_url($gateway_url); ?>" target="_blank">Gateway Panel &rarr; Shield Sites &rarr; Settings</a>.
                             </p>
-                            <br>
-                            <input type="submit" name="osc_save_webhook" class="button button-primary" value="Save Webhook Secret" />
-                        </form>
+                        <?php else: ?>
+                            <span style="color:#d63638;font-weight:600;">&#9888; Not configured</span>
+                            <p class="description" style="margin-top:4px;">
+                                Set the <strong>Stripe Webhook Signing Secret</strong> (<code>whsec_...</code>) in your
+                                <a href="<?php echo esc_url($gateway_url); ?>" target="_blank">Gateway Panel &rarr; Shield Sites &rarr; Settings</a>.
+                                It will sync here automatically on the next heartbeat (within 5 minutes).
+                            </p>
+                        <?php endif; ?>
                     </td>
                 </tr>
             </table>
