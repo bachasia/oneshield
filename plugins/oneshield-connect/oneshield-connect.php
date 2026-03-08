@@ -25,6 +25,7 @@ require_once OSC_PLUGIN_DIR . 'inc/ping.php';
 // Load checkout handlers unconditionally so AJAX actions are always registered.
 // (Previously only loaded conditionally — causing AJAX actions to 404.)
 require_once OSC_PLUGIN_DIR . 'checkout/stripe.php';
+require_once OSC_PLUGIN_DIR . 'checkout/stripe-webhook.php';
 require_once OSC_PLUGIN_DIR . 'checkout/paypal.php';
 require_once OSC_PLUGIN_DIR . 'inc/order.php';
 
@@ -60,6 +61,10 @@ add_action('osc_heartbeat_cron', 'osc_run_heartbeat');
 
 // Handle checkout iframe requests (?os-checkout=1)
 add_action('init', 'osc_handle_checkout_request');
+
+// Handle Stripe webhook events (?os_stripe_webhook_event=1)
+// Must run early on init before any output is sent.
+add_action('init', 'osc_handle_stripe_webhook_request', 5);
 function osc_handle_checkout_request() {
     if (!isset($_GET['os-checkout'])) {
         return;

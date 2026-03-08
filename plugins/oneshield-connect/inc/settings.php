@@ -30,6 +30,9 @@ function osc_register_settings(): void {
     register_setting('oneshield_connect', 'oneshield_connect_authorize_key', [
         'sanitize_callback' => 'sanitize_text_field',
     ]);
+    register_setting('oneshield_connect', 'oneshield_connect_stripe_webhook_secret', [
+        'sanitize_callback' => 'sanitize_text_field',
+    ]);
 }
 
 function osc_settings_page(): void {
@@ -77,6 +80,13 @@ function osc_settings_page(): void {
         osc_update_option('authorize_key', '');
         $is_connected = false;
         $notice = '<div class="notice notice-success"><p>Disconnected from Gateway Panel.</p></div>';
+    }
+
+    // Handle save webhook secret (when already connected)
+    if (isset($_POST['osc_save_webhook']) && check_admin_referer('osc_save_webhook_action')) {
+        $new_secret = sanitize_text_field($_POST['stripe_webhook_secret'] ?? '');
+        osc_update_option('stripe_webhook_secret', $new_secret);
+        $notice = '<div class="notice notice-success"><p>Stripe Webhook Secret saved.</p></div>';
     }
 
     ?>
@@ -197,6 +207,52 @@ function osc_settings_page(): void {
                             echo '<span style="color:#d63638;">&#9888; No heartbeat received yet</span>';
                         }
                         ?>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid #ccd0d4;padding:20px;margin-top:20px;max-width:600px;">
+            <h2 style="margin-top:0;">Stripe Webhook</h2>
+            <p style="margin-bottom:12px;color:#555;">
+                Register this URL in your Stripe Dashboard under
+                <strong>Developers &rarr; Webhooks &rarr; Add endpoint</strong>.
+                Listen for: <code>payment_intent.succeeded</code>, <code>payment_intent.payment_failed</code>, <code>charge.refunded</code>.
+            </p>
+            <table class="form-table">
+                <tr>
+                    <th>Webhook URL</th>
+                    <td>
+                        <code id="osc-webhook-url" style="background:#f0f0f1;padding:6px 10px;display:inline-block;border-radius:4px;font-size:13px;user-select:all;">
+                            <?php echo esc_html(get_site_url() . '/?os_stripe_webhook_event=1'); ?>
+                        </code>
+                        <button type="button" class="button button-secondary" style="margin-left:8px;vertical-align:middle;"
+                            onclick="navigator.clipboard.writeText(document.getElementById('osc-webhook-url').textContent.trim()).then(function(){this.textContent='Copied!';setTimeout(function(){document.querySelector('[onclick*=osc-webhook-url]').textContent='Copy';},2000)}.bind(this))">
+                            Copy
+                        </button>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="stripe_webhook_secret">Signing Secret</label></th>
+                    <td>
+                        <form method="post">
+                            <?php wp_nonce_field('osc_save_webhook_action'); ?>
+                            <input
+                                type="password"
+                                id="stripe_webhook_secret"
+                                name="stripe_webhook_secret"
+                                value="<?php echo esc_attr(osc_get_option('stripe_webhook_secret', '')); ?>"
+                                placeholder="whsec_..."
+                                class="regular-text"
+                                autocomplete="new-password"
+                            />
+                            <p class="description">
+                                After adding the endpoint, Stripe shows a <strong>Signing secret</strong> (<code>whsec_xxx</code>).
+                                Paste it here. Used to verify that events come from Stripe.
+                            </p>
+                            <br>
+                            <input type="submit" name="osc_save_webhook" class="button button-primary" value="Save Webhook Secret" />
+                        </form>
                     </td>
                 </tr>
             </table>

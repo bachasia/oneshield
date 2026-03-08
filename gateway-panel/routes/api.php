@@ -133,3 +133,7 @@ Route::prefix('webhook')
         Route::post('paypal/{site_id}', [WebhookController::class, 'paypal']);
         Route::post('stripe/{site_id}', [WebhookController::class, 'stripe']);
     });
+
+// Shield→Panel webhook relay: requires HMAC auth (shield site is an authenticated client)
+Route::post('webhook/from-shield', [WebhookController::class, 'fromShield'])
+    ->middleware([ApiCors::class, HmacAuthentication::class, 'throttle:200,1']);
