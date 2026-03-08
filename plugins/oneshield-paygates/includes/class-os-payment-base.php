@@ -262,6 +262,9 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             'currency' => get_woocommerce_currency(),
             'group_id' => $this->group_id ?: null,
             'idempotency_key' => 'osp:' . $gateway . ':' . $temp_order_id,
+            'meta'     => [
+                'money_site_domain' => parse_url(home_url(), PHP_URL_HOST),
+            ],
         ];
 
         // Collect extra params from settings to pass through to the iframe (simple flags only)
