@@ -52,6 +52,11 @@ class CheckoutSessionService
                 ->first();
 
             if ($existing) {
+                // Update meta on the existing session in case it was missing
+                // (e.g. plugin was deployed after the session was created).
+                if (!empty($data['meta'])) {
+                    $existing->update(['meta' => array_merge($existing->meta ?? [], $data['meta'])]);
+                }
                 return $existing;
             }
 
