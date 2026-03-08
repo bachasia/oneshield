@@ -526,6 +526,12 @@ add_action('wp_ajax_osc_update_payment_intent', 'osc_ajax_update_payment_intent'
 add_action('wp_ajax_nopriv_osc_patch_pi_wc_order', 'osc_ajax_patch_pi_wc_order');
 add_action('wp_ajax_osc_patch_pi_wc_order', 'osc_ajax_patch_pi_wc_order');
 
+// AJAX: Issue a Stripe refund for a PaymentIntent.
+// Called by Gateway Panel relay when money site admin triggers a WC refund.
+// Authenticated by site_key (same pre-shared secret used in osc_patch_pi_wc_order).
+add_action('wp_ajax_nopriv_osc_stripe_refund', 'osc_ajax_stripe_refund');
+add_action('wp_ajax_osc_stripe_refund', 'osc_ajax_stripe_refund');
+
 function osc_ajax_create_payment_intent(): void {
     $amount               = (int) ($_POST['amount'] ?? 0);
     $currency             = sanitize_text_field($_POST['currency'] ?? 'usd');
@@ -1128,4 +1134,83 @@ function osc_build_billing_for_js(array $billing): array {
     }
 
     return $result;
+}
+
+/**
+ * AJAX: Issue a Stripe Refund for a PaymentIntent.
+ *
+ * Called by the Gateway Panel relay when a WooCommerce admin triggers a refund
+ * from the order detail screen. The shield site holds the Stripe secret key so
+ * the refund API call must be made here.
+ *
+ * Authentication: site_key (same pre-shared secret used in osc_patch_pi_wc_order).
+ *
+ * POST params:
+ *   pi_id     — Stripe PaymentIntent ID (pi_xxx)
+ *   site_key  — This shield site's site_key
+ *   amount    — (optional) Refund amount in cents; omit for full refund
+ *   reason    — (optional) Stripe refund reason: requested_by_customer | duplicate | fraudulent
+ */
+function osc_ajax_stripe_refund(): void {
+    $site_key    = sanitize_text_field($_POST['site_key'] ?? '');
+    $pi_id       = sanitize_text_field($_POST['pi_id']    ?? '');
+    $amount      = isset($_POST['amount']) ? (int) $_POST['amount'] : null;
+    $reason      = sanitize_text_field($_POST['reason']   ?? 'requested_by_customer');
+
+    // Verify site_key
+    $expected_key = osc_get_option('site_key', '');
+    if (empty($site_key) || empty($expected_key) || !hash_equals($expected_key, $site_key)) {
+        wp_send_json_error('Unauthorized', 401);
+    }
+
+    if (empty($pi_id) || !str_starts_with($pi_id, 'pi_')) {
+        wp_send_json_error('Invalid pi_id');
+    }
+
+    $config     = osc_get_stripe_config();
+    $secret_key = $config['secret_key'] ?? '';
+    if (empty($secret_key)) {
+        wp_send_json_error('Stripe not configured');
+    }
+
+    // Validate reason against Stripe's allowed values
+    $allowed_reasons = ['requested_by_customer', 'duplicate', 'fraudulent'];
+    if (!in_array($reason, $allowed_reasons, true)) {
+        $reason = 'requested_by_customer';
+    }
+
+    // Build refund params
+    $refund_params = [
+        'payment_intent' => $pi_id,
+        'reason'         => $reason,
+    ];
+    if ($amount !== null && $amount > 0) {
+        $refund_params['amount'] = $amount;
+    }
+
+    $response = wp_remote_post('https://api.stripe.com/v1/refunds', [
+        'timeout' => 15,
+        'headers' => [
+            'Authorization' => 'Bearer ' . $secret_key,
+            'Content-Type'  => 'application/x-www-form-urlencoded',
+        ],
+        'body' => http_build_query($refund_params),
+    ]);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error($response->get_error_message());
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    $body = json_decode(wp_remote_retrieve_body($response), true);
+
+    if ($code >= 400) {
+        wp_send_json_error($body['error']['message'] ?? 'Stripe refund failed (HTTP ' . $code . ')');
+    }
+
+    wp_send_json_success([
+        'refund_id' => $body['id']     ?? '',
+        'status'    => $body['status'] ?? '',
+        'amount'    => $body['amount'] ?? 0,
+    ]);
 }

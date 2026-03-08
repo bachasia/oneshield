@@ -586,4 +586,63 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             wc_get_logger()->info('[OneShield ' . strtoupper($this->gateway_name) . '] ' . $message, ['source' => 'oneshield-paygates']);
         }
     }
+
+    /**
+     * Relay a refund request to the Gateway Panel.
+     *
+     * Panel will forward to the shield site which holds the Stripe secret key
+     * and will call the Stripe Refunds API.
+     *
+     * @param string        $gateway_txn_id  Stripe PaymentIntent ID (pi_xxx)
+     * @param int|null      $amount_cents    Amount in cents; null = full refund
+     * @param string        $reason          Human-readable reason (passed to Stripe)
+     * @param \WC_Order     $order           WC order (used to find checkout_id)
+     * @return array|\WP_Error  array with 'refund_id' on success, WP_Error on failure
+     */
+    protected function request_refund_via_panel(string $gateway_txn_id, ?int $amount_cents, string $reason, \WC_Order $order) {
+        if (empty($this->gateway_url) || empty($this->token_secret)) {
+            return new \WP_Error('not_configured', __('Gateway not configured.', 'oneshield-paygates'));
+        }
+
+        $checkout_id = $order->get_meta('_os_checkout_id', true);
+
+        $payload = [
+            'gateway_transaction_id' => $gateway_txn_id,
+            'gateway'                => $this->gateway_name,
+            'reason'                 => $reason ?: 'requested_by_customer',
+        ];
+
+        if ($amount_cents !== null) {
+            $payload['amount'] = $amount_cents;
+        }
+
+        if (!empty($checkout_id)) {
+            $payload['checkout_id'] = $checkout_id;
+        }
+
+        $response = wp_remote_post(rtrim($this->gateway_url, '/') . '/api/paygates/refund', [
+            'timeout' => 20,
+            'headers' => $this->sign_request($payload),
+            'body'    => json_encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->log('request_refund_via_panel error: ' . $response->get_error_message());
+            return new \WP_Error('network_error', $response->get_error_message());
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($code >= 400) {
+            $msg = $body['error'] ?? ('Refund failed (HTTP ' . $code . ')');
+            $this->log('request_refund_via_panel HTTP ' . $code . ': ' . $msg);
+            return new \WP_Error('refund_failed', $msg);
+        }
+
+        return [
+            'refund_id' => $body['refund_id'] ?? '',
+            'status'    => $body['status']    ?? '',
+        ];
+    }
 }

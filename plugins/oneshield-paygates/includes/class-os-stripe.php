@@ -14,7 +14,7 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
         $this->method_title       = __('OneShield Stripe', 'oneshield-paygates');
         $this->method_description = __('Credit Card payment via Stripe.', 'oneshield-paygates');
         $this->has_fields         = true;
-        $this->supports           = ['products'];
+        $this->supports           = ['products', 'refunds'];
 
         $this->init_form_fields();
         $this->init_settings();
@@ -224,6 +224,49 @@ class OS_Stripe_Gateway extends OS_Payment_Base {
             'result'   => 'success',
             'redirect' => $order->get_checkout_order_received_url(),
         ];
+    }
+
+    /**
+     * Process a refund initiated from WooCommerce order admin.
+     *
+     * WC calls this when admin clicks "Refund" on the order screen.
+     * Relays: money site → Gateway Panel /api/paygates/refund
+     *       → Panel → shield site osc_stripe_refund AJAX
+     *       → shield site → Stripe Refunds API.
+     *
+     * @param int        $order_id WC order ID
+     * @param float|null $amount   Amount to refund in store currency (null = full refund)
+     * @param string     $reason   Reason text shown in Stripe dashboard
+     * @return bool|\WP_Error
+     */
+    public function process_refund($order_id, $amount = null, $reason = '') {
+        $order  = wc_get_order($order_id);
+        $txn_id = $order->get_transaction_id();
+
+        if (empty($txn_id)) {
+            return new \WP_Error(
+                'no_transaction_id',
+                __('No Stripe transaction ID found for this order.', 'oneshield-paygates')
+            );
+        }
+
+        // Amount in cents; null = full refund (Panel/shield resolves from PI)
+        $amount_cents = $amount ? (int) round((float) $amount * 100) : null;
+
+        $result = $this->request_refund_via_panel($txn_id, $amount_cents, (string) $reason, $order);
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        $order->add_order_note(sprintf(
+            /* translators: 1: amount, 2: currency, 3: Stripe refund ID */
+            __('OneShield: Stripe refund of %1$s %2$s processed. Refund ID: %3$s', 'oneshield-paygates'),
+            number_format((float) ($amount ?? $order->get_total()), 2),
+            $order->get_currency(),
+            $result['refund_id'] ?? 'n/a'
+        ));
+
+        return true;
     }
 
     /**

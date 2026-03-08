@@ -584,4 +584,96 @@ class PaygatesController extends Controller
             ),
         ]);
     }
+
+    /**
+     * Relay a refund request from the money site to the shield site.
+     *
+     * Flow:
+     *  1. Validate + authenticate (same HMAC middleware as other paygates routes)
+     *  2. Resolve the shield site via checkout_id (preferred) or Transaction lookup
+     *  3. POST to the shield site's osc_stripe_refund AJAX handler (which holds the Stripe secret key)
+     *  4. Return refund_id on success
+     *
+     * POST /api/paygates/refund
+     */
+    public function refund(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'gateway_transaction_id' => 'required|string|max:255',
+            'gateway'                => 'nullable|in:stripe,paypal',
+            'amount'                 => 'nullable|integer|min:1',   // cents; null = full refund
+            'reason'                 => 'nullable|string|max:500',
+            'checkout_id'            => 'nullable|string|max:255',
+        ]);
+
+        $piId       = $validated['gateway_transaction_id'];
+        $checkoutId = $validated['checkout_id'] ?? null;
+
+        // ── 1. Resolve shield site ───────────────────────────────────────────
+        $site = null;
+
+        // Prefer checkout_id — most reliable link to the shield site
+        if (!empty($checkoutId)) {
+            $session = \App\Models\CheckoutSession::where('id', $checkoutId)
+                ->where('user_id', $user->id)
+                ->first();
+            $site = $session?->site;
+        }
+
+        // Fallback: look up most recent Transaction with this PI ID
+        if (!$site) {
+            $txn = \App\Models\Transaction::where('gateway_transaction_id', $piId)
+                ->whereHas('site', fn ($q) => $q->where('user_id', $user->id))
+                ->latest()
+                ->first();
+            $site = $txn?->site;
+        }
+
+        if (!$site || empty($site->url) || empty($site->site_key)) {
+            return response()->json(['error' => 'shield_site_not_found'], 404);
+        }
+
+        // ── 2. Relay to shield site ──────────────────────────────────────────
+        $ajaxUrl = rtrim($site->url, '/') . '/wp-admin/admin-ajax.php';
+
+        $relayPayload = [
+            'action'   => 'osc_stripe_refund',
+            'pi_id'    => $piId,
+            'site_key' => $site->site_key,
+            'reason'   => $validated['reason'] ?? 'requested_by_customer',
+        ];
+
+        if (isset($validated['amount'])) {
+            $relayPayload['amount'] = $validated['amount'];
+        }
+
+        $relayResp = \Illuminate\Support\Facades\Http::timeout(20)->asForm()->post($ajaxUrl, $relayPayload);
+
+        if ($relayResp->failed()) {
+            return response()->json([
+                'error'  => 'shield_relay_failed',
+                'status' => $relayResp->status(),
+            ], 502);
+        }
+
+        $relayBody = $relayResp->json();
+
+        if (empty($relayBody['success'])) {
+            $msg = $relayBody['data'] ?? 'Refund failed on shield site';
+            return response()->json(['error' => $msg], 422);
+        }
+
+        // ── 3. Mark Transaction as refunded ──────────────────────────────────
+        \App\Models\Transaction::where('gateway_transaction_id', $piId)
+            ->whereHas('site', fn ($q) => $q->where('user_id', $user->id))
+            ->update(['status' => 'refunded']);
+
+        return response()->json([
+            'success'   => true,
+            'refund_id' => $relayBody['data']['refund_id'] ?? '',
+            'status'    => $relayBody['data']['status']    ?? 'succeeded',
+        ]);
+    }
 }

@@ -95,6 +95,7 @@ Route::prefix('paygates')
         Route::post('update-billing',  [PaygatesController::class, 'updateBilling']);
         Route::get('iframe-url',       [PaygatesController::class, 'iframeUrl']);
         Route::post('patch-order-id',  [PaygatesController::class, 'patchOrderId']);
+        Route::post('refund',          [PaygatesController::class, 'refund']);
     });
 
 /*
