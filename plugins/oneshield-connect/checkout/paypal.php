@@ -165,43 +165,24 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 }, '*');
             }
 
-            // PayPal SDK injects its credit card form inside a nested iframe,
-            // so ResizeObserver on document.body doesn't fire when it expands.
-            // Use a MutationObserver to detect when PayPal injects/removes iframes
-            // and poll height briefly afterwards to catch the full expansion.
-            (function() {
-                var lastHeight = 0;
-                var pollTimer  = null;
-
-                function pollHeight(duration) {
-                    if (pollTimer) clearInterval(pollTimer);
-                    var elapsed = 0;
-                    pollTimer = setInterval(function() {
-                        var h = document.body.scrollHeight;
-                        if (h !== lastHeight) {
-                            lastHeight = h;
-                            notifyParentResize();
-                        }
-                        elapsed += 100;
-                        if (elapsed >= duration) {
-                            clearInterval(pollTimer);
-                            pollTimer = null;
-                        }
-                    }, 100);
+            // Poll #paypal-button-container offsetHeight every 50ms.
+            // PayPal SDK injects its credit card form into a top-level overlay
+            // (paypal-overlay-uid-*) which makes the container grow — scrollHeight
+            // alone does not capture this. offsetHeight polling is the reliable approach.
+            var _lastPaypalHeight = 0;
+            setInterval(function() {
+                var container = document.getElementById('paypal-button-container');
+                if (!container) return;
+                var h = container.offsetHeight;
+                if (h !== _lastPaypalHeight && h > 0) {
+                    _lastPaypalHeight = h;
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'resize',
+                        height: document.body.scrollHeight,
+                    }, '*');
                 }
-
-                // Observe DOM mutations — PayPal injects iframes when card form opens
-                var mo = new MutationObserver(function(mutations) {
-                    var relevant = mutations.some(function(m) {
-                        return m.addedNodes.length > 0 || m.removedNodes.length > 0;
-                    });
-                    if (relevant) {
-                        // Poll for up to 3 seconds after any DOM change
-                        pollHeight(3000);
-                    }
-                });
-                mo.observe(document.body, { childList: true, subtree: true });
-            })();
+            }, 50);
         })();
         </script>
     </body>
