@@ -119,6 +119,34 @@
         return document.getElementById('osp-iframe-' + gateway);
     }
 
+    // ── Hide/Show Place Order button based on payment method ───────────────
+
+    function togglePlaceOrderButton() {
+        var gateway = getActiveOspGateway();
+        var $placeOrder = $('#place_order');
+        
+        if (gateway === 'paypal') {
+            // Hide Place Order button when PayPal is selected
+            $placeOrder.hide();
+        } else {
+            // Show Place Order button for other payment methods
+            $placeOrder.show();
+        }
+    }
+
+    // Run on page load
+    togglePlaceOrderButton();
+
+    // Run when payment method changes
+    $(document.body).on('change', 'input[name="payment_method"]', function() {
+        togglePlaceOrderButton();
+    });
+
+    // Run after WooCommerce updates checkout
+    $(document.body).on('updated_checkout', function() {
+        togglePlaceOrderButton();
+    });
+
     // ── Auto-resize iframe ──────────────────────────────────────────────────
 
     window.addEventListener('message', function (event) {
