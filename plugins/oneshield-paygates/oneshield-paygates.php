@@ -199,7 +199,7 @@ function osp_render_paypal_iframe_outside(): void {
 
     $iframe_url  = esc_url($result['iframe_url']);
     $loading_id  = 'osp-iframe-loading-paypal';
-    $initial_h   = '120';
+    $initial_h   = '200';
 
     ?>
     <div id="osp-paypal-button-wrap" style="display:none;margin-top:12px;">
@@ -207,7 +207,7 @@ function osp_render_paypal_iframe_outside(): void {
             <iframe
                 id="osp-iframe-paypal"
                 src="<?php echo $iframe_url; ?>"
-                style="width:100%;height:<?php echo $initial_h; ?>px;border:none;display:block;overflow:hidden;"
+                style="width:100%;height:<?php echo $initial_h; ?>px;border:none;display:block;"
                 scrolling="no"
                 allow="payment"
                 sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation"
