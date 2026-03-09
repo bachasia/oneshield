@@ -103,10 +103,22 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     /**
      * Get iframe result for PayPal, with session-based fingerprinting to avoid
      * re-creating a new order on every page refresh (same as render_iframe_field).
-     * Result is cached in WC session so the after-submit hook does not make a
-     * second Panel request on the same page load.
+     *
+     * NOTE: We do NOT cache the full result (including iframe_url / checkout_id)
+     * in WC session because the CheckoutSession expires after 30 min. Always fetch
+     * a fresh URL from the Panel — the Panel's idempotency logic returns the existing
+     * active session, or creates a new one if the old one expired.
+     *
+     * Within a single PHP request (payment_fields + after-submit hook both call this),
+     * we use a static variable to avoid a second HTTP round-trip.
      */
     public function get_paypal_iframe_result(): ?array {
+        static $request_cache = null;
+
+        if ($request_cache !== null) {
+            return $request_cache;
+        }
+
         if (empty($this->gateway_url) || empty($this->token_secret)) {
             return null;
         }
@@ -117,15 +129,8 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             WC()->cart->get_cart_hash(),
         ]));
 
-        // Return cached result if fingerprint matches
-        if (WC()->session) {
-            $cached_fp  = (string) WC()->session->get('osp_paypal_result_fp', '');
-            $cached_raw = WC()->session->get('osp_paypal_result_cache', null);
-            if ($cached_fp === $cart_fingerprint && is_array($cached_raw)) {
-                return $cached_raw;
-            }
-        }
-
+        // Reuse the same temp_order_id for the same cart (avoids creating a new
+        // CheckoutSession on every refresh), but always fetch a fresh iframe URL.
         $temp_order_id = '';
         if (WC()->session) {
             $saved_id = (string) WC()->session->get('osp_paypal_temp_order_id', '');
@@ -155,15 +160,8 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'extra_params'    => $this->get_iframe_extra_params(),
         ];
 
-        $result = $this->get_iframe_url_from_payload($payload);
-
-        // Cache result in session so the after-submit hook reuses it
-        if ($result && WC()->session) {
-            WC()->session->set('osp_paypal_result_cache', $result);
-            WC()->session->set('osp_paypal_result_fp', $cart_fingerprint);
-        }
-
-        return $result;
+        $request_cache = $this->get_iframe_url_from_payload($payload);
+        return $request_cache;
     }
 
     public function validate_fields(): bool {
