@@ -103,6 +103,8 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     /**
      * Get iframe result for PayPal, with session-based fingerprinting to avoid
      * re-creating a new order on every page refresh (same as render_iframe_field).
+     * Result is cached in WC session so the after-submit hook does not make a
+     * second Panel request on the same page load.
      */
     public function get_paypal_iframe_result(): ?array {
         if (empty($this->gateway_url) || empty($this->token_secret)) {
@@ -114,6 +116,15 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             get_woocommerce_currency(),
             WC()->cart->get_cart_hash(),
         ]));
+
+        // Return cached result if fingerprint matches
+        if (WC()->session) {
+            $cached_fp  = (string) WC()->session->get('osp_paypal_result_fp', '');
+            $cached_raw = WC()->session->get('osp_paypal_result_cache', null);
+            if ($cached_fp === $cart_fingerprint && is_array($cached_raw)) {
+                return $cached_raw;
+            }
+        }
 
         $temp_order_id = '';
         if (WC()->session) {
@@ -144,7 +155,15 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'extra_params'    => $this->get_iframe_extra_params(),
         ];
 
-        return $this->get_iframe_url_from_payload($payload);
+        $result = $this->get_iframe_url_from_payload($payload);
+
+        // Cache result in session so the after-submit hook reuses it
+        if ($result && WC()->session) {
+            WC()->session->set('osp_paypal_result_cache', $result);
+            WC()->session->set('osp_paypal_result_fp', $cart_fingerprint);
+        }
+
+        return $result;
     }
 
     public function validate_fields(): bool {
