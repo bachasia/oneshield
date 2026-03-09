@@ -67,7 +67,84 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     }
 
     public function payment_fields(): void {
-        $this->render_iframe_field('paypal');
+        // Render only hidden inputs here. The actual iframe is rendered
+        // outside the payment box (via woocommerce_review_order_after_submit)
+        // so WC's updated_checkout does not destroy it.
+        $result = $this->get_paypal_iframe_result();
+        if (!$result || empty($result['iframe_url'])) {
+            echo '<p style="color:#dc2626;font-size:13px;">'
+               . esc_html__('Payment service temporarily unavailable. Please try again shortly.', 'oneshield-paygates')
+               . '</p>';
+            return;
+        }
+
+        $os_txn_id      = esc_attr((string) ($result['transaction_id'] ?? ''));
+        $os_site_id     = esc_attr((string) ($result['site_id'] ?? ''));
+        $os_checkout_id = esc_attr((string) ($result['checkout_id'] ?? ''));
+        $iframe_url     = esc_attr($result['iframe_url']);
+
+        // Save shield domain in session for order meta
+        $parsed = wp_parse_url($result['iframe_url']);
+        $shield_domain = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
+        if (WC()->session && !empty($shield_domain)) {
+            WC()->session->set('osp_paypal_shield_url', $shield_domain);
+        }
+
+        // Hidden inputs for process_payment()
+        echo '<input type="hidden" name="osp_paypal_transaction_id"    id="osp_paypal_transaction_id"    value="" />';
+        echo '<input type="hidden" name="osp_paypal_os_transaction_id" id="osp_paypal_os_transaction_id" value="' . $os_txn_id . '" />';
+        echo '<input type="hidden" name="osp_paypal_os_site_id"        id="osp_paypal_os_site_id"        value="' . $os_site_id . '" />';
+        echo '<input type="hidden" name="osp_paypal_os_checkout_id"    id="osp_paypal_os_checkout_id"    value="' . $os_checkout_id . '" />';
+
+        // Store iframe URL so the outside iframe container can use it
+        echo '<span id="osp-paypal-iframe-src" data-src="' . $iframe_url . '" style="display:none;"></span>';
+    }
+
+    /**
+     * Get iframe result for PayPal, with session-based fingerprinting to avoid
+     * re-creating a new order on every page refresh (same as render_iframe_field).
+     */
+    public function get_paypal_iframe_result(): ?array {
+        if (empty($this->gateway_url) || empty($this->token_secret)) {
+            return null;
+        }
+
+        $cart_fingerprint = md5(json_encode([
+            (float) WC()->cart->get_total('raw'),
+            get_woocommerce_currency(),
+            WC()->cart->get_cart_hash(),
+        ]));
+
+        $temp_order_id = '';
+        if (WC()->session) {
+            $saved_id = (string) WC()->session->get('osp_paypal_temp_order_id', '');
+            $saved_fp = (string) WC()->session->get('osp_paypal_temp_order_fp', '');
+            if (!empty($saved_id) && $saved_fp === $cart_fingerprint) {
+                $temp_order_id = $saved_id;
+            } else {
+                $temp_order_id = 'checkout-' . wp_generate_uuid4();
+                WC()->session->set('osp_paypal_temp_order_id', $temp_order_id);
+                WC()->session->set('osp_paypal_temp_order_fp', $cart_fingerprint);
+            }
+        }
+        if (empty($temp_order_id)) {
+            $temp_order_id = 'checkout-' . wp_generate_uuid4();
+        }
+
+        $payload = [
+            'gateway'         => 'paypal',
+            'order_id'        => $temp_order_id,
+            'amount'          => (float) WC()->cart->get_total('raw'),
+            'currency'        => get_woocommerce_currency(),
+            'group_id'        => $this->group_id ?: null,
+            'idempotency_key' => 'osp:paypal:' . $temp_order_id,
+            'meta'            => [
+                'money_site_domain' => parse_url(home_url(), PHP_URL_HOST),
+            ],
+            'extra_params'    => $this->get_iframe_extra_params(),
+        ];
+
+        return $this->get_iframe_url_from_payload($payload);
     }
 
     public function validate_fields(): bool {

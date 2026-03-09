@@ -119,35 +119,22 @@
         return document.getElementById('osp-iframe-' + gateway);
     }
 
-    // ── Move PayPal iframe to Place Order button position ──────────────────
-
-    var paypalIframeOriginalParent = null;
+    // ── Toggle Place Order button and PayPal iframe wrap ──────────────────
+    // #osp-paypal-button-wrap is rendered outside the payment box by PHP
+    // (woocommerce_review_order_after_submit hook) so WC updated_checkout
+    // never destroys it. We simply show/hide it here.
 
     function togglePayPalIframePosition() {
-        var gateway = getActiveOspGateway();
+        var gateway     = getActiveOspGateway();
         var $placeOrder = $('#place_order');
-        var $paypalIframe = $('#osp-iframe-paypal').closest('.osp-iframe-wrap');
-        
-        if (gateway === 'paypal' && $paypalIframe.length && $placeOrder.length) {
-            // Save original parent if not saved yet
-            if (!paypalIframeOriginalParent) {
-                paypalIframeOriginalParent = $paypalIframe.parent();
-            }
-            
-            // Hide Place Order button
+        var $ppWrap     = $('#osp-paypal-button-wrap');
+
+        if (gateway === 'paypal') {
             $placeOrder.hide();
-            
-            // Move PayPal iframe to Place Order button position
-            $paypalIframe.insertAfter($placeOrder);
-            $paypalIframe.show();
+            $ppWrap.show();
         } else {
-            // Show Place Order button
             $placeOrder.show();
-            
-            // Move PayPal iframe back to original position
-            if ($paypalIframe.length && paypalIframeOriginalParent && paypalIframeOriginalParent.length) {
-                $paypalIframe.appendTo(paypalIframeOriginalParent);
-            }
+            $ppWrap.hide();
         }
     }
 
@@ -155,16 +142,13 @@
     togglePayPalIframePosition();
 
     // Run when payment method changes
-    $(document.body).on('change', 'input[name="payment_method"]', function() {
+    $(document.body).on('change', 'input[name="payment_method"]', function () {
         togglePayPalIframePosition();
     });
 
-    // Run after WooCommerce updates checkout
-    $(document.body).on('updated_checkout', function() {
-        // Reset saved parent when checkout rebuilds
-        paypalIframeOriginalParent = null;
-        togglePayPalIframePosition();
-    });
+    // Run after WooCommerce updates checkout (Place Order button may re-appear)
+    // NOTE: a second updated_checkout listener at the bottom also calls this for
+    // consistency — keeping them separate makes the toggle self-contained here.
 
     // ── Auto-resize iframe ──────────────────────────────────────────────────
 
@@ -463,6 +447,8 @@
             confirmTimeoutId = null;
         }
         hideOverlay();
+        // Re-apply PayPal iframe toggle in case Place Order button re-appeared
+        togglePayPalIframePosition();
     });
 
     // WooCommerce emits checkout_error on validation/server errors.

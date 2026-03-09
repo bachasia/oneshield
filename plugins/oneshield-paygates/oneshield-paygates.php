@@ -179,6 +179,50 @@ function osp_get_gateway_instance(string $gateway): ?OS_Payment_Base {
     return $key ? ($instances[$key] ?? null) : null;
 }
 
+// ── PayPal iframe outside payment box ───────────────────────────────────────
+// Rendered after the Place Order button so WooCommerce's updated_checkout
+// does NOT rebuild it (it lives outside .payment_box / #order_review).
+// Visibility is controlled by checkout.js based on selected payment method.
+
+add_action('woocommerce_review_order_after_submit', 'osp_render_paypal_iframe_outside');
+
+function osp_render_paypal_iframe_outside(): void {
+    $gw = osp_get_gateway_instance('paypal');
+    if (!$gw || !$gw->is_available()) {
+        return;
+    }
+
+    $result = $gw->get_paypal_iframe_result();
+    if (!$result || empty($result['iframe_url'])) {
+        return;
+    }
+
+    $iframe_url  = esc_url($result['iframe_url']);
+    $loading_id  = 'osp-iframe-loading-paypal';
+    $initial_h   = '120';
+
+    ?>
+    <div id="osp-paypal-button-wrap" style="display:none;margin-top:12px;">
+        <div class="osp-iframe-wrap" style="position:relative;">
+            <iframe
+                id="osp-iframe-paypal"
+                src="<?php echo $iframe_url; ?>"
+                style="width:100%;height:<?php echo $initial_h; ?>px;border:none;display:block;overflow:hidden;"
+                scrolling="no"
+                allow="payment"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+                referrerpolicy="no-referrer"
+                onload="var l=document.getElementById('<?php echo esc_attr($loading_id); ?>');if(l)l.style.display='none';"
+            ></iframe>
+            <div id="<?php echo esc_attr($loading_id); ?>"
+                 style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;font-size:13px;color:#9ca3af;">
+                <?php esc_html_e('Loading payment form…', 'oneshield-paygates'); ?>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
 // ── Orders list: Shield URL column ──────────────────────────────────────────
 // Supports both WooCommerce HPOS (woocommerce_shop_order_list_table_columns)
 // and the legacy CPT list (manage_edit-shop_order_columns).
