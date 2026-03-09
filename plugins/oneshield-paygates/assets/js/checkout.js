@@ -119,32 +119,51 @@
         return document.getElementById('osp-iframe-' + gateway);
     }
 
-    // ── Hide/Show Place Order button based on payment method ───────────────
+    // ── Move PayPal iframe to Place Order button position ──────────────────
 
-    function togglePlaceOrderButton() {
+    var paypalIframeOriginalParent = null;
+
+    function togglePayPalIframePosition() {
         var gateway = getActiveOspGateway();
         var $placeOrder = $('#place_order');
+        var $paypalIframe = $('#osp-iframe-paypal').closest('.osp-iframe-wrap');
         
-        if (gateway === 'paypal') {
-            // Hide Place Order button when PayPal is selected
+        if (gateway === 'paypal' && $paypalIframe.length && $placeOrder.length) {
+            // Save original parent if not saved yet
+            if (!paypalIframeOriginalParent) {
+                paypalIframeOriginalParent = $paypalIframe.parent();
+            }
+            
+            // Hide Place Order button
             $placeOrder.hide();
+            
+            // Move PayPal iframe to Place Order button position
+            $paypalIframe.insertAfter($placeOrder);
+            $paypalIframe.show();
         } else {
-            // Show Place Order button for other payment methods
+            // Show Place Order button
             $placeOrder.show();
+            
+            // Move PayPal iframe back to original position
+            if ($paypalIframe.length && paypalIframeOriginalParent && paypalIframeOriginalParent.length) {
+                $paypalIframe.appendTo(paypalIframeOriginalParent);
+            }
         }
     }
 
     // Run on page load
-    togglePlaceOrderButton();
+    togglePayPalIframePosition();
 
     // Run when payment method changes
     $(document.body).on('change', 'input[name="payment_method"]', function() {
-        togglePlaceOrderButton();
+        togglePayPalIframePosition();
     });
 
     // Run after WooCommerce updates checkout
     $(document.body).on('updated_checkout', function() {
-        togglePlaceOrderButton();
+        // Reset saved parent when checkout rebuilds
+        paypalIframeOriginalParent = null;
+        togglePayPalIframePosition();
     });
 
     // ── Auto-resize iframe ──────────────────────────────────────────────────
