@@ -180,12 +180,19 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
         $txn_id     = sanitize_text_field($_POST['osp_paypal_transaction_id']     ?? '');
         $os_txn_id  = sanitize_text_field($_POST['osp_paypal_os_transaction_id']  ?? '');
         $os_site_id = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
+        $os_checkout_id = sanitize_text_field($_POST['osp_paypal_os_checkout_id'] ?? '');
 
         if (empty($txn_id)) {
             wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
             return ['result' => 'failure'];
         }
 
+        // Phase 1/2: if checkout_id present, complete the session (idempotent)
+        if (!empty($os_checkout_id)) {
+            $this->complete_checkout_session($os_checkout_id, $txn_id);
+        }
+
+        // Legacy confirm (always run for backward compatibility / webhook reconciliation)
         if ($os_site_id && $os_txn_id) {
             $confirmed = $this->confirm_with_panel($os_site_id, $order->get_id(), $txn_id);
             if (!$confirmed) {
@@ -198,6 +205,11 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'OneShield: PayPal payment completed. Transaction ID: %s',
             $txn_id
         ));
+
+        if (!empty($os_checkout_id)) {
+            $order->update_meta_data('_os_checkout_id', $os_checkout_id);
+            $order->save();
+        }
 
         // Persist the shield site URL on the order for display in the orders list.
         if (WC()->session) {
@@ -216,5 +228,37 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'result'   => 'success',
             'redirect' => $order->get_checkout_order_received_url(),
         ];
+    }
+
+    /**
+     * Mark checkout session as completed via Gateway Panel API.
+     */
+    private function complete_checkout_session(string $checkout_id, string $gateway_txn_id): void {
+        if (empty($this->gateway_url) || empty($this->token_secret)) {
+            return;
+        }
+
+        $payload = [
+            'gateway_transaction_id' => $gateway_txn_id,
+        ];
+
+        $response = wp_remote_post(
+            rtrim($this->gateway_url, '/') . '/api/checkout-sessions/' . rawurlencode($checkout_id) . '/complete',
+            [
+                'timeout' => 10,
+                'headers' => $this->sign_request($payload),
+                'body'    => json_encode($payload),
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            $this->log('complete_checkout_session error: ' . $response->get_error_message());
+            return;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code !== 200) {
+            $this->log('complete_checkout_session HTTP ' . $code);
+        }
     }
 }
