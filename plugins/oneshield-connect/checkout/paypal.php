@@ -164,6 +164,19 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height: h,
                 }, '*');
             }
+
+            // Watch for any height changes (e.g. PayPal expands credit card form)
+            if (typeof ResizeObserver !== 'undefined') {
+                var lastHeight = 0;
+                var ro = new ResizeObserver(function() {
+                    var h = document.body.scrollHeight;
+                    if (h !== lastHeight) {
+                        lastHeight = h;
+                        notifyParentResize();
+                    }
+                });
+                ro.observe(document.body);
+            }
         })();
         </script>
     </body>
