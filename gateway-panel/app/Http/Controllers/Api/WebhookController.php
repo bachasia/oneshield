@@ -457,6 +457,35 @@ class WebhookController extends Controller
             if ($site) {
                 $this->siteRouter->recordSuccess($site);
             }
+        } elseif ($status === 'failed' && $orderId) {
+            // No existing record (checkout_id mode) — create a failed Transaction
+            // so the failure is visible in the Panel even if the customer closed
+            // the browser before the money site called /confirm.
+            $session = CheckoutSession::where('order_ref', $orderId)
+                ->whereHas('site', fn ($q) => $q->where('user_id', $user->id))
+                ->latest()
+                ->first();
+
+            $transaction = Transaction::create([
+                'site_id'                => $session?->site_id ?? $site?->id,
+                'order_id'               => $orderId,
+                'amount'                 => $session
+                    ? $session->amount_minor / 100
+                    : ($amount ? $amount / 100 : 0),
+                'currency'               => $session?->currency ?? $currency,
+                'gateway'                => $validated['gateway'] ?? 'stripe',
+                'status'                 => 'failed',
+                'gateway_transaction_id' => $piId,
+                'money_site_domain'      => $session?->meta['money_site_domain'] ?? 'unknown',
+                'billing_data'           => $session?->billing_snapshot ?: null,
+                'raw_response'           => $rawPayload,
+            ]);
+
+            $moneySiteDomain = $transaction->money_site_domain;
+
+            if ($site) {
+                $this->siteRouter->recordFailure($site);
+            }
         }
 
         // ── 2. Push status to money site ──────────────────────────────────────
