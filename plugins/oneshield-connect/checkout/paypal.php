@@ -183,6 +183,22 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     }, '*');
                 }
             }, 50);
+
+            // Detect PayPal card-form overlay (paypal-overlay-uid-*) open/close.
+            // When customer clicks "Debit or Credit Card" in the PayPal button, the
+            // SDK injects a full-screen overlay into this iframe's DOM. The parent
+            // iframe is too small to show it, so we notify the parent to go fullscreen.
+            var _paypalOverlayOpen = false;
+            setInterval(function() {
+                var overlayOpen = !!document.querySelector('[id*="paypal-overlay-uid"]');
+                if (overlayOpen !== _paypalOverlayOpen) {
+                    _paypalOverlayOpen = overlayOpen;
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: overlayOpen ? 'paypal_overlay_open' : 'paypal_overlay_close',
+                    }, '*');
+                }
+            }, 50);
         })();
         </script>
     </body>

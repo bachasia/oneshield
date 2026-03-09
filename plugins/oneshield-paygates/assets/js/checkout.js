@@ -152,6 +152,9 @@
 
     // ── Auto-resize iframe ──────────────────────────────────────────────────
 
+    // Track last known PayPal iframe height so we can restore it after overlay closes.
+    var _lastPaypalIframeHeight = 200;
+
     window.addEventListener('message', function (event) {
         if (!event.data || event.data.source !== 'oneshield-connect') return;
         var msg = event.data;
@@ -160,7 +163,48 @@
             var gateway = getActiveOspGateway();
             if (!gateway) return;
             var f = getIframe(gateway);
-            if (f) f.style.height = Math.max(msg.height, 50) + 'px';
+            if (f) {
+                var newH = Math.max(msg.height, 50);
+                f.style.height = newH + 'px';
+                if (gateway === 'paypal') {
+                    _lastPaypalIframeHeight = newH;
+                }
+            }
+        }
+
+        // PayPal card-form overlay opened inside the iframe — make the iframe
+        // wrap full-screen so the overlay is fully visible to the customer.
+        if (msg.action === 'paypal_overlay_open') {
+            var $wrap   = $('#osp-paypal-button-wrap');
+            var $iframe = $('#osp-iframe-paypal');
+            $wrap.css({
+                position:   'fixed',
+                top:        0,
+                left:       0,
+                width:      '100vw',
+                height:     '100vh',
+                'z-index':  999999,
+                margin:     0,
+                background: '#fff',
+            });
+            $iframe.css({ height: '100vh' });
+        }
+
+        // PayPal card-form overlay closed — restore the wrap to normal flow.
+        if (msg.action === 'paypal_overlay_close') {
+            var $wrap   = $('#osp-paypal-button-wrap');
+            var $iframe = $('#osp-iframe-paypal');
+            $wrap.css({
+                position:   '',
+                top:        '',
+                left:       '',
+                width:      '',
+                height:     '',
+                'z-index':  '',
+                margin:     '12px 0 0 0',
+                background: '',
+            });
+            $iframe.css({ height: _lastPaypalIframeHeight + 'px' });
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
