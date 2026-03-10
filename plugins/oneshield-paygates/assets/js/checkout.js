@@ -175,6 +175,13 @@
         togglePayPalIframePosition();
     });
 
+    // Some themes/plugins switch payment method without firing a native
+    // change event consistently. Keep PayPal button visibility in sync.
+    $(document.body).on('payment_method_selected updated_checkout', function () {
+        togglePayPalIframePosition();
+    });
+    setInterval(togglePayPalIframePosition, 200);
+
     // Run after WooCommerce updates checkout (Place Order button may re-appear)
     // NOTE: a second updated_checkout listener at the bottom also calls this for
     // consistency — keeping them separate makes the toggle self-contained here.
