@@ -72,6 +72,13 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 ajax_url: '<?php echo esc_js(admin_url('admin-ajax.php')); ?>',
             };
 
+            function setPaypalFullscreen(open) {
+                window.parent.postMessage({
+                    source: 'oneshield-connect',
+                    action: open ? 'paypal_overlay_open' : 'paypal_overlay_close',
+                }, '*');
+            }
+
             paypal.Buttons({
                 style: {
                     layout:  'vertical',
@@ -95,9 +102,21 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     const data = await resp.json();
                     if (!data.success) {
                         showError(data.data || 'Failed to create order.');
+                        setPaypalFullscreen(false);
                         return null;
                     }
                     return data.data.paypal_order_id;
+                },
+
+                onClick: function() {
+                    // Some PayPal secure-browser / popup fallback screens are rendered
+                    // inside the iframe flow. Force parent iframe wrapper fullscreen
+                    // immediately so those screens are fully visible.
+                    setPaypalFullscreen(true);
+                },
+
+                onCancel: function() {
+                    setPaypalFullscreen(false);
                 },
 
                 onApprove: async function(data) {
@@ -113,6 +132,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     const result = await resp.json();
 
                     if (result.success) {
+                        setPaypalFullscreen(false);
                         // Notify tracking (non-blocking)
                         fetch(orderData.ajax_url, {
                             method: 'POST',
@@ -132,11 +152,13 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             order_id:       orderData.order_id,
                         }, '*');
                     } else {
+                        setPaypalFullscreen(false);
                         showError(result.data || 'Payment capture failed.');
                     }
                 },
 
                 onError: function(err) {
+                    setPaypalFullscreen(false);
                     showError('Payment failed. Please try again.');
                     console.error('PayPal error:', err);
                 },
