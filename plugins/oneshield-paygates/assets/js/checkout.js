@@ -173,15 +173,46 @@
             }
         }
 
-        // PayPal SDK injected its overlay into iframe — show dim overlay + message
-        // on the parent page. Iframe stays in place; overlay is pure HTML on parent.
+        // PayPal SDK overlay detected in iframe — make iframe fullscreen.
+        // Portal iframe to <body> to escape any parent stacking context
+        // (overflow, transform, etc). Apply fixed positioning via CSS class.
         if (msg.action === 'paypal_overlay_open') {
-            ospShowPaypalOverlay();
+            var f = document.getElementById('osp-iframe-paypal');
+            if (f && !f._ospPPParent) {
+                f._ospPPParent = f.parentNode;
+                f._ospPPNext   = f.nextSibling;
+                document.body.appendChild(f);
+                f.style.cssText = [
+                    'position:fixed',
+                    'top:0',
+                    'left:0',
+                    'width:100%',
+                    'height:100vh',
+                    'z-index:99999',
+                    'border:none',
+                    'margin:0',
+                    'padding:0',
+                    'display:block',
+                ].join('!important;') + '!important';
+                document.body.style.overflow = 'hidden';
+            }
         }
 
-        // PayPal overlay gone — remove parent overlay.
+        // PayPal overlay gone — restore iframe to original position and size.
         if (msg.action === 'paypal_overlay_close') {
-            ospHidePaypalOverlay();
+            var f = document.getElementById('osp-iframe-paypal');
+            if (f && f._ospPPParent) {
+                f.style.cssText = '';
+                if (f._ospPPNext && f._ospPPNext.parentNode === f._ospPPParent) {
+                    f._ospPPParent.insertBefore(f, f._ospPPNext);
+                } else {
+                    f._ospPPParent.appendChild(f);
+                }
+                f._ospPPParent = null;
+                f._ospPPNext   = null;
+                f.style.height = _lastPaypalIframeHeight + 'px';
+                document.body.style.overflow = '';
+            }
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
@@ -492,78 +523,6 @@
             .replace(/'/g, '&#39;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
-    }
-
-    // ── PayPal parent-page overlay ──────────────────────────────────────────
-    // When PayPal SDK shows its overlay inside the iframe, we dim the entire
-    // parent page and show a centered message — iframe stays in its original place.
-
-    var _ospPPOverlay = null;
-
-    function ospShowPaypalOverlay() {
-        if (_ospPPOverlay) return;
-
-        var style = document.createElement('style');
-        style.id  = 'osp-pp-ol-style';
-        style.textContent = [
-            '#osp-pp-ol{',
-                'position:fixed;inset:0;z-index:2147483000;',
-                'background:rgba(0,0,0,0.80);',
-                'display:flex;align-items:center;justify-content:center;',
-                'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
-            '}',
-            '#osp-pp-ol-box{text-align:center;padding:0 40px;max-width:460px;}',
-            '#osp-pp-ol-logo{',
-                'font-size:42px;font-weight:800;color:#fff;',
-                'letter-spacing:-1px;margin-bottom:18px;',
-            '}',
-            '#osp-pp-ol-msg{',
-                'font-size:15px;line-height:1.65;color:rgba(255,255,255,0.88);',
-                'margin:0 0 22px;',
-            '}',
-            '#osp-pp-ol-link{',
-                'font-size:15px;font-weight:600;color:#fff;',
-                'text-decoration:underline;cursor:pointer;',
-            '}',
-        ].join('');
-
-        var el = document.createElement('div');
-        el.id  = 'osp-pp-ol';
-        el.innerHTML =
-            '<div id="osp-pp-ol-box">' +
-                '<div id="osp-pp-ol-logo">PayPal</div>' +
-                '<p id="osp-pp-ol-msg">' +
-                    'Bạn không thấy trình duyệt paypal bảo mật?<br>' +
-                    'Chúng tôi sẽ giúp bạn mở lại cửa sổ để hoàn tất giao dịch mua hàng' +
-                '</p>' +
-                '<a id="osp-pp-ol-link" href="#">Nhấp để tiếp tục</a>' +
-            '</div>';
-
-        document.head.appendChild(style);
-        document.body.appendChild(el);
-        document.body.style.overflow = 'hidden';
-        _ospPPOverlay = el;
-
-        el.querySelector('#osp-pp-ol-link').addEventListener('click', function (e) {
-            e.preventDefault();
-            var iframe = document.getElementById('osp-iframe-paypal');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    source: 'oneshield-checkout',
-                    action: 'paypal_refocus_popup',
-                }, '*');
-            }
-        });
-    }
-
-    function ospHidePaypalOverlay() {
-        if (_ospPPOverlay) {
-            _ospPPOverlay.remove();
-            _ospPPOverlay = null;
-        }
-        var s = document.getElementById('osp-pp-ol-style');
-        if (s) s.remove();
-        document.body.style.overflow = '';
     }
 
 })(jQuery);
