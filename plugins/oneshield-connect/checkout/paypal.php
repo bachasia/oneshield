@@ -114,12 +114,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height:  45,
                 },
 
-                onClick: function() {
-                    // Expand iframe to fullscreen immediately on click so PayPal's
-                    // inline overlay/popup message is fully visible.
-                    setPaypalFullscreen(true);
-                },
-
                 createOrder: async function() {
                     const resp = await fetch(orderData.ajax_url, {
                         method: 'POST',
