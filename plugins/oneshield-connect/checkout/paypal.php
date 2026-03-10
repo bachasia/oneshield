@@ -79,39 +79,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 }, '*');
             }
 
-            // Track the PayPal popup window reference so we can re-focus it
-            // when the parent page asks via 'paypal_refocus_popup' message.
-            var _paypalPopup = null;
-
-            // Monkey-patch window.open to capture the PayPal popup reference.
-            (function() {
-                var _origOpen = window.open;
-                window.open = function(url, name, features) {
-                    var win = _origOpen.call(window, url, name, features);
-                    if (url && typeof url === 'string' && url.indexOf('paypal.com') !== -1) {
-                        _paypalPopup = win;
-                    }
-                    return win;
-                };
-            })();
-
-            // Listen for parent requests to re-focus or cancel the PayPal popup
-            window.addEventListener('message', function(e) {
-                if (!e.data || e.data.source !== 'oneshield-checkout') return;
-                if (e.data.action === 'paypal_refocus_popup') {
-                    if (_paypalPopup && !_paypalPopup.closed) {
-                        try { _paypalPopup.focus(); } catch(err) {}
-                    }
-                }
-                if (e.data.action === 'paypal_cancel') {
-                    // Close popup if open, notify parent overlay is done
-                    if (_paypalPopup && !_paypalPopup.closed) {
-                        try { _paypalPopup.close(); } catch(err) {}
-                    }
-                    setPaypalFullscreen(false);
-                }
-            });
-
             paypal.Buttons({
                 style: {
                     layout:  'vertical',
