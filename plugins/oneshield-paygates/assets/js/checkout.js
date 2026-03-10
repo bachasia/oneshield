@@ -535,13 +535,71 @@
 
     // ── PayPal fullscreen iframe (competitor-style) ─────────────────────────
 
+    var _ppAncestorRestore = [];
+
+    function relaxPayPalIframeAncestors(iframe) {
+        if (_ppAncestorRestore.length) return;
+
+        var node = iframe.parentElement;
+        while (node && node !== document.documentElement) {
+            _ppAncestorRestore.push({
+                el: node,
+                overflow: node.style.getPropertyValue('overflow'),
+                overflowPriority: node.style.getPropertyPriority('overflow'),
+                overflowX: node.style.getPropertyValue('overflow-x'),
+                overflowXPriority: node.style.getPropertyPriority('overflow-x'),
+                overflowY: node.style.getPropertyValue('overflow-y'),
+                overflowYPriority: node.style.getPropertyPriority('overflow-y'),
+                transform: node.style.getPropertyValue('transform'),
+                transformPriority: node.style.getPropertyPriority('transform'),
+                contain: node.style.getPropertyValue('contain'),
+                containPriority: node.style.getPropertyPriority('contain')
+            });
+
+            node.style.setProperty('overflow', 'visible', 'important');
+            node.style.setProperty('overflow-x', 'visible', 'important');
+            node.style.setProperty('overflow-y', 'visible', 'important');
+            node.style.setProperty('transform', 'none', 'important');
+            node.style.setProperty('contain', 'none', 'important');
+
+            node = node.parentElement;
+        }
+    }
+
+    function restorePayPalIframeAncestors() {
+        if (!_ppAncestorRestore.length) return;
+
+        _ppAncestorRestore.forEach(function (item) {
+            if (!item.el) return;
+
+            if (item.overflow) item.el.style.setProperty('overflow', item.overflow, item.overflowPriority || '');
+            else item.el.style.removeProperty('overflow');
+
+            if (item.overflowX) item.el.style.setProperty('overflow-x', item.overflowX, item.overflowXPriority || '');
+            else item.el.style.removeProperty('overflow-x');
+
+            if (item.overflowY) item.el.style.setProperty('overflow-y', item.overflowY, item.overflowYPriority || '');
+            else item.el.style.removeProperty('overflow-y');
+
+            if (item.transform) item.el.style.setProperty('transform', item.transform, item.transformPriority || '');
+            else item.el.style.removeProperty('transform');
+
+            if (item.contain) item.el.style.setProperty('contain', item.contain, item.containPriority || '');
+            else item.el.style.removeProperty('contain');
+        });
+
+        _ppAncestorRestore = [];
+    }
+
     function setPayPalIframeFullscreen(open) {
         var iframe = document.getElementById('osp-iframe-paypal');
         if (!iframe) return;
         if (open) {
+            relaxPayPalIframeAncestors(iframe);
             iframe.classList.add('osp-pp-fullscreen');
         } else {
             iframe.classList.remove('osp-pp-fullscreen');
+            restorePayPalIframeAncestors();
         }
     }
 
