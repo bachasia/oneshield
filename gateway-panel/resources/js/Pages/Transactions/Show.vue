@@ -267,15 +267,15 @@ function statusDot(status) {
 
 function gatewayClass(gateway) {
   return {
-    paypal: 'bg-blue-100 text-blue-700',
-    stripe: 'bg-violet-100 text-violet-700',
+    paypal: 'bg-amber-50 text-amber-700',
+    stripe: 'bg-indigo-50 text-indigo-700',
   }[gateway] ?? 'bg-gray-100 text-gray-600';
 }
 
 function gatewayDot(gateway) {
   return {
-    paypal: 'bg-blue-500',
-    stripe: 'bg-violet-500',
+    paypal: 'bg-amber-500',
+    stripe: 'bg-indigo-500',
   }[gateway] ?? 'bg-gray-400';
 }
 

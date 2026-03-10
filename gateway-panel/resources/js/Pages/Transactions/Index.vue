@@ -163,13 +163,13 @@ function customerName(tx) {
 }
 function gatewayClass(g) {
   return {
-    paypal:    'bg-blue-50 text-blue-700',
+    paypal:    'bg-amber-50 text-amber-700',
     stripe:    'bg-indigo-50 text-indigo-700',
     airwallex: 'bg-rose-50 text-rose-700',
   }[g] ?? 'bg-gray-100 text-gray-600';
 }
 function gatewaydot(g) {
-  return { paypal: 'bg-blue-500', stripe: 'bg-indigo-500', airwallex: 'bg-rose-500' }[g] ?? 'bg-gray-400';
+  return { paypal: 'bg-amber-500', stripe: 'bg-indigo-500', airwallex: 'bg-rose-500' }[g] ?? 'bg-gray-400';
 }
 function statusClass(s) {
   return {

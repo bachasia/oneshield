@@ -106,10 +106,10 @@
             </tr>
             <tr v-for="tx in recent_transactions" :key="tx.id" class="hover:bg-gray-50/60 transition-colors">
               <td class="px-6 py-3 font-mono text-xs text-gray-600">{{ tx.order_id }}</td>
-              <td class="px-6 py-3 font-semibold text-gray-900">{{ tx.currency }} {{ Number(tx.amount).toFixed(2) }}</td>
+              <td class="px-6 py-3 font-semibold text-gray-900">{{ String(tx.currency || '').toUpperCase() }} {{ Number(tx.amount).toFixed(2) }}</td>
               <td class="px-6 py-3">
-                <span class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full capitalize" :class="getGatewayClass(tx.gateway)">
-                  <span class="font-bold" :class="getGatewayIconClass(tx.gateway)">{{ getGatewayIcon(tx.gateway) }}</span>
+                <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full capitalize" :class="getGatewayClass(tx.gateway)">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="getGatewayDotClass(tx.gateway)" />
                   {{ tx.gateway }}
                 </span>
               </td>
@@ -148,29 +148,20 @@ function formatDate(dateStr) {
 
 function getGatewayClass(gateway) {
   const classes = {
-    'paypal': 'bg-blue-50 text-blue-700',
+    'paypal': 'bg-amber-50 text-amber-700',
     'stripe': 'bg-indigo-50 text-indigo-700',
     'airwallex': 'bg-rose-50 text-rose-700',
   };
   return classes[gateway] || 'bg-gray-100 text-gray-600';
 }
 
-function getGatewayIcon(gateway) {
-  const icons = {
-    'paypal': 'P',
-    'stripe': 'S',
-    'airwallex': 'A',
-  };
-  return icons[gateway] || gateway?.charAt(0)?.toUpperCase() || '?';
-}
-
-function getGatewayIconClass(gateway) {
+function getGatewayDotClass(gateway) {
   const classes = {
-    'paypal': 'text-blue-500',
-    'stripe': 'text-indigo-500',
-    'airwallex': 'text-rose-500',
+    'paypal': 'bg-amber-500',
+    'stripe': 'bg-indigo-500',
+    'airwallex': 'bg-rose-500',
   };
-  return classes[gateway] || 'text-gray-500';
+  return classes[gateway] || 'bg-gray-500';
 }
 
 function getStatusClass(status) {
