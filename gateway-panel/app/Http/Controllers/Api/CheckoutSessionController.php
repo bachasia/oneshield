@@ -220,6 +220,7 @@ class CheckoutSessionController extends Controller
         $validated = $request->validate([
             'gateway_transaction_id'   => 'required|string|max:100',
             'stripe_payment_intent_id' => 'nullable|string|max:100',
+            'wc_order_id'              => 'nullable|string|max:100',
         ]);
 
         $session = CheckoutSession::findOrFail($id);
@@ -241,9 +242,12 @@ class CheckoutSessionController extends Controller
         $shipping = $billing['shipping'] ?? [];
         unset($billing['shipping']); // keep billing_data clean
 
+        // Use the real WC order ID if provided, otherwise fall back to temp UUID
+        $orderId = !empty($validated['wc_order_id']) ? $validated['wc_order_id'] : $session->order_ref;
+
         $transaction = \App\Models\Transaction::create([
             'site_id'                => $session->site_id,
-            'order_id'               => $session->order_ref,
+            'order_id'               => $orderId,
             'amount'                 => number_format($session->amount_minor / 100, 2, '.', ''),
             'currency'               => strtoupper($session->currency),
             'gateway'                => $session->gateway,

@@ -187,9 +187,39 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             return ['result' => 'failure'];
         }
 
-        // Phase 1/2: if checkout_id present, complete the session (idempotent)
+        // Phase 1/2: if checkout_id present, complete the session (idempotent).
+        // Send billing from the real WC order so it appears in the Panel.
         if (!empty($os_checkout_id)) {
-            $this->complete_checkout_session($os_checkout_id, $txn_id);
+            // Collect billing from the WC order (available at process_payment time)
+            $billing = array_filter([
+                'first_name' => $order->get_billing_first_name(),
+                'last_name'  => $order->get_billing_last_name(),
+                'email'      => $order->get_billing_email(),
+                'phone'      => $order->get_billing_phone(),
+                'address_1'  => $order->get_billing_address_1(),
+                'address_2'  => $order->get_billing_address_2(),
+                'city'       => $order->get_billing_city(),
+                'state'      => $order->get_billing_state(),
+                'postcode'   => $order->get_billing_postcode(),
+                'country'    => $order->get_billing_country(),
+            ]);
+
+            // Push billing to Panel session before completing
+            if (!empty($billing)) {
+                $shipping = array_filter([
+                    'first_name' => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+                    'last_name'  => $order->get_shipping_last_name()  ?: $order->get_billing_last_name(),
+                    'address_1'  => $order->get_shipping_address_1()  ?: $order->get_billing_address_1(),
+                    'address_2'  => $order->get_shipping_address_2()  ?: $order->get_billing_address_2(),
+                    'city'       => $order->get_shipping_city()        ?: $order->get_billing_city(),
+                    'state'      => $order->get_shipping_state()       ?: $order->get_billing_state(),
+                    'postcode'   => $order->get_shipping_postcode()    ?: $order->get_billing_postcode(),
+                    'country'    => $order->get_shipping_country()     ?: $order->get_billing_country(),
+                ]);
+                $this->send_billing_to_panel(0, $billing, $os_checkout_id, $shipping);
+            }
+
+            $this->complete_checkout_session($os_checkout_id, $txn_id, (string) $order->get_id());
         }
 
         // Legacy confirm (always run for backward compatibility / webhook reconciliation)
@@ -233,7 +263,7 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     /**
      * Mark checkout session as completed via Gateway Panel API.
      */
-    private function complete_checkout_session(string $checkout_id, string $gateway_txn_id): void {
+    private function complete_checkout_session(string $checkout_id, string $gateway_txn_id, string $wc_order_id = ''): void {
         if (empty($this->gateway_url) || empty($this->token_secret)) {
             return;
         }
@@ -241,6 +271,10 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
         $payload = [
             'gateway_transaction_id' => $gateway_txn_id,
         ];
+
+        if (!empty($wc_order_id)) {
+            $payload['wc_order_id'] = $wc_order_id;
+        }
 
         $response = wp_remote_post(
             rtrim($this->gateway_url, '/') . '/api/checkout-sessions/' . rawurlencode($checkout_id) . '/complete',
