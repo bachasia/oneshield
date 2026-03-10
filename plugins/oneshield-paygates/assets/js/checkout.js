@@ -179,15 +179,16 @@
             }
         }
 
-        // PayPal overlay detected — add fullscreen class to iframe.
+        // PayPal overlay detected — hide iframe, show fullscreen overlay on parent.
         if (msg.action === 'paypal_overlay_open') {
-            $('#osp-iframe-paypal').addClass('osp-pp-fullscreen');
+            $('#osp-iframe-paypal').css('visibility', 'hidden');
+            ospPPOverlayShow();
         }
 
-        // PayPal overlay gone — remove fullscreen class, restore height.
+        // PayPal overlay gone — restore iframe, remove overlay.
         if (msg.action === 'paypal_overlay_close') {
-            $('#osp-iframe-paypal').removeClass('osp-pp-fullscreen')
-                .css('height', _lastPaypalIframeHeight + 'px');
+            $('#osp-iframe-paypal').css('visibility', '');
+            ospPPOverlayHide();
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
@@ -498,6 +499,78 @@
             .replace(/'/g, '&#39;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    }
+
+    // ── PayPal fullscreen overlay (parent page) ─────────────────────────────
+
+    var _ospPPEl = null;
+
+    function ospPPOverlayShow() {
+        if (_ospPPEl) return;
+
+        var el = document.createElement('div');
+        el.id = 'osp-pp-fs';
+        el.innerHTML =
+            '<button id="osp-pp-fs-close" aria-label="Close">' +
+                '<svg width="20" height="20" viewBox="0 0 20 20" fill="none">' +
+                '<path d="M2 2l16 16M18 2L2 18" stroke="white" stroke-width="2.5" stroke-linecap="round"/>' +
+                '</svg>' +
+            '</button>' +
+            '<div id="osp-pp-fs-body">' +
+                '<div id="osp-pp-fs-logo">PayPal</div>' +
+                '<p id="osp-pp-fs-msg">' +
+                    'Bạn không thấy trình duyệt paypal bảo mật?<br>' +
+                    'Chúng tôi sẽ giúp bạn mở lại cửa sổ để hoàn tất giao dịch mua hàng' +
+                '</p>' +
+                '<a id="osp-pp-fs-link" href="#">Nhấp để tiếp tục</a>' +
+            '</div>';
+
+        var style = document.createElement('style');
+        style.id = 'osp-pp-fs-style';
+        style.textContent =
+            '#osp-pp-fs{position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;}' +
+            '#osp-pp-fs-close{position:absolute;top:20px;right:24px;background:none;border:none;cursor:pointer;padding:4px;line-height:0;}' +
+            '#osp-pp-fs-body{text-align:center;padding:0 40px;max-width:460px;}' +
+            '#osp-pp-fs-logo{font-size:44px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}' +
+            '#osp-pp-fs-msg{font-size:15px;line-height:1.65;color:rgba(255,255,255,0.88);margin:0 0 22px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}' +
+            '#osp-pp-fs-link{font-size:15px;font-weight:600;color:#fff;text-decoration:underline;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}';
+
+        document.head.appendChild(style);
+        document.body.appendChild(el);
+        document.body.style.overflow = 'hidden';
+        _ospPPEl = el;
+
+        // X button — send cancel message to iframe so PayPal SDK closes cleanly
+        document.getElementById('osp-pp-fs-close').addEventListener('click', function () {
+            ospPPOverlayHide();
+            $('#osp-iframe-paypal').css('visibility', '');
+            var iframe = document.getElementById('osp-iframe-paypal');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    source: 'oneshield-checkout',
+                    action: 'paypal_cancel',
+                }, '*');
+            }
+        });
+
+        // "Nhấp để tiếp tục" — refocus PayPal popup
+        document.getElementById('osp-pp-fs-link').addEventListener('click', function (e) {
+            e.preventDefault();
+            var iframe = document.getElementById('osp-iframe-paypal');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    source: 'oneshield-checkout',
+                    action: 'paypal_refocus_popup',
+                }, '*');
+            }
+        });
+    }
+
+    function ospPPOverlayHide() {
+        if (_ospPPEl) { _ospPPEl.remove(); _ospPPEl = null; }
+        var s = document.getElementById('osp-pp-fs-style');
+        if (s) s.remove();
+        document.body.style.overflow = '';
     }
 
 })(jQuery);

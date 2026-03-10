@@ -95,13 +95,20 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 };
             })();
 
-            // Listen for parent requests to re-focus the PayPal popup
+            // Listen for parent requests to re-focus or cancel the PayPal popup
             window.addEventListener('message', function(e) {
                 if (!e.data || e.data.source !== 'oneshield-checkout') return;
                 if (e.data.action === 'paypal_refocus_popup') {
                     if (_paypalPopup && !_paypalPopup.closed) {
                         try { _paypalPopup.focus(); } catch(err) {}
                     }
+                }
+                if (e.data.action === 'paypal_cancel') {
+                    // Close popup if open, notify parent overlay is done
+                    if (_paypalPopup && !_paypalPopup.closed) {
+                        try { _paypalPopup.close(); } catch(err) {}
+                    }
+                    setPaypalFullscreen(false);
                 }
             });
 
