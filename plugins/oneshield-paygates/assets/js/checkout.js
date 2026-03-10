@@ -175,15 +175,14 @@
             }
         }
 
-        // PayPal card-form overlay opened inside the iframe.
-        // Move wrap to <body> and force true fullscreen so it is never clipped
-        // by checkout containers, transforms, or overflow rules.
+        // PayPal overlay opened — expand the iframe wrap to true fullscreen
+        // so the PayPal login/checkout UI is fully visible.
         if (msg.action === 'paypal_overlay_open') {
             var $wrap   = $('#osp-paypal-button-wrap');
             var $iframe = $('#osp-iframe-paypal');
             if ($wrap.length && !_paypalWrapOriginalParent) {
                 _paypalWrapOriginalParent = $wrap[0].parentNode;
-                _paypalWrapOriginalNext = $wrap[0].nextSibling;
+                _paypalWrapOriginalNext   = $wrap[0].nextSibling;
                 document.body.appendChild($wrap[0]);
             }
             $wrap.css({
@@ -194,17 +193,14 @@
                 height:     '100vh',
                 'z-index':  2147483000,
                 margin:     0,
-                background: '#fff',
+                background: 'transparent',
                 display:    'block',
             });
-            $iframe.css({ height: '100vh' });
+            $iframe.css({ width: '100vw', height: '100vh' });
             $('body').css('overflow', 'hidden');
-
-            // Show the "can't see PayPal window?" notification overlay on the left side
-            showPaypalNotifyOverlay($iframe);
         }
 
-        // PayPal card-form overlay closed — restore the wrap to normal flow.
+        // PayPal overlay closed — restore wrap and iframe to their original position/size.
         if (msg.action === 'paypal_overlay_close') {
             var $wrap   = $('#osp-paypal-button-wrap');
             var $iframe = $('#osp-iframe-paypal');
@@ -231,7 +227,7 @@
                 margin:     '12px 0 0 0',
                 background: '',
             });
-            $iframe.css({ height: _lastPaypalIframeHeight + 'px' });
+            $iframe.css({ width: '', height: _lastPaypalIframeHeight + 'px' });
             $('body').css('overflow', '');
         }
 
@@ -543,72 +539,6 @@
             .replace(/'/g, '&#39;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
-    }
-
-    // Show a centered notification on the left half of the screen when PayPal
-    // opens its login/checkout popup so users know what is happening.
-    function showPaypalNotifyOverlay($iframe) {
-        if ($('#osp-paypal-notify-overlay').length) return;
-
-        // Determine iframe left offset so the notify panel covers the left side
-        var iframeLeft = $iframe.length ? $iframe.offset().left : 0;
-        var notifyWidth = iframeLeft > 0 ? iframeLeft : Math.floor(window.innerWidth / 2);
-
-        var $notify = $([
-            '<div id="osp-paypal-notify-overlay" style="',
-                'position:fixed;',
-                'top:0;left:0;',
-                'width:' + notifyWidth + 'px;',
-                'height:100vh;',
-                'z-index:2147483001;',
-                'background:rgba(0,0,0,0.75);',
-                'display:flex;align-items:center;justify-content:center;',
-            '">',
-                '<div style="',
-                    'text-align:center;padding:0 32px;max-width:360px;',
-                '">',
-                    '<svg width="80" height="80" viewBox="0 0 80 80" fill="none" style="margin-bottom:20px;display:block;margin-left:auto;margin-right:auto;">',
-                        '<rect x="10" y="20" width="60" height="40" rx="4" fill="white" opacity="0.15"/>',
-                        '<rect x="10" y="20" width="60" height="40" rx="4" stroke="white" stroke-width="2"/>',
-                        '<rect x="22" y="32" width="36" height="6" rx="2" fill="white" opacity="0.6"/>',
-                        '<rect x="22" y="43" width="20" height="4" rx="2" fill="white" opacity="0.4"/>',
-                    '</svg>',
-                    '<p style="',
-                        'margin:0 0 8px;',
-                        'font-size:18px;font-weight:700;color:#fff;',
-                        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
-                        'line-height:1.4;',
-                    '">PayPal</p>',
-                    '<p style="',
-                        'margin:0 0 20px;',
-                        'font-size:14px;color:rgba(255,255,255,0.85);',
-                        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
-                        'line-height:1.6;',
-                    '">Bạn không thấy trình duyệt paypal bảo mật?<br>Chúng tôi sẽ giúp bạn mở lại cửa sổ để hoàn tất giao dịch mua hàng</p>',
-                    '<a id="osp-paypal-notify-focus" href="#" style="',
-                        'font-size:14px;font-weight:600;color:#fff;',
-                        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
-                        'text-decoration:underline;cursor:pointer;',
-                    '">Nhấp để tiếp tục</a>',
-                '</div>',
-            '</div>',
-        ].join(''));
-
-        $('body').append($notify);
-
-        // Clicking "Nhấp để tiếp tục" tries to focus/re-open the PayPal popup window.
-        // The iframe tracks the popup reference via postMessage; we send a message asking
-        // it to re-focus or re-open the popup.
-        $('#osp-paypal-notify-focus').on('click', function (e) {
-            e.preventDefault();
-            var iframe = document.getElementById('osp-iframe-paypal');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    source: 'oneshield-checkout',
-                    action: 'paypal_refocus_popup',
-                }, '*');
-            }
-        });
     }
 
 })(jQuery);
