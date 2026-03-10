@@ -26,6 +26,13 @@
     var ajaxUrl        = ospData.ajax_url || '';
     var sendBillingGws = ospData.send_billing_gateways || [];
 
+    // ── Inject PayPal fullscreen CSS immediately ────────────────────────────
+    (function () {
+        var s = document.createElement('style');
+        s.textContent = '.osp-pp-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}';
+        document.head.appendChild(s);
+    })();
+
     // Track state per gateway
     var state = {
         stripe: { confirmed: false, txnId: '' },
@@ -72,7 +79,6 @@
                 '#osp-payment-overlay{display:none}',
                 '#osp-payment-overlay.osp-visible{display:flex!important}',
                 '#osp-overlay-text,#osp-overlay-sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif!important;font-style:normal!important;}',
-                '#osp-iframe-paypal.osp-paypal-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}',
             '</style>',
         ].join(''));
         $('body').append($overlay);
@@ -173,80 +179,15 @@
             }
         }
 
-        // PayPal SDK overlay detected — make iframe fullscreen WITHOUT moving it in DOM
-        // (moving causes iframe reload). Instead walk up all ancestors and temporarily
-        // neutralise overflow/transform that would clip position:fixed descendants.
+        // PayPal overlay detected — add fullscreen class to iframe.
         if (msg.action === 'paypal_overlay_open') {
-            var f = document.getElementById('osp-iframe-paypal');
-            if (f && !f._ospPPActive) {
-                f._ospPPActive    = true;
-                f._ospPPAncestors = [];
-
-                // Walk every ancestor up to <html> and save/clear clipping props.
-                var el = f.parentElement;
-                while (el && el !== document.documentElement) {
-                    var cs = window.getComputedStyle(el);
-                    var needsFix = (
-                        cs.overflow !== 'visible' ||
-                        cs.overflowX !== 'visible' ||
-                        cs.overflowY !== 'visible' ||
-                        cs.transform !== 'none' ||
-                        cs.willChange !== 'auto' ||
-                        cs.filter !== 'none'
-                    );
-                    if (needsFix) {
-                        f._ospPPAncestors.push({
-                            el:        el,
-                            overflow:  el.style.overflow,
-                            overflowX: el.style.overflowX,
-                            overflowY: el.style.overflowY,
-                            transform: el.style.transform,
-                            willChange: el.style.willChange,
-                            filter:    el.style.filter,
-                        });
-                        el.style.overflow  = 'visible';
-                        el.style.overflowX = 'visible';
-                        el.style.overflowY = 'visible';
-                        if (cs.transform !== 'none')  el.style.transform  = 'none';
-                        if (cs.willChange !== 'auto') el.style.willChange = 'auto';
-                        if (cs.filter !== 'none')     el.style.filter     = 'none';
-                    }
-                    el = el.parentElement;
-                }
-
-                // Now apply fixed fullscreen to iframe itself.
-                f._ospPPOrigHeight = f.style.height;
-                f.style.cssText =
-                    'position:fixed!important;' +
-                    'top:0!important;left:0!important;' +
-                    'width:100vw!important;height:100vh!important;' +
-                    'z-index:99999!important;' +
-                    'border:none!important;margin:0!important;padding:0!important;' +
-                    'display:block!important;';
-                document.body.style.overflow = 'hidden';
-            }
+            $('#osp-iframe-paypal').addClass('osp-pp-fullscreen');
         }
 
-        // PayPal overlay gone — restore all ancestors and iframe.
+        // PayPal overlay gone — remove fullscreen class, restore height.
         if (msg.action === 'paypal_overlay_close') {
-            var f = document.getElementById('osp-iframe-paypal');
-            if (f && f._ospPPActive) {
-                // Restore ancestors
-                (f._ospPPAncestors || []).forEach(function (saved) {
-                    saved.el.style.overflow   = saved.overflow;
-                    saved.el.style.overflowX  = saved.overflowX;
-                    saved.el.style.overflowY  = saved.overflowY;
-                    saved.el.style.transform  = saved.transform;
-                    saved.el.style.willChange = saved.willChange;
-                    saved.el.style.filter     = saved.filter;
-                });
-                f._ospPPAncestors = [];
-                f._ospPPActive    = false;
-                // Restore iframe
-                f.style.cssText = '';
-                f.style.height  = _lastPaypalIframeHeight + 'px';
-                document.body.style.overflow = '';
-            }
+            $('#osp-iframe-paypal').removeClass('osp-pp-fullscreen')
+                .css('height', _lastPaypalIframeHeight + 'px');
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
