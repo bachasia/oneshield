@@ -137,8 +137,14 @@
         var $ppWrap     = $('#osp-paypal-button-wrap');
 
         if (gateway === 'paypal') {
-            $placeOrder.hide();
-            $ppWrap.show();
+            // Only hide Place Order if the PayPal iframe wrap actually exists in DOM.
+            if ($ppWrap.length) {
+                $placeOrder.hide();
+                $ppWrap.show();
+            } else {
+                // Wrap not rendered (API error) — fall back to Place Order button.
+                $placeOrder.show();
+            }
         } else {
             $placeOrder.show();
             $ppWrap.hide();
@@ -475,6 +481,9 @@
             confirmTimeoutId = null;
         }
         hideOverlay();
+        // Always restore iframe visibility and remove any stale PP overlay
+        $('#osp-iframe-paypal').css('visibility', '');
+        ospPPOverlayHide();
         // Re-apply PayPal iframe toggle in case Place Order button re-appeared
         togglePayPalIframePosition();
     });
