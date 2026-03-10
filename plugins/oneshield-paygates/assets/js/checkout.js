@@ -173,44 +173,78 @@
             }
         }
 
-        // PayPal SDK overlay detected in iframe — make iframe fullscreen.
-        // Portal iframe to <body> to escape any parent stacking context
-        // (overflow, transform, etc). Apply fixed positioning via CSS class.
+        // PayPal SDK overlay detected — make iframe fullscreen WITHOUT moving it in DOM
+        // (moving causes iframe reload). Instead walk up all ancestors and temporarily
+        // neutralise overflow/transform that would clip position:fixed descendants.
         if (msg.action === 'paypal_overlay_open') {
             var f = document.getElementById('osp-iframe-paypal');
-            if (f && !f._ospPPParent) {
-                f._ospPPParent = f.parentNode;
-                f._ospPPNext   = f.nextSibling;
-                document.body.appendChild(f);
-                f.style.cssText = [
-                    'position:fixed',
-                    'top:0',
-                    'left:0',
-                    'width:100%',
-                    'height:100vh',
-                    'z-index:99999',
-                    'border:none',
-                    'margin:0',
-                    'padding:0',
-                    'display:block',
-                ].join('!important;') + '!important';
+            if (f && !f._ospPPActive) {
+                f._ospPPActive    = true;
+                f._ospPPAncestors = [];
+
+                // Walk every ancestor up to <html> and save/clear clipping props.
+                var el = f.parentElement;
+                while (el && el !== document.documentElement) {
+                    var cs = window.getComputedStyle(el);
+                    var needsFix = (
+                        cs.overflow !== 'visible' ||
+                        cs.overflowX !== 'visible' ||
+                        cs.overflowY !== 'visible' ||
+                        cs.transform !== 'none' ||
+                        cs.willChange !== 'auto' ||
+                        cs.filter !== 'none'
+                    );
+                    if (needsFix) {
+                        f._ospPPAncestors.push({
+                            el:        el,
+                            overflow:  el.style.overflow,
+                            overflowX: el.style.overflowX,
+                            overflowY: el.style.overflowY,
+                            transform: el.style.transform,
+                            willChange: el.style.willChange,
+                            filter:    el.style.filter,
+                        });
+                        el.style.overflow  = 'visible';
+                        el.style.overflowX = 'visible';
+                        el.style.overflowY = 'visible';
+                        if (cs.transform !== 'none')  el.style.transform  = 'none';
+                        if (cs.willChange !== 'auto') el.style.willChange = 'auto';
+                        if (cs.filter !== 'none')     el.style.filter     = 'none';
+                    }
+                    el = el.parentElement;
+                }
+
+                // Now apply fixed fullscreen to iframe itself.
+                f._ospPPOrigHeight = f.style.height;
+                f.style.cssText =
+                    'position:fixed!important;' +
+                    'top:0!important;left:0!important;' +
+                    'width:100vw!important;height:100vh!important;' +
+                    'z-index:99999!important;' +
+                    'border:none!important;margin:0!important;padding:0!important;' +
+                    'display:block!important;';
                 document.body.style.overflow = 'hidden';
             }
         }
 
-        // PayPal overlay gone — restore iframe to original position and size.
+        // PayPal overlay gone — restore all ancestors and iframe.
         if (msg.action === 'paypal_overlay_close') {
             var f = document.getElementById('osp-iframe-paypal');
-            if (f && f._ospPPParent) {
+            if (f && f._ospPPActive) {
+                // Restore ancestors
+                (f._ospPPAncestors || []).forEach(function (saved) {
+                    saved.el.style.overflow   = saved.overflow;
+                    saved.el.style.overflowX  = saved.overflowX;
+                    saved.el.style.overflowY  = saved.overflowY;
+                    saved.el.style.transform  = saved.transform;
+                    saved.el.style.willChange = saved.willChange;
+                    saved.el.style.filter     = saved.filter;
+                });
+                f._ospPPAncestors = [];
+                f._ospPPActive    = false;
+                // Restore iframe
                 f.style.cssText = '';
-                if (f._ospPPNext && f._ospPPNext.parentNode === f._ospPPParent) {
-                    f._ospPPParent.insertBefore(f, f._ospPPNext);
-                } else {
-                    f._ospPPParent.appendChild(f);
-                }
-                f._ospPPParent = null;
-                f._ospPPNext   = null;
-                f.style.height = _lastPaypalIframeHeight + 'px';
+                f.style.height  = _lastPaypalIframeHeight + 'px';
                 document.body.style.overflow = '';
             }
         }
