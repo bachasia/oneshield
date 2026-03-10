@@ -176,21 +176,36 @@
             }
         }
 
-        // PayPal inline overlay opened — add fullscreen class to iframe only.
-        // Mirrors competitor approach: just CSS, no DOM portal.
+        // PayPal overlay opened — move iframe to body and make fullscreen.
+        // Using position:fixed on iframe inside a transformed/overflow parent
+        // will not escape the stacking context. Moving to body avoids this.
         if (msg.action === 'paypal_overlay_open') {
             var f = document.getElementById('osp-iframe-paypal');
+            if (f && !f._ospOriginalParent) {
+                f._ospOriginalParent = f.parentNode;
+                f._ospOriginalNext   = f.nextSibling;
+                document.body.appendChild(f);
+            }
             if (f) {
                 f.classList.add('osp-paypal-fullscreen');
                 document.body.style.overflow = 'hidden';
             }
         }
 
-        // PayPal inline overlay closed — remove fullscreen class, restore height.
+        // PayPal overlay closed — move iframe back, restore size.
         if (msg.action === 'paypal_overlay_close') {
             var f = document.getElementById('osp-iframe-paypal');
             if (f) {
                 f.classList.remove('osp-paypal-fullscreen');
+                if (f._ospOriginalParent) {
+                    if (f._ospOriginalNext && f._ospOriginalNext.parentNode === f._ospOriginalParent) {
+                        f._ospOriginalParent.insertBefore(f, f._ospOriginalNext);
+                    } else {
+                        f._ospOriginalParent.appendChild(f);
+                    }
+                    f._ospOriginalParent = null;
+                    f._ospOriginalNext   = null;
+                }
                 f.style.height = _lastPaypalIframeHeight + 'px';
                 document.body.style.overflow = '';
             }

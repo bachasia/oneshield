@@ -207,9 +207,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             }
 
             // Poll #paypal-button-container offsetHeight every 50ms.
-            // PayPal SDK injects its credit card form into a top-level overlay
-            // (paypal-overlay-uid-*) which makes the container grow — scrollHeight
-            // alone does not capture this. offsetHeight polling is the reliable approach.
             var _lastPaypalHeight = 0;
             setInterval(function() {
                 var container = document.getElementById('paypal-button-container');
@@ -223,6 +220,20 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         height: document.body.scrollHeight,
                     }, '*');
                 }
+            }, 50);
+
+            // PayPal SDK injects paypal-overlay-uid-* into this iframe whenever
+            // the button is clicked (popup flow) or inline card form is shown.
+            // In both cases the iframe must be fullscreen so the overlay is visible.
+            var _paypalOverlayOpen = false;
+            setInterval(function() {
+                var overlayOpen = !!document.querySelector('[id*="paypal-overlay-uid"]');
+                if (overlayOpen === _paypalOverlayOpen) return;
+                _paypalOverlayOpen = overlayOpen;
+                window.parent.postMessage({
+                    source: 'oneshield-connect',
+                    action: overlayOpen ? 'paypal_overlay_open' : 'paypal_overlay_close',
+                }, '*');
             }, 50);
         })();
         </script>
