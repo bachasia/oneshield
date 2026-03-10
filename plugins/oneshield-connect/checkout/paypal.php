@@ -134,13 +134,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     return data.data.paypal_order_id;
                 },
 
-                onClick: function() {
-                    // Some PayPal secure-browser / popup fallback screens are rendered
-                    // inside the iframe flow. Force parent iframe wrapper fullscreen
-                    // immediately so those screens are fully visible.
-                    setPaypalFullscreen(true);
-                },
-
                 onCancel: function() {
                     setPaypalFullscreen(false);
                 },
