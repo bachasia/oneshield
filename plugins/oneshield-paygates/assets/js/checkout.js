@@ -29,9 +29,25 @@
     // ── Inject PayPal fullscreen CSS immediately ────────────────────────────
     (function () {
         var s = document.createElement('style');
-        s.textContent = '.osp-pp-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}';
+        s.textContent = '.osp-pp-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}#osp-pp-fs,#osp-pp-fs-style{display:none!important;}';
         document.head.appendChild(s);
     })();
+
+    function cleanupLegacyPayPalOverlay() {
+        var legacyOverlay = document.getElementById('osp-pp-fs');
+        if (legacyOverlay) {
+            legacyOverlay.remove();
+        }
+        var legacyStyle = document.getElementById('osp-pp-fs-style');
+        if (legacyStyle) {
+            legacyStyle.remove();
+        }
+        if (document.body) {
+            document.body.style.overflow = '';
+        }
+    }
+
+    cleanupLegacyPayPalOverlay();
 
     // Track state per gateway
     var state = {
@@ -187,11 +203,13 @@
 
         // PayPal overlay detected inside iframe — make iframe fullscreen.
         if (msg.action === 'paypal_overlay_open') {
+            cleanupLegacyPayPalOverlay();
             setPayPalIframeFullscreen(true);
         }
 
         // PayPal overlay gone — restore iframe to normal.
         if (msg.action === 'paypal_overlay_close') {
+            cleanupLegacyPayPalOverlay();
             setPayPalIframeFullscreen(false);
         }
 
@@ -479,6 +497,7 @@
             confirmTimeoutId = null;
         }
         hideOverlay();
+        cleanupLegacyPayPalOverlay();
         // Always restore PayPal iframe to normal size
         setPayPalIframeFullscreen(false);
         // Re-apply PayPal iframe toggle in case Place Order button re-appeared
