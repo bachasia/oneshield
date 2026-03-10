@@ -224,27 +224,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     }, '*');
                 }
             }, 50);
-
-            // Detect when PayPal injects an inline card/checkout form directly
-            // into THIS iframe's DOM (secure-browser / no-popup fallback path).
-            // We identify this by watching for a full-viewport element that is NOT
-            // the standard button container — specifically an element with position
-            // fixed or absolute that covers the full viewport height.
-            // Strategy: watch for paypal-overlay-uid-* but ONLY trigger fullscreen
-            // if the popup is not open (i.e. _paypalPopup is null/closed), meaning
-            // PayPal is rendering inline instead of in a popup.
-            var _paypalOverlayOpen = false;
-            setInterval(function() {
-                var overlayEl = document.querySelector('[id*="paypal-overlay-uid"]');
-                var isInlineFlow = !!overlayEl && (_paypalPopup === null || _paypalPopup.closed);
-                if (isInlineFlow !== _paypalOverlayOpen) {
-                    _paypalOverlayOpen = isInlineFlow;
-                    window.parent.postMessage({
-                        source: 'oneshield-connect',
-                        action: isInlineFlow ? 'paypal_overlay_open' : 'paypal_overlay_close',
-                    }, '*');
-                }
-            }, 100);
         })();
         </script>
     </body>
