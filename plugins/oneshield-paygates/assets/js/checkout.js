@@ -154,6 +154,9 @@
 
     // Track last known PayPal iframe height so we can restore it after overlay closes.
     var _lastPaypalIframeHeight = 200;
+    // Track original DOM position when we portal PayPal wrap to <body> for true fullscreen.
+    var _paypalWrapOriginalParent = null;
+    var _paypalWrapOriginalNext = null;
 
     window.addEventListener('message', function (event) {
         if (!event.data || event.data.source !== 'oneshield-connect') return;
@@ -172,28 +175,45 @@
             }
         }
 
-        // PayPal card-form overlay opened inside the iframe — make the iframe
-        // wrap full-screen so the overlay is fully visible to the customer.
+        // PayPal card-form overlay opened inside the iframe.
+        // Move wrap to <body> and force true fullscreen so it is never clipped
+        // by checkout containers, transforms, or overflow rules.
         if (msg.action === 'paypal_overlay_open') {
             var $wrap   = $('#osp-paypal-button-wrap');
             var $iframe = $('#osp-iframe-paypal');
+            if ($wrap.length && !_paypalWrapOriginalParent) {
+                _paypalWrapOriginalParent = $wrap[0].parentNode;
+                _paypalWrapOriginalNext = $wrap[0].nextSibling;
+                document.body.appendChild($wrap[0]);
+            }
             $wrap.css({
                 position:   'fixed',
                 top:        0,
                 left:       0,
                 width:      '100vw',
                 height:     '100vh',
-                'z-index':  999999,
+                'z-index':  2147483000,
                 margin:     0,
                 background: '#fff',
+                display:    'block',
             });
             $iframe.css({ height: '100vh' });
+            $('body').css('overflow', 'hidden');
         }
 
         // PayPal card-form overlay closed — restore the wrap to normal flow.
         if (msg.action === 'paypal_overlay_close') {
             var $wrap   = $('#osp-paypal-button-wrap');
             var $iframe = $('#osp-iframe-paypal');
+            if ($wrap.length && _paypalWrapOriginalParent) {
+                if (_paypalWrapOriginalNext && _paypalWrapOriginalNext.parentNode === _paypalWrapOriginalParent) {
+                    _paypalWrapOriginalParent.insertBefore($wrap[0], _paypalWrapOriginalNext);
+                } else {
+                    _paypalWrapOriginalParent.appendChild($wrap[0]);
+                }
+                _paypalWrapOriginalParent = null;
+                _paypalWrapOriginalNext = null;
+            }
             $wrap.css({
                 position:   '',
                 top:        '',
@@ -205,6 +225,7 @@
                 background: '',
             });
             $iframe.css({ height: _lastPaypalIframeHeight + 'px' });
+            $('body').css('overflow', '');
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
