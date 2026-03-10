@@ -88,6 +88,11 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height:  45,
                 },
 
+                onClick: function() {
+                    // Keep parent iframe fullscreen for the whole popup flow.
+                    setPaypalFullscreen(true);
+                },
+
                 createOrder: async function() {
                     const resp = await fetch(orderData.ajax_url, {
                         method: 'POST',
@@ -196,18 +201,14 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 }
             }, 50);
 
-            // PayPal SDK injects paypal-overlay-uid-* into this iframe whenever
-            // the button is clicked (popup flow) or inline card form is shown.
-            // In both cases the iframe must be fullscreen so the overlay is visible.
-            var _paypalOverlayOpen = false;
+            // PayPal SDK injects paypal-overlay-uid-* into this iframe during
+            // popup/card flow. Force fullscreen while detected, but do not send
+            // auto-close here to avoid flicker; close is handled by callbacks.
             setInterval(function() {
                 var overlayOpen = !!document.querySelector('[id*="paypal-overlay-uid"]');
-                if (overlayOpen === _paypalOverlayOpen) return;
-                _paypalOverlayOpen = overlayOpen;
-                window.parent.postMessage({
-                    source: 'oneshield-connect',
-                    action: overlayOpen ? 'paypal_overlay_open' : 'paypal_overlay_close',
-                }, '*');
+                if (overlayOpen) {
+                    setPaypalFullscreen(true);
+                }
             }, 50);
         })();
         </script>
