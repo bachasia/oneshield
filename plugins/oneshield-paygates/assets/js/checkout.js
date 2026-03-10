@@ -72,6 +72,7 @@
                 '#osp-payment-overlay{display:none}',
                 '#osp-payment-overlay.osp-visible{display:flex!important}',
                 '#osp-overlay-text,#osp-overlay-sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif!important;font-style:normal!important;}',
+                '#osp-iframe-paypal.osp-paypal-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}',
             '</style>',
         ].join(''));
         $('body').append($overlay);
@@ -154,9 +155,6 @@
 
     // Track last known PayPal iframe height so we can restore it after overlay closes.
     var _lastPaypalIframeHeight = 200;
-    // Track original DOM position when we portal PayPal wrap to <body> for true fullscreen.
-    var _paypalWrapOriginalParent = null;
-    var _paypalWrapOriginalNext = null;
 
     window.addEventListener('message', function (event) {
         if (!event.data || event.data.source !== 'oneshield-connect') return;
@@ -168,67 +166,34 @@
             var f = getIframe(gateway);
             if (f) {
                 var newH = Math.max(msg.height, 50);
-                f.style.height = newH + 'px';
-                if (gateway === 'paypal') {
+                // Only update stored height when NOT in fullscreen mode
+                if (gateway === 'paypal' && !f.classList.contains('osp-paypal-fullscreen')) {
                     _lastPaypalIframeHeight = newH;
+                    f.style.height = newH + 'px';
+                } else if (gateway !== 'paypal') {
+                    f.style.height = newH + 'px';
                 }
             }
         }
 
-        // PayPal overlay opened — expand the iframe wrap to true fullscreen
-        // so the PayPal login/checkout UI is fully visible.
+        // PayPal inline overlay opened — add fullscreen class to iframe only.
+        // Mirrors competitor approach: just CSS, no DOM portal.
         if (msg.action === 'paypal_overlay_open') {
-            var $wrap   = $('#osp-paypal-button-wrap');
-            var $iframe = $('#osp-iframe-paypal');
-            if ($wrap.length && !_paypalWrapOriginalParent) {
-                _paypalWrapOriginalParent = $wrap[0].parentNode;
-                _paypalWrapOriginalNext   = $wrap[0].nextSibling;
-                document.body.appendChild($wrap[0]);
+            var f = document.getElementById('osp-iframe-paypal');
+            if (f) {
+                f.classList.add('osp-paypal-fullscreen');
+                document.body.style.overflow = 'hidden';
             }
-            $wrap.css({
-                position:   'fixed',
-                top:        0,
-                left:       0,
-                width:      '100vw',
-                height:     '100vh',
-                'z-index':  2147483000,
-                margin:     0,
-                background: 'transparent',
-                display:    'block',
-            });
-            $iframe.css({ width: '100vw', height: '100vh' });
-            $('body').css('overflow', 'hidden');
         }
 
-        // PayPal overlay closed — restore wrap and iframe to their original position/size.
+        // PayPal inline overlay closed — remove fullscreen class, restore height.
         if (msg.action === 'paypal_overlay_close') {
-            var $wrap   = $('#osp-paypal-button-wrap');
-            var $iframe = $('#osp-iframe-paypal');
-
-            // Remove the notify overlay if present
-            $('#osp-paypal-notify-overlay').remove();
-
-            if ($wrap.length && _paypalWrapOriginalParent) {
-                if (_paypalWrapOriginalNext && _paypalWrapOriginalNext.parentNode === _paypalWrapOriginalParent) {
-                    _paypalWrapOriginalParent.insertBefore($wrap[0], _paypalWrapOriginalNext);
-                } else {
-                    _paypalWrapOriginalParent.appendChild($wrap[0]);
-                }
-                _paypalWrapOriginalParent = null;
-                _paypalWrapOriginalNext = null;
+            var f = document.getElementById('osp-iframe-paypal');
+            if (f) {
+                f.classList.remove('osp-paypal-fullscreen');
+                f.style.height = _lastPaypalIframeHeight + 'px';
+                document.body.style.overflow = '';
             }
-            $wrap.css({
-                position:   '',
-                top:        '',
-                left:       '',
-                width:      '',
-                height:     '',
-                'z-index':  '',
-                margin:     '12px 0 0 0',
-                background: '',
-            });
-            $iframe.css({ width: '', height: _lastPaypalIframeHeight + 'px' });
-            $('body').css('overflow', '');
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately
