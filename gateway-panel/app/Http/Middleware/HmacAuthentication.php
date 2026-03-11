@@ -66,13 +66,24 @@ class HmacAuthentication
         // when re-encoding $request->all() (float precision, key ordering, special chars).
         // The PHP plugin signs json_encode($payload) directly, so we must verify
         // against the same raw JSON string.
+        // For GET requests or empty bodies, fall back to array-based verification
+        // (oneshield-connect signs an empty array [] for GET requests).
         $rawBody = $request->getContent();
-        $valid = $this->hmacService->verifyRaw(
-            $rawBody,
-            $signature,
-            (int) $timestamp,
-            $tokenSecret
-        );
+        if ($rawBody !== '' && $rawBody !== null) {
+            $valid = $this->hmacService->verifyRaw(
+                $rawBody,
+                $signature,
+                (int) $timestamp,
+                $tokenSecret
+            );
+        } else {
+            $valid = $this->hmacService->verify(
+                $request->all(),
+                $signature,
+                (int) $timestamp,
+                $tokenSecret
+            );
+        }
 
         if (!$valid) {
             return response()->json(['error' => 'Invalid or expired signature'], 401);
