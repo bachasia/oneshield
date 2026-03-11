@@ -47,6 +47,40 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
                 'desc_tip'    => true,
                 'description' => __('Include customer billing info in the PayPal payment request.', 'oneshield-paygates'),
             ],
+            'invoice_prefix' => [
+                'title'       => __('Invoice Prefix', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __('Prefix added to the invoice ID sent to PayPal. E.g. "N167-FAN" → invoice ID will be "N167-FAN-{order_id}".', 'oneshield-paygates'),
+                'default'     => '',
+                'desc_tip'    => false,
+            ],
+            'overwrite_product_title' => [
+                'title'       => __('Overwrite product title', 'oneshield-paygates'),
+                'type'        => 'select',
+                'description' => __('Choose how to display the product title in PayPal transaction details.', 'oneshield-paygates'),
+                'default'     => 'keep_original',
+                'desc_tip'    => false,
+                'options'     => [
+                    'use_last_word'    => __('Use the last word', 'oneshield-paygates'),
+                    'user_define'      => __('User define', 'oneshield-paygates'),
+                    'keep_original'    => __('Keep the original (Not recommended)', 'oneshield-paygates'),
+                ],
+            ],
+            'user_define_title' => [
+                'title'       => __('User define title', 'oneshield-paygates'),
+                'type'        => 'text',
+                'description' => __('This will be appeared on PayPal transaction as product title, when overwrite product title is "User define". You can define title with <strong>[order_id]</strong> or <strong>[last_word]</strong> or <strong>[rand_title_from_list]</strong> and <strong>[rand_N]</strong> (random a N length string, N is a number > 1) shortcode.<br>For example: Order #[order_id] or [rand_10] product or [last_word] product.', 'oneshield-paygates'),
+                'default'     => '[order_id] [rand_12] item',
+                'desc_tip'    => false,
+            ],
+            'random_title_list' => [
+                'title'       => __('Random title list', 'oneshield-paygates'),
+                'type'        => 'textarea',
+                'description' => __('Please enter a list of titles to randomize, separated by commas. For example: T-Shirt, Personalized Hoodie, Gift for dad', 'oneshield-paygates'),
+                'default'     => '',
+                'desc_tip'    => false,
+                'css'         => 'height:80px;',
+            ],
             'test_mode' => [
                 'title'       => __('Test Mode', 'oneshield-paygates'),
                 'type'        => 'checkbox',
@@ -64,6 +98,80 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
                 'description' => __('Log events to WooCommerce → Status → Logs.', 'oneshield-paygates'),
             ],
         ];
+    }
+
+    /**
+     * Custom HTML renderer for the 'user_define_title' and 'random_title_list' fields
+     * so we can add show/hide JS based on the 'overwrite_product_title' select.
+     */
+    public function generate_user_define_title_html(string $key, array $data): string {
+        $field_key = $this->get_field_key($key);
+        $value     = $this->get_option($key, $data['default'] ?? '');
+        ob_start();
+        ?>
+        <tr valign="top" class="osp-paypal-user-define-row">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($field_key); ?>"><?php echo esc_html($data['title']); ?></label>
+            </th>
+            <td class="forminp">
+                <input type="text"
+                       name="<?php echo esc_attr($field_key); ?>"
+                       id="<?php echo esc_attr($field_key); ?>"
+                       value="<?php echo esc_attr($value); ?>"
+                       style="width:100%;max-width:460px;"
+                       placeholder="[order_id] [rand_12] item"
+                />
+                <p class="description"><?php echo wp_kses_post($data['description'] ?? ''); ?></p>
+            </td>
+        </tr>
+        <?php
+        return ob_get_clean();
+    }
+
+    public function generate_random_title_list_html(string $key, array $data): string {
+        $field_key = $this->get_field_key($key);
+        $value     = $this->get_option($key, $data['default'] ?? '');
+        ob_start();
+        ?>
+        <tr valign="top" class="osp-paypal-random-list-row">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($field_key); ?>"><?php echo esc_html($data['title']); ?></label>
+            </th>
+            <td class="forminp">
+                <textarea
+                    name="<?php echo esc_attr($field_key); ?>"
+                    id="<?php echo esc_attr($field_key); ?>"
+                    style="width:100%;max-width:460px;height:80px;"
+                    placeholder="Vintage Design, Birthday Gift, Personalized, New Collection"
+                ><?php echo esc_textarea($value); ?></textarea>
+                <p class="description"><?php echo esc_html($data['description'] ?? ''); ?></p>
+            </td>
+        </tr>
+        <script>
+        (function() {
+            var selectId = '<?php echo esc_js($this->get_field_key('overwrite_product_title')); ?>';
+            var userDefineRows = document.querySelectorAll('.osp-paypal-user-define-row, .osp-paypal-random-list-row');
+
+            function toggleRows() {
+                var sel = document.getElementById(selectId);
+                if (!sel) return;
+                var show = (sel.value === 'user_define');
+                userDefineRows.forEach(function(row) {
+                    row.style.display = show ? '' : 'none';
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                var sel = document.getElementById(selectId);
+                if (sel) {
+                    toggleRows();
+                    sel.addEventListener('change', toggleRows);
+                }
+            });
+        })();
+        </script>
+        <?php
+        return ob_get_clean();
     }
 
     public function payment_fields(): void {
@@ -162,6 +270,39 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
 
         $request_cache = $this->get_iframe_url_from_payload($payload);
         return $request_cache;
+    }
+
+    /**
+     * Override to include PayPal order info settings in extra_params passed to the iframe.
+     */
+    protected function get_iframe_extra_params(): array {
+        $params = parent::get_iframe_extra_params();
+
+        $params['invoice_prefix']          = $this->get_option('invoice_prefix', '');
+        $params['overwrite_product_title'] = $this->get_option('overwrite_product_title', 'keep_original');
+        $params['user_define_title']       = $this->get_option('user_define_title', '');
+        $params['random_title_list']       = $this->get_option('random_title_list', '');
+
+        // Pass the first product name from the cart for use in title shortcodes
+        $params['product_name'] = $this->get_cart_first_product_name();
+
+        return $params;
+    }
+
+    /**
+     * Get the name of the first product in the WooCommerce cart.
+     */
+    private function get_cart_first_product_name(): string {
+        if (!WC()->cart) {
+            return '';
+        }
+        foreach (WC()->cart->get_cart() as $item) {
+            $product = $item['data'] ?? null;
+            if ($product && method_exists($product, 'get_name')) {
+                return $product->get_name();
+            }
+        }
+        return '';
     }
 
     public function validate_fields(): bool {

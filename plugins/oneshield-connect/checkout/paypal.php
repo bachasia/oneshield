@@ -24,6 +24,13 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
         wp_die('Invalid payment amount.', 'Payment Error', ['response' => 400]);
     }
 
+    // PayPal order info settings (injected from session meta by osc_handle_checkout_by_id)
+    $invoice_prefix          = sanitize_text_field($_GET['invoice_prefix'] ?? '');
+    $overwrite_product_title = sanitize_text_field($_GET['overwrite_product_title'] ?? 'keep_original');
+    $user_define_title       = sanitize_text_field($_GET['user_define_title'] ?? '');
+    $random_title_list       = sanitize_text_field($_GET['random_title_list'] ?? '');
+    $product_name            = sanitize_text_field($_GET['product_name'] ?? '');
+
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -65,11 +72,16 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
         <script>
         (function() {
             const orderData = {
-                order_id: '<?php echo esc_js($order_id); ?>',
-                token:    '<?php echo esc_js($token); ?>',
-                amount:   '<?php echo esc_js(number_format($amount, 2, '.', '')); ?>',
-                currency: '<?php echo esc_js($currency); ?>',
-                ajax_url: '<?php echo esc_js(admin_url('admin-ajax.php')); ?>',
+                order_id:                '<?php echo esc_js($order_id); ?>',
+                token:                   '<?php echo esc_js($token); ?>',
+                amount:                  '<?php echo esc_js(number_format($amount, 2, '.', '')); ?>',
+                currency:                '<?php echo esc_js($currency); ?>',
+                ajax_url:                '<?php echo esc_js(admin_url('admin-ajax.php')); ?>',
+                invoice_prefix:          '<?php echo esc_js($invoice_prefix); ?>',
+                overwrite_product_title: '<?php echo esc_js($overwrite_product_title); ?>',
+                user_define_title:       '<?php echo esc_js($user_define_title); ?>',
+                random_title_list:       '<?php echo esc_js($random_title_list); ?>',
+                product_name:            '<?php echo esc_js($product_name); ?>',
             };
 
             function setPaypalFullscreen(open) {
@@ -98,10 +110,15 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams({
-                            action:   'osc_create_paypal_order',
-                            order_id: orderData.order_id,
-                            amount:   orderData.amount,
-                            currency: orderData.currency,
+                            action:                  'osc_create_paypal_order',
+                            order_id:                orderData.order_id,
+                            amount:                  orderData.amount,
+                            currency:                orderData.currency,
+                            invoice_prefix:          orderData.invoice_prefix,
+                            overwrite_product_title: orderData.overwrite_product_title,
+                            user_define_title:       orderData.user_define_title,
+                            random_title_list:       orderData.random_title_list,
+                            product_name:            orderData.product_name,
                         }),
                     });
                     const data = await resp.json();
@@ -228,6 +245,27 @@ function osc_ajax_create_paypal_order(): void {
     $currency = sanitize_text_field($_POST['currency'] ?? 'USD');
     $order_id = sanitize_text_field($_POST['order_id'] ?? '');
 
+    // Order info settings passed from money site via session meta → $_GET
+    $invoice_prefix          = sanitize_text_field($_POST['invoice_prefix'] ?? '');
+    $overwrite_product_title = sanitize_text_field($_POST['overwrite_product_title'] ?? 'keep_original');
+    $user_define_title       = sanitize_text_field($_POST['user_define_title'] ?? '');
+    $random_title_list       = sanitize_text_field($_POST['random_title_list'] ?? '');
+    $product_name            = sanitize_text_field($_POST['product_name'] ?? '');
+
+    // Resolve item name based on overwrite_product_title setting
+    $item_name = osc_resolve_paypal_item_name(
+        $overwrite_product_title,
+        $product_name,
+        $user_define_title,
+        $random_title_list,
+        $order_id
+    );
+
+    // Build invoice_id
+    $invoice_id = !empty($invoice_prefix)
+        ? $invoice_prefix . '-' . $order_id
+        : $order_id;
+
     $access_token = osc_get_paypal_access_token();
     if (is_wp_error($access_token)) {
         wp_send_json_error($access_token->get_error_message());
@@ -236,6 +274,23 @@ function osc_ajax_create_paypal_order(): void {
     $config   = osc_get_paypal_config();
     $api_base = ($config['mode'] === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
+    $purchase_unit = [
+        'reference_id' => $order_id,
+        'invoice_id'   => $invoice_id,
+        'amount'       => [
+            'currency_code' => $currency,
+            'value'         => $amount,
+            'breakdown'     => [
+                'item_total' => ['currency_code' => $currency, 'value' => $amount],
+            ],
+        ],
+        'items' => [[
+            'name'       => $item_name,
+            'unit_amount'=> ['currency_code' => $currency, 'value' => $amount],
+            'quantity'   => '1',
+        ]],
+    ];
+
     $response = wp_remote_post($api_base . '/v2/checkout/orders', [
         'timeout' => 15,
         'headers' => [
@@ -243,11 +298,8 @@ function osc_ajax_create_paypal_order(): void {
             'Content-Type'  => 'application/json',
         ],
         'body' => json_encode([
-            'intent' => 'CAPTURE',
-            'purchase_units' => [[
-                'reference_id' => $order_id,
-                'amount'       => ['currency_code' => $currency, 'value' => $amount],
-            ]],
+            'intent'         => 'CAPTURE',
+            'purchase_units' => [$purchase_unit],
         ]),
     ]);
 
@@ -257,6 +309,78 @@ function osc_ajax_create_paypal_order(): void {
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
     wp_send_json_success(['paypal_order_id' => $body['id']]);
+}
+
+/**
+ * Resolve the PayPal item name based on the overwrite_product_title setting.
+ *
+ * Supported shortcodes in user_define_title:
+ *   [order_id]            – the order reference
+ *   [last_word]           – last word of the original product name
+ *   [rand_title_from_list]– random item from the comma-separated random_title_list
+ *   [rand_N]              – random alphanumeric string of length N (N > 1)
+ */
+function osc_resolve_paypal_item_name(
+    string $mode,
+    string $original_name,
+    string $user_define_title,
+    string $random_title_list,
+    string $order_id
+): string {
+    switch ($mode) {
+        case 'use_last_word':
+            $words = preg_split('/\s+/', trim($original_name), -1, PREG_SPLIT_NO_EMPTY);
+            return !empty($words) ? end($words) : $original_name;
+
+        case 'user_define':
+            return osc_process_title_shortcodes($user_define_title, $original_name, $random_title_list, $order_id);
+
+        case 'keep_original':
+        default:
+            return $original_name ?: $order_id;
+    }
+}
+
+/**
+ * Process shortcodes in user-defined title template.
+ */
+function osc_process_title_shortcodes(
+    string $template,
+    string $original_name,
+    string $random_title_list,
+    string $order_id
+): string {
+    if (empty($template)) {
+        return $original_name ?: $order_id;
+    }
+
+    // [order_id] → order reference
+    $result = str_replace('[order_id]', $order_id, $template);
+
+    // [last_word] → last word of original product name
+    $words     = preg_split('/\s+/', trim($original_name), -1, PREG_SPLIT_NO_EMPTY);
+    $last_word = !empty($words) ? end($words) : $original_name;
+    $result    = str_replace('[last_word]', $last_word, $result);
+
+    // [rand_title_from_list] → random item from comma-separated list
+    if (strpos($result, '[rand_title_from_list]') !== false) {
+        $titles = array_filter(array_map('trim', explode(',', $random_title_list)));
+        $random_title = !empty($titles) ? $titles[array_rand($titles)] : '';
+        $result = str_replace('[rand_title_from_list]', $random_title, $result);
+    }
+
+    // [rand_N] → random alphanumeric string of length N
+    $result = preg_replace_callback('/\[rand_(\d+)\]/', function ($matches) {
+        $length = max(2, (int) $matches[1]);
+        $chars  = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $str    = '';
+        for ($i = 0; $i < $length; $i++) {
+            $str .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        return $str;
+    }, $result);
+
+    return trim($result) ?: ($original_name ?: $order_id);
 }
 
 // AJAX: Capture PayPal order

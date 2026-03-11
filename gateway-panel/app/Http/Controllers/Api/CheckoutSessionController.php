@@ -169,6 +169,7 @@ class CheckoutSessionController extends Controller
             'billing'            => $billing,
             'status'             => $session->status,
             'expires_at'         => $session->expires_at->toIso8601String(),
+            'meta'               => $session->meta ?? [],
         ]);
     }
 

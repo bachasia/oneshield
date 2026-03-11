@@ -184,10 +184,15 @@ class PaygatesController extends Controller
                 'description_format' => $extraParams['description_format'] ?? null,
                 'billing'            => $validated['billing'] ?? null,
                 'idempotency_key'    => $validated['idempotency_key'] ?? null,
-                'meta'               => [
-                    'money_site_domain' => $moneySiteDomain,
-                    'site_id'           => $site->id,
-                ],
+                'meta'               => array_filter([
+                    'money_site_domain'       => $moneySiteDomain,
+                    'site_id'                 => $site->id,
+                    'invoice_prefix'          => $extraParams['invoice_prefix'] ?? null,
+                    'overwrite_product_title' => $extraParams['overwrite_product_title'] ?? null,
+                    'user_define_title'       => $extraParams['user_define_title'] ?? null,
+                    'random_title_list'       => $extraParams['random_title_list'] ?? null,
+                    'product_name'            => $extraParams['product_name'] ?? null,
+                ], fn($v) => $v !== null && $v !== ''),
             ]);
 
             return response()->json([

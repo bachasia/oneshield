@@ -155,6 +155,23 @@ function osc_handle_checkout_by_id(string $checkout_id): void {
         $_GET['site_id']  = (string) ($meta['site_id'] ?? osc_site_id());
     }
 
+    // PayPal order info settings (passed via meta from money site plugin)
+    if (!empty($meta['invoice_prefix'])) {
+        $_GET['invoice_prefix'] = (string) $meta['invoice_prefix'];
+    }
+    if (!empty($meta['overwrite_product_title'])) {
+        $_GET['overwrite_product_title'] = (string) $meta['overwrite_product_title'];
+    }
+    if (!empty($meta['user_define_title'])) {
+        $_GET['user_define_title'] = (string) $meta['user_define_title'];
+    }
+    if (!empty($meta['random_title_list'])) {
+        $_GET['random_title_list'] = (string) $meta['random_title_list'];
+    }
+    if (!empty($meta['product_name'])) {
+        $_GET['product_name'] = (string) $meta['product_name'];
+    }
+
     // Store checkout_id for AJAX billing refresh
     $_GET['checkout_id'] = $checkout_id;
 
