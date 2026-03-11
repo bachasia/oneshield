@@ -183,6 +183,12 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             echo '<p style="color:#dc2626;font-size:13px;">'
                . esc_html__('Payment service temporarily unavailable. Please try again shortly.', 'oneshield-paygates')
                . '</p>';
+            // Temp debug: always show raw error so we can diagnose on production
+            if ($this->last_error) {
+                echo '<p style="color:#9ca3af;font-size:11px;margin-top:4px;word-break:break-all;">'
+                   . '<strong>[Debug]</strong> ' . esc_html($this->last_error)
+                   . '</p>';
+            }
             return;
         }
 
