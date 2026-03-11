@@ -62,9 +62,13 @@ class HmacAuthentication
             return response()->json(['error' => 'Invalid token'], 401);
         }
 
-        $payload = $request->all();
-        $valid = $this->hmacService->verify(
-            $payload,
+        // Use raw body for HMAC verification to avoid json_encode discrepancies
+        // when re-encoding $request->all() (float precision, key ordering, special chars).
+        // The PHP plugin signs json_encode($payload) directly, so we must verify
+        // against the same raw JSON string.
+        $rawBody = $request->getContent();
+        $valid = $this->hmacService->verifyRaw(
+            $rawBody,
             $signature,
             (int) $timestamp,
             $tokenSecret

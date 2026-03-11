@@ -284,13 +284,33 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     protected function get_iframe_extra_params(): array {
         $params = parent::get_iframe_extra_params();
 
-        $params['invoice_prefix']          = $this->get_option('invoice_prefix', '');
-        $params['overwrite_product_title'] = $this->get_option('overwrite_product_title', 'keep_original');
-        $params['user_define_title']       = $this->get_option('user_define_title', '');
-        $params['random_title_list']       = $this->get_option('random_title_list', '');
+        // Only include non-empty values to keep payload clean.
+        $invoice_prefix = $this->get_option('invoice_prefix', '');
+        if ($invoice_prefix !== '') {
+            $params['invoice_prefix'] = $invoice_prefix;
+        }
 
-        // Pass the first product name from the cart for use in title shortcodes
-        $params['product_name'] = $this->get_cart_first_product_name();
+        $title_mode = $this->get_option('overwrite_product_title', 'keep_original');
+        if ($title_mode !== 'keep_original') {
+            $params['overwrite_product_title'] = $title_mode;
+        }
+
+        if ($title_mode === 'user_define') {
+            $user_define_title = $this->get_option('user_define_title', '');
+            if ($user_define_title !== '') {
+                $params['user_define_title'] = $user_define_title;
+            }
+            $random_title_list = $this->get_option('random_title_list', '');
+            if ($random_title_list !== '') {
+                $params['random_title_list'] = $random_title_list;
+            }
+        }
+
+        // Pass the first product name from the cart for title shortcodes ([last_word])
+        $product_name = $this->get_cart_first_product_name();
+        if ($product_name !== '') {
+            $params['product_name'] = $product_name;
+        }
 
         return $params;
     }

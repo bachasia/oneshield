@@ -49,6 +49,36 @@ class HmacService
     }
 
     /**
+     * Verify a signed request using the raw request body string.
+     *
+     * This avoids json_encode discrepancies that occur when using $request->all()
+     * (decoded then re-encoded array). The PHP plugin signs the raw JSON string
+     * directly, so we verify against the same string.
+     *
+     * @param  string  $rawBody  Raw request body (JSON string)
+     * @param  string  $signature  Signature from X-OneShield-Signature header
+     * @param  int  $timestamp  Timestamp from X-OneShield-Timestamp header
+     * @param  string  $tokenSecret  HMAC signing key
+     * @param  int  $maxAgeSeconds  Maximum allowed age in seconds (default 5 minutes)
+     */
+    public function verifyRaw(
+        string $rawBody,
+        string $signature,
+        int $timestamp,
+        string $tokenSecret,
+        int $maxAgeSeconds = 300
+    ): bool {
+        if (abs(time() - $timestamp) > $maxAgeSeconds) {
+            return false;
+        }
+
+        $message  = $rawBody . $timestamp;
+        $expected = hash_hmac('sha256', $message, $tokenSecret);
+
+        return hash_equals($expected, $signature);
+    }
+
+    /**
      * Generate a cryptographically secure random token.
      */
     public function generateToken(int $length = 64): string
