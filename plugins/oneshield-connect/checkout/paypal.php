@@ -160,11 +160,12 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         }).catch(function() {});
 
                         window.parent.postMessage({
-                            source:         'oneshield-connect',
-                            status:         'success',
-                            gateway:        'paypal',
-                            transaction_id: result.data.capture_id,
-                            order_id:       orderData.order_id,
+                            source:          'oneshield-connect',
+                            status:          'success',
+                            gateway:         'paypal',
+                            transaction_id:  result.data.capture_id,
+                            paypal_order_id: data.orderID,
+                            order_id:        orderData.order_id,
                         }, '*');
                     } else {
                         setPaypalFullscreen(false);
@@ -420,6 +421,55 @@ function osc_ajax_capture_paypal_order(): void {
         wp_send_json_success(['capture_id' => $capture_id]);
     } else {
         wp_send_json_error('Capture failed');
+    }
+}
+
+// AJAX: Patch PayPal order invoice_id with real WC order ID (called by money site after process_payment)
+add_action('wp_ajax_nopriv_osc_patch_paypal_invoice', 'osc_ajax_patch_paypal_invoice');
+add_action('wp_ajax_osc_patch_paypal_invoice', 'osc_ajax_patch_paypal_invoice');
+
+function osc_ajax_patch_paypal_invoice(): void {
+    $paypal_order_id = sanitize_text_field($_POST['paypal_order_id'] ?? '');
+    $invoice_id      = sanitize_text_field($_POST['invoice_id'] ?? '');
+
+    if (empty($paypal_order_id) || empty($invoice_id)) {
+        wp_send_json_error('Missing paypal_order_id or invoice_id');
+    }
+
+    $access_token = osc_get_paypal_access_token();
+    if (is_wp_error($access_token)) {
+        wp_send_json_error($access_token->get_error_message());
+    }
+
+    $config   = osc_get_paypal_config();
+    $api_base = ($config['mode'] === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+    // PayPal Orders v2 PATCH: update invoice_id on purchase_units[0]
+    $response = wp_remote_request($api_base . '/v2/checkout/orders/' . $paypal_order_id, [
+        'method'  => 'PATCH',
+        'timeout' => 15,
+        'headers' => [
+            'Authorization' => 'Bearer ' . $access_token,
+            'Content-Type'  => 'application/json',
+        ],
+        'body' => json_encode([[
+            'op'    => 'replace',
+            'path'  => '/purchase_units/@reference_id==\'default\'/invoice_id',
+            'value' => $invoice_id,
+        ]]),
+    ]);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error($response->get_error_message());
+    }
+
+    $code = wp_remote_retrieve_response_code($response);
+    // PayPal PATCH returns 204 No Content on success
+    if ($code === 204 || $code === 200) {
+        wp_send_json_success(['invoice_id' => $invoice_id]);
+    } else {
+        $body = wp_remote_retrieve_body($response);
+        wp_send_json_error('PayPal PATCH failed (' . $code . '): ' . $body);
     }
 }
 

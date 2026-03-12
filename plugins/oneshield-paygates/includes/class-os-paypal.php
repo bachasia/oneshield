@@ -343,11 +343,12 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     }
 
     public function process_payment($order_id) {
-        $order      = wc_get_order($order_id);
-        $txn_id     = sanitize_text_field($_POST['osp_paypal_transaction_id']     ?? '');
-        $os_txn_id  = sanitize_text_field($_POST['osp_paypal_os_transaction_id']  ?? '');
-        $os_site_id = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
-        $os_checkout_id = sanitize_text_field($_POST['osp_paypal_os_checkout_id'] ?? '');
+        $order           = wc_get_order($order_id);
+        $txn_id          = sanitize_text_field($_POST['osp_paypal_transaction_id']     ?? '');
+        $os_txn_id       = sanitize_text_field($_POST['osp_paypal_os_transaction_id']  ?? '');
+        $os_site_id      = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
+        $os_checkout_id  = sanitize_text_field($_POST['osp_paypal_os_checkout_id']     ?? '');
+        $paypal_order_id = sanitize_text_field($_POST['osp_paypal_paypal_order_id']    ?? '');
 
         if (empty($txn_id)) {
             wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
@@ -403,6 +404,15 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             $txn_id
         ));
 
+        // Patch PayPal order invoice_id with real WC order ID (fire-and-forget)
+        if (!empty($paypal_order_id)) {
+            $invoice_prefix = $this->get_option('invoice_prefix', '');
+            $invoice_id = !empty($invoice_prefix)
+                ? $invoice_prefix . '-' . $order_id
+                : (string) $order_id;
+            $this->patch_paypal_invoice($paypal_order_id, $invoice_id);
+        }
+
         if (!empty($os_checkout_id)) {
             $order->update_meta_data('_os_checkout_id', $os_checkout_id);
             $order->save();
@@ -425,6 +435,43 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             'result'   => 'success',
             'redirect' => $order->get_checkout_order_received_url(),
         ];
+    }
+
+    /**
+     * Patch PayPal order invoice_id with real WC order ID via Shield Site AJAX.
+     * Fire-and-forget — failure here is non-fatal, only affects PayPal dashboard display.
+     */
+    private function patch_paypal_invoice(string $paypal_order_id, string $invoice_id): void {
+        // Get shield site URL from session (set during payment_fields rendering)
+        $shield_url = '';
+        if (WC()->session) {
+            $shield_url = (string) WC()->session->get('osp_paypal_shield_url', '');
+        }
+        if (empty($shield_url)) {
+            $this->log('patch_paypal_invoice: no shield_url in session');
+            return;
+        }
+
+        $ajax_url = rtrim($shield_url, '/') . '/wp-admin/admin-ajax.php';
+
+        $response = wp_remote_post($ajax_url, [
+            'timeout' => 8,
+            'body'    => [
+                'action'          => 'osc_patch_paypal_invoice',
+                'paypal_order_id' => $paypal_order_id,
+                'invoice_id'      => $invoice_id,
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->log('patch_paypal_invoice error: ' . $response->get_error_message());
+            return;
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code !== 200) {
+            $this->log('patch_paypal_invoice HTTP ' . $code . ': ' . wp_remote_retrieve_body($response));
+        }
     }
 
     /**

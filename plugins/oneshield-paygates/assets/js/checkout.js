@@ -281,8 +281,9 @@
             return;
         }
 
-        state[gateway].confirmed = true;
-        state[gateway].txnId     = msg.transaction_id;
+        state[gateway].confirmed     = true;
+        state[gateway].txnId         = msg.transaction_id;
+        state[gateway].paypalOrderId = msg.paypal_order_id || '';
 
         var prefix = 'osp_' + gateway;
 
@@ -303,6 +304,18 @@
             injected.name  = prefix + '_transaction_id';
             injected.value = msg.transaction_id;
             form.appendChild(injected);
+
+            // Also inject paypal_order_id for use in process_payment invoice patch
+            if (gateway === 'paypal' && msg.paypal_order_id) {
+                var existingPpOid = form.querySelector('#osp_paypal_order_id_injected');
+                if (existingPpOid) existingPpOid.remove();
+                var ppOid = document.createElement('input');
+                ppOid.type  = 'hidden';
+                ppOid.id    = 'osp_paypal_order_id_injected';
+                ppOid.name  = 'osp_paypal_paypal_order_id';
+                ppOid.value = msg.paypal_order_id;
+                form.appendChild(ppOid);
+            }
         }
 
         var osTxnInput      = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
