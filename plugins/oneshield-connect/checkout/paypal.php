@@ -119,27 +119,34 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
 
                     if (orderData.money_site_url && orderData.checkout_id) {
                         try {
-                            const draftResp = await fetch(
-                                orderData.money_site_url + '/wp-admin/admin-ajax.php',
-                                {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                    body: new URLSearchParams({
-                                        action:               'osp_get_paypal_invoice_id',
-                                        checkout_session_id:  orderData.checkout_id,
-                                    }),
-                                }
-                            );
-                            const draftData = await draftResp.json();
-                            if (draftData.success) {
+                            const draftUrl = orderData.money_site_url + '/wp-admin/admin-ajax.php';
+                            console.log('OSC: fetching draft order from', draftUrl);
+                            const draftResp = await fetch(draftUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                body: new URLSearchParams({
+                                    action:               'osp_get_paypal_invoice_id',
+                                    checkout_session_id:  orderData.checkout_id,
+                                }),
+                            });
+                            console.log('OSC: draft response status', draftResp.status);
+                            const draftText = await draftResp.text();
+                            console.log('OSC: draft response body', draftText);
+                            let draftData;
+                            try { draftData = JSON.parse(draftText); } catch(pe) { draftData = null; }
+                            if (draftData && draftData.success) {
                                 invoiceId      = draftData.data.invoice_id;
                                 draftOrderId   = String(draftData.data.draft_order_id);
                                 _draftOrderId  = draftOrderId;
+                                console.log('OSC: using invoice_id', invoiceId, 'draft_order_id', draftOrderId);
+                            } else {
+                                console.warn('OSC: draft order fetch failed', draftData);
                             }
                         } catch (e) {
-                            // Non-fatal: fall back to temp invoice_id
-                            console.warn('OSC: could not fetch draft order id', e);
+                            console.error('OSC: could not fetch draft order id', e);
                         }
+                    } else {
+                        console.warn('OSC: missing money_site_url or checkout_id', orderData.money_site_url, orderData.checkout_id);
                     }
 
                     // Step 2: create PayPal order with correct invoice_id
