@@ -179,9 +179,10 @@ function osp_get_gateway_instance(string $gateway): ?OS_Payment_Base {
     return $key ? ($instances[$key] ?? null) : null;
 }
 
-// ── PayPal: create draft WC order early so invoice_id is known when creating PayPal order ──
-// Called by Shield Site iframe just before creating the PayPal order.
-// Returns a stable (invoice_id, draft_order_id) pair for the current cart session.
+// ── PayPal: return a stable invoice_id for the current checkout session ──────
+// Called cross-origin from Shield Site iframe before creating the PayPal order.
+// Uses a simple per-site sequence counter stored in WP options — no WC order created.
+// The real WC order ID is linked via meta after process_payment() completes.
 add_action('wp_ajax_nopriv_osp_get_paypal_invoice_id', 'osp_ajax_get_paypal_invoice_id');
 add_action('wp_ajax_osp_get_paypal_invoice_id',        'osp_ajax_get_paypal_invoice_id');
 
@@ -190,94 +191,45 @@ function osp_ajax_get_paypal_invoice_id(): void {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     if (!empty($origin)) {
         header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
-        header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Allow-Methods: POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type');
     }
-    // Handle preflight
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
         status_header(200);
         exit;
     }
 
     $checkout_session_id = sanitize_text_field($_POST['checkout_session_id'] ?? '');
-    $amount              = (float) ($_POST['amount']   ?? 0);
-    $currency            = strtoupper(sanitize_text_field($_POST['currency'] ?? 'USD'));
-
     if (empty($checkout_session_id)) {
         wp_send_json_error('Missing checkout_session_id');
     }
 
-    // Use transient keyed to checkout_session_id so multiple calls return same draft order
-    $transient_key = 'osp_paypal_draft_' . md5($checkout_session_id);
+    // Return cached result for same checkout session (idempotent)
+    $transient_key = 'osp_pp_inv_' . md5($checkout_session_id);
     $cached        = get_transient($transient_key);
-    if ($cached && !empty($cached['draft_order_id'])) {
-        $draft_order = wc_get_order((int) $cached['draft_order_id']);
-        if ($draft_order && in_array($draft_order->get_status(), ['pending', 'on-hold'], true)) {
-            wp_send_json_success($cached);
-        }
+    if ($cached) {
+        wp_send_json_success($cached);
     }
 
     // Get invoice_prefix from PayPal gateway settings
     $gw             = osp_get_gateway_instance('paypal');
     $invoice_prefix = $gw ? $gw->get_option('invoice_prefix', '') : '';
 
-    // Create a minimal pending WC order — no cart needed, just amount+currency.
-    // This is called cross-origin from the Shield Site iframe, so WC cart/session
-    // is unavailable. We only need the order ID for the invoice_id.
-    $draft_order = wc_create_order([
-        'status'      => 'pending',
-        'created_via' => 'oneshield_paypal_draft',
-    ]);
+    // Atomically increment a sequence counter stored in WP options
+    // This gives us a unique, short, human-readable number — no WC order created.
+    $seq = (int) get_option('osp_paypal_invoice_seq', 0) + 1;
+    update_option('osp_paypal_invoice_seq', $seq, false);
 
-    if (is_wp_error($draft_order)) {
-        wp_send_json_error('Failed to create draft order: ' . $draft_order->get_error_message());
-    }
+    $invoice_id = !empty($invoice_prefix)
+        ? $invoice_prefix . '-' . $seq
+        : (string) $seq;
 
-    // Set order total manually — no line items needed for invoice_id purposes
-    $draft_order->set_total($amount > 0 ? $amount : 0);
-    $draft_order->set_currency(!empty($currency) ? $currency : get_woocommerce_currency());
-    $draft_order->set_payment_method('os_paypal');
-    $draft_order->set_payment_method_title('PayPal');
+    $result = ['invoice_id' => $invoice_id, 'seq' => $seq];
 
-    // Tag for cleanup + link to checkout session
-    $draft_order->update_meta_data('_osp_paypal_draft', '1');
-    $draft_order->update_meta_data('_osp_checkout_session_id', $checkout_session_id);
-    $draft_order->save();
-
-    $draft_order_id = $draft_order->get_id();
-    $invoice_id     = !empty($invoice_prefix)
-        ? $invoice_prefix . '-' . $draft_order_id
-        : (string) $draft_order_id;
-
-    $result = [
-        'draft_order_id' => $draft_order_id,
-        'invoice_id'     => $invoice_id,
-    ];
-
-    // Cache for 30 minutes
+    // Cache for 30 minutes so retries return the same invoice_id
     set_transient($transient_key, $result, 30 * MINUTE_IN_SECONDS);
 
     wp_send_json_success($result);
-}
-
-// ── Cleanup stale PayPal draft orders (older than 2 hours) ──────────────────
-add_action('osp_cleanup_paypal_drafts', 'osp_do_cleanup_paypal_drafts');
-if (!wp_next_scheduled('osp_cleanup_paypal_drafts')) {
-    wp_schedule_event(time(), 'hourly', 'osp_cleanup_paypal_drafts');
-}
-
-function osp_do_cleanup_paypal_drafts(): void {
-    $orders = wc_get_orders([
-        'status'       => ['pending'],
-        'meta_key'     => '_osp_paypal_draft',
-        'meta_value'   => '1',
-        'date_created' => '<' . (time() - 2 * HOUR_IN_SECONDS),
-        'limit'        => 50,
-    ]);
-    foreach ($orders as $order) {
-        $order->update_status('cancelled', 'Auto-cancelled: PayPal draft order expired.');
-    }
 }
 
 // ── PayPal iframe outside payment box ───────────────────────────────────────

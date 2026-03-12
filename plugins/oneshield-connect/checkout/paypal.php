@@ -137,12 +137,11 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             let draftData;
                             try { draftData = JSON.parse(draftText); } catch(pe) { draftData = null; }
                             if (draftData && draftData.success) {
-                                invoiceId      = draftData.data.invoice_id;
-                                draftOrderId   = String(draftData.data.draft_order_id);
-                                _draftOrderId  = draftOrderId;
-                                console.log('OSC: using invoice_id', invoiceId, 'draft_order_id', draftOrderId);
+                                invoiceId     = draftData.data.invoice_id;
+                                _draftOrderId = '';
+                                console.log('OSC: using invoice_id', invoiceId);
                             } else {
-                                console.warn('OSC: draft order fetch failed', draftData);
+                                console.warn('OSC: invoice_id fetch failed', draftData);
                             }
                         } catch (e) {
                             console.error('OSC: could not fetch draft order id', e);

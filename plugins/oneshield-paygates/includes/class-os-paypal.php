@@ -405,12 +405,11 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             $txn_id
         ));
 
-        // Cancel draft order if WC created a new order instead of reusing the draft
-        if ($draft_order_id && $draft_order_id !== $order_id) {
-            $draft = wc_get_order($draft_order_id);
-            if ($draft && $draft->get_meta('_osp_paypal_draft') === '1') {
-                $draft->update_status('cancelled', 'Replaced by WC order #' . $order_id);
-            }
+        // Store the PayPal invoice_id on the WC order for reference
+        // (invoice_id was generated from sequence counter, not a draft order)
+        if (!empty($paypal_order_id)) {
+            $order->update_meta_data('_osp_paypal_order_id', $paypal_order_id);
+            $order->save();
         }
 
         if (!empty($os_checkout_id)) {
