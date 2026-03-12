@@ -209,7 +209,11 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         }, '*');
                     } else {
                         setPaypalFullscreen(false);
-                        showError(result.data || 'Payment capture failed.');
+                        const errMsg = (result.data && result.data.message)
+                            ? result.data.message
+                            : (result.data || 'Payment capture failed.');
+                        console.error('OSC capture error:', result.data);
+                        showError(errMsg);
                     }
                 },
 
@@ -453,16 +457,29 @@ function osc_ajax_capture_paypal_order(): void {
         wp_send_json_error($response->get_error_message());
     }
 
-    $body       = json_decode(wp_remote_retrieve_body($response), true);
+    $http_code  = wp_remote_retrieve_response_code($response);
+    $raw_body   = wp_remote_retrieve_body($response);
+    $body       = json_decode($raw_body, true);
     $capture_id = $body['purchase_units'][0]['payments']['captures'][0]['id'] ?? null;
 
-    if ($capture_id) {
+    // Also check for INSTRUMENT_DECLINED or other soft declines
+    $capture_status = $body['purchase_units'][0]['payments']['captures'][0]['status'] ?? null;
+
+    if ($capture_id && $capture_status !== 'DECLINED') {
         wp_send_json_success([
             'capture_id'     => $capture_id,
             'draft_order_id' => $draft_order_id,
         ]);
     } else {
-        wp_send_json_error('Capture failed');
+        // Return PayPal error details for debugging
+        $pp_error = $body['message'] ?? ($body['details'][0]['description'] ?? $raw_body);
+        $pp_issue = $body['details'][0]['issue'] ?? '';
+        wp_send_json_error([
+            'message'   => 'Capture failed (HTTP ' . $http_code . '): ' . $pp_error,
+            'issue'     => $pp_issue,
+            'http_code' => $http_code,
+            'raw'       => $raw_body,
+        ]);
     }
 }
 
