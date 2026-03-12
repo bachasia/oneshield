@@ -142,6 +142,31 @@
         return document.getElementById('osp-iframe-' + gateway);
     }
 
+    function collectCheckoutFields() {
+        var $form = $('form.checkout, form#order_review');
+        return {
+            billing_first_name:   $form.find('[name="billing_first_name"]').val() || '',
+            billing_last_name:    $form.find('[name="billing_last_name"]').val()  || '',
+            billing_email:        $form.find('[name="billing_email"]').val()      || '',
+            billing_phone:        $form.find('[name="billing_phone"]').val()      || '',
+            billing_address_1:    $form.find('[name="billing_address_1"]').val()  || '',
+            billing_address_2:    $form.find('[name="billing_address_2"]').val()  || '',
+            billing_city:         $form.find('[name="billing_city"]').val()       || '',
+            billing_state:        $form.find('[name="billing_state"]').val()      || '',
+            billing_postcode:     $form.find('[name="billing_postcode"]').val()   || '',
+            billing_country:      $form.find('[name="billing_country"]').val()    || '',
+            shipping_first_name:  $form.find('[name="shipping_first_name"]').val() || $form.find('[name="billing_first_name"]').val() || '',
+            shipping_last_name:   $form.find('[name="shipping_last_name"]').val()  || $form.find('[name="billing_last_name"]').val()  || '',
+            shipping_address_1:   $form.find('[name="shipping_address_1"]').val()  || $form.find('[name="billing_address_1"]').val()  || '',
+            shipping_address_2:   $form.find('[name="shipping_address_2"]').val()  || $form.find('[name="billing_address_2"]').val()  || '',
+            shipping_city:        $form.find('[name="shipping_city"]').val()       || $form.find('[name="billing_city"]').val()       || '',
+            shipping_state:       $form.find('[name="shipping_state"]').val()      || $form.find('[name="billing_state"]').val()      || '',
+            shipping_postcode:    $form.find('[name="shipping_postcode"]').val()   || $form.find('[name="billing_postcode"]').val()   || '',
+            shipping_country:     $form.find('[name="shipping_country"]').val()    || $form.find('[name="billing_country"]').val()    || '',
+            order_comments:       $form.find('[name="order_comments"]').val()      || '',
+        };
+    }
+
     // ── Toggle Place Order button and PayPal iframe wrap ──────────────────
     // #osp-paypal-button-wrap is rendered outside the payment box by PHP
     // (woocommerce_review_order_after_submit hook) so WC updated_checkout
@@ -218,6 +243,38 @@
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             setPayPalIframeFullscreen(false);
+        }
+
+        // Iframe asks parent (Money Site) to create pending WC order and return
+        // wc_order_id + invoice_id before calling PayPal createOrder.
+        if (msg.action === 'oneshield-request-pending-order' && msg.gateway === 'paypal') {
+            var checkoutId = $('[name="osp_paypal_os_checkout_id"]').val() || '';
+            var payload = $.extend({
+                action:              'osp_create_paypal_pending_order',
+                nonce:               ospData.nonce || '',
+                checkout_session_id: checkoutId,
+            }, collectCheckoutFields());
+
+            $.post(ajaxUrl, payload)
+                .done(function(resp) {
+                    var reply = {
+                        source:   'oneshield-paygates',
+                        action:   'oneshield-pending-order-ready',
+                        success:  !!(resp && resp.success),
+                        wc_order_id: resp && resp.data ? resp.data.wc_order_id : '',
+                        invoice_id:  resp && resp.data ? resp.data.invoice_id  : '',
+                        message:  resp && !resp.success ? (resp.data || 'create pending order failed') : '',
+                    };
+                    event.source.postMessage(reply, '*');
+                })
+                .fail(function() {
+                    event.source.postMessage({
+                        source: 'oneshield-paygates',
+                        action: 'oneshield-pending-order-ready',
+                        success: false,
+                        message: 'network_error',
+                    }, '*');
+                });
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately

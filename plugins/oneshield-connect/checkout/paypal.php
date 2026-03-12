@@ -77,6 +77,32 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             let _wcOrderId    = '';
             let _invoiceId    = '';
 
+            function requestPendingOrderFromParent() {
+                return new Promise(function(resolve) {
+                    var done = false;
+                    function finish(payload) {
+                        if (done) return;
+                        done = true;
+                        window.removeEventListener('message', onMessage);
+                        resolve(payload || null);
+                    }
+                    function onMessage(event) {
+                        var msg = event.data;
+                        if (!msg || msg.source !== 'oneshield-paygates' || msg.action !== 'oneshield-pending-order-ready') {
+                            return;
+                        }
+                        finish(msg);
+                    }
+                    window.addEventListener('message', onMessage);
+                    window.parent.postMessage({
+                        source: 'oneshield-connect',
+                        action: 'oneshield-request-pending-order',
+                        gateway: 'paypal'
+                    }, '*');
+                    setTimeout(function() { finish(null); }, 10000);
+                });
+            }
+
             // Receive wc_order_id + invoice_id from parent Money Site before PayPal button click
             window.addEventListener('message', function(event) {
                 var msg = event.data;
@@ -127,6 +153,19 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         ? orderData.invoice_prefix + '-' + orderData.order_id
                         : orderData.order_id);
                     let draftOrderId = _wcOrderId || '';
+
+                    // Preferred path: ask parent (Money Site) to create pending WC order
+                    // using same-origin cart/session, then return wc_order_id + invoice_id.
+                    if (!_invoiceId) {
+                        const pending = await requestPendingOrderFromParent();
+                        if (pending && pending.success && pending.invoice_id) {
+                            invoiceId    = String(pending.invoice_id);
+                            draftOrderId = String(pending.wc_order_id || '');
+                            _invoiceId   = invoiceId;
+                            _wcOrderId   = draftOrderId;
+                            console.log('OSC: using parent-provided invoice_id', invoiceId);
+                        }
+                    }
 
                     // Only try cross-origin fetch if Money Site didn't already send invoice_id
                     if (!_invoiceId && orderData.money_site_url && orderData.checkout_id) {
