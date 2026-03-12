@@ -349,6 +349,7 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
         $os_site_id      = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
         $os_checkout_id  = sanitize_text_field($_POST['osp_paypal_os_checkout_id']     ?? '');
         $paypal_order_id = sanitize_text_field($_POST['osp_paypal_paypal_order_id']    ?? '');
+        $draft_order_id  = absint($_POST['osp_paypal_draft_order_id']                  ?? 0);
 
         if (empty($txn_id)) {
             wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
@@ -404,13 +405,12 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             $txn_id
         ));
 
-        // Patch PayPal order invoice_id with real WC order ID (fire-and-forget)
-        if (!empty($paypal_order_id)) {
-            $invoice_prefix = $this->get_option('invoice_prefix', '');
-            $invoice_id = !empty($invoice_prefix)
-                ? $invoice_prefix . '-' . $order_id
-                : (string) $order_id;
-            $this->patch_paypal_invoice($paypal_order_id, $invoice_id);
+        // Cancel draft order if WC created a new order instead of reusing the draft
+        if ($draft_order_id && $draft_order_id !== $order_id) {
+            $draft = wc_get_order($draft_order_id);
+            if ($draft && $draft->get_meta('_osp_paypal_draft') === '1') {
+                $draft->update_status('cancelled', 'Replaced by WC order #' . $order_id);
+            }
         }
 
         if (!empty($os_checkout_id)) {

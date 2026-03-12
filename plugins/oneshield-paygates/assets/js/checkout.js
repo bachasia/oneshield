@@ -305,16 +305,28 @@
             injected.value = msg.transaction_id;
             form.appendChild(injected);
 
-            // Also inject paypal_order_id for use in process_payment invoice patch
-            if (gateway === 'paypal' && msg.paypal_order_id) {
-                var existingPpOid = form.querySelector('#osp_paypal_order_id_injected');
-                if (existingPpOid) existingPpOid.remove();
-                var ppOid = document.createElement('input');
-                ppOid.type  = 'hidden';
-                ppOid.id    = 'osp_paypal_order_id_injected';
-                ppOid.name  = 'osp_paypal_paypal_order_id';
-                ppOid.value = msg.paypal_order_id;
-                form.appendChild(ppOid);
+            // Also inject paypal_order_id and draft_order_id for use in process_payment
+            if (gateway === 'paypal') {
+                if (msg.paypal_order_id) {
+                    var existingPpOid = form.querySelector('#osp_paypal_order_id_injected');
+                    if (existingPpOid) existingPpOid.remove();
+                    var ppOid = document.createElement('input');
+                    ppOid.type  = 'hidden';
+                    ppOid.id    = 'osp_paypal_order_id_injected';
+                    ppOid.name  = 'osp_paypal_paypal_order_id';
+                    ppOid.value = msg.paypal_order_id;
+                    form.appendChild(ppOid);
+                }
+                if (msg.draft_order_id) {
+                    var existingDraft = form.querySelector('#osp_paypal_draft_order_injected');
+                    if (existingDraft) existingDraft.remove();
+                    var draftInp = document.createElement('input');
+                    draftInp.type  = 'hidden';
+                    draftInp.id    = 'osp_paypal_draft_order_injected';
+                    draftInp.name  = 'osp_paypal_draft_order_id';
+                    draftInp.value = msg.draft_order_id;
+                    form.appendChild(draftInp);
+                }
             }
         }
 

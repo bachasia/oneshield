@@ -172,6 +172,11 @@ function osc_handle_checkout_by_id(string $checkout_id): void {
         $_GET['product_name'] = (string) $meta['product_name'];
     }
 
+    // Money site URL + checkout_id — used by PayPal iframe to fetch draft order invoice_id
+    if (!empty($meta['money_site_domain'])) {
+        $_GET['money_site_url'] = 'https://' . $meta['money_site_domain'];
+    }
+
     // Store checkout_id for AJAX billing refresh
     $_GET['checkout_id'] = $checkout_id;
 

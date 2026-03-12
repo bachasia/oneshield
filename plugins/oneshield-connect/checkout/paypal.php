@@ -30,6 +30,8 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
     $user_define_title       = sanitize_text_field($_GET['user_define_title'] ?? '');
     $random_title_list       = sanitize_text_field($_GET['random_title_list'] ?? '');
     $product_name            = sanitize_text_field($_GET['product_name'] ?? '');
+    $money_site_url          = sanitize_text_field($_GET['money_site_url'] ?? '');
+    $checkout_id             = sanitize_text_field($_GET['checkout_id'] ?? '');
 
     ?>
     <!DOCTYPE html>
@@ -71,6 +73,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
 
         <script>
         (function() {
+            let _draftOrderId = '';
             const orderData = {
                 order_id:                '<?php echo esc_js($order_id); ?>',
                 token:                   '<?php echo esc_js($token); ?>',
@@ -82,6 +85,8 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 user_define_title:       '<?php echo esc_js($user_define_title); ?>',
                 random_title_list:       '<?php echo esc_js($random_title_list); ?>',
                 product_name:            '<?php echo esc_js($product_name); ?>',
+                money_site_url:          '<?php echo esc_js(rtrim($money_site_url, '/')); ?>',
+                checkout_id:             '<?php echo esc_js($checkout_id); ?>',
             };
 
             function setPaypalFullscreen(open) {
@@ -106,6 +111,38 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 },
 
                 createOrder: async function() {
+                    // Step 1: fetch draft WC order ID from money site (gives us real invoice_id)
+                    let invoiceId = orderData.invoice_prefix
+                        ? orderData.invoice_prefix + '-' + orderData.order_id
+                        : orderData.order_id;
+                    let draftOrderId = '';
+
+                    if (orderData.money_site_url && orderData.checkout_id) {
+                        try {
+                            const draftResp = await fetch(
+                                orderData.money_site_url + '/wp-admin/admin-ajax.php',
+                                {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                    body: new URLSearchParams({
+                                        action:               'osp_get_paypal_invoice_id',
+                                        checkout_session_id:  orderData.checkout_id,
+                                    }),
+                                }
+                            );
+                            const draftData = await draftResp.json();
+                            if (draftData.success) {
+                                invoiceId      = draftData.data.invoice_id;
+                                draftOrderId   = String(draftData.data.draft_order_id);
+                                _draftOrderId  = draftOrderId;
+                            }
+                        } catch (e) {
+                            // Non-fatal: fall back to temp invoice_id
+                            console.warn('OSC: could not fetch draft order id', e);
+                        }
+                    }
+
+                    // Step 2: create PayPal order with correct invoice_id
                     const resp = await fetch(orderData.ajax_url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -114,11 +151,12 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             order_id:                orderData.order_id,
                             amount:                  orderData.amount,
                             currency:                orderData.currency,
-                            invoice_prefix:          orderData.invoice_prefix,
+                            invoice_id_override:     invoiceId,
                             overwrite_product_title: orderData.overwrite_product_title,
                             user_define_title:       orderData.user_define_title,
                             random_title_list:       orderData.random_title_list,
                             product_name:            orderData.product_name,
+                            draft_order_id:          draftOrderId,
                         }),
                     });
                     const data = await resp.json();
@@ -142,6 +180,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             action:          'osc_capture_paypal_order',
                             paypal_order_id: data.orderID,
                             order_id:        orderData.order_id,
+                            draft_order_id:  _draftOrderId,
                         }),
                     });
                     const result = await resp.json();
@@ -166,6 +205,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             transaction_id:  result.data.capture_id,
                             paypal_order_id: data.orderID,
                             order_id:        orderData.order_id,
+                            draft_order_id:  result.data.draft_order_id || '',
                         }, '*');
                     } else {
                         setPaypalFullscreen(false);
@@ -247,7 +287,7 @@ function osc_ajax_create_paypal_order(): void {
     $order_id = sanitize_text_field($_POST['order_id'] ?? '');
 
     // Order info settings passed from money site via session meta → $_GET
-    $invoice_prefix          = sanitize_text_field($_POST['invoice_prefix'] ?? '');
+    $invoice_id_override     = sanitize_text_field($_POST['invoice_id_override'] ?? '');
     $overwrite_product_title = sanitize_text_field($_POST['overwrite_product_title'] ?? 'keep_original');
     $user_define_title       = sanitize_text_field($_POST['user_define_title'] ?? '');
     $random_title_list       = sanitize_text_field($_POST['random_title_list'] ?? '');
@@ -262,10 +302,8 @@ function osc_ajax_create_paypal_order(): void {
         $order_id
     );
 
-    // Build invoice_id
-    $invoice_id = !empty($invoice_prefix)
-        ? $invoice_prefix . '-' . $order_id
-        : $order_id;
+    // Use invoice_id from JS (which fetched draft order id from money site), fallback to order_id
+    $invoice_id = !empty($invoice_id_override) ? $invoice_id_override : $order_id;
 
     $access_token = osc_get_paypal_access_token();
     if (is_wp_error($access_token)) {
@@ -392,6 +430,7 @@ function osc_ajax_capture_paypal_order(): void {
     // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
 
     $paypal_order_id = sanitize_text_field($_POST['paypal_order_id'] ?? '');
+    $draft_order_id  = sanitize_text_field($_POST['draft_order_id']  ?? '');
 
     $access_token = osc_get_paypal_access_token();
     if (is_wp_error($access_token)) {
@@ -418,7 +457,10 @@ function osc_ajax_capture_paypal_order(): void {
     $capture_id = $body['purchase_units'][0]['payments']['captures'][0]['id'] ?? null;
 
     if ($capture_id) {
-        wp_send_json_success(['capture_id' => $capture_id]);
+        wp_send_json_success([
+            'capture_id'     => $capture_id,
+            'draft_order_id' => $draft_order_id,
+        ]);
     } else {
         wp_send_json_error('Capture failed');
     }
