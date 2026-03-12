@@ -186,6 +186,20 @@ add_action('wp_ajax_nopriv_osp_get_paypal_invoice_id', 'osp_ajax_get_paypal_invo
 add_action('wp_ajax_osp_get_paypal_invoice_id',        'osp_ajax_get_paypal_invoice_id');
 
 function osp_ajax_get_paypal_invoice_id(): void {
+    // Allow cross-origin requests from Shield Site iframes
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (!empty($origin)) {
+        header('Access-Control-Allow-Origin: ' . esc_url_raw($origin));
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type');
+    }
+    // Handle preflight
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        status_header(200);
+        exit;
+    }
+
     $checkout_session_id = sanitize_text_field($_POST['checkout_session_id'] ?? '');
 
     if (empty($checkout_session_id)) {
