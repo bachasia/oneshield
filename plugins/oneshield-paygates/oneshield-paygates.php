@@ -179,6 +179,99 @@ function osp_get_gateway_instance(string $gateway): ?OS_Payment_Base {
     return $key ? ($instances[$key] ?? null) : null;
 }
 
+// ── PayPal: create real WC pending order before PayPal popup opens ───────────
+// Called from Money Site JS (same-origin, has cart/session) when user clicks Place Order.
+// Creates the WC order with full billing/shipping/cart data, returns the order_id.
+// This order_id is then used as invoice_id in PayPal, and completed after capture.
+add_action('wp_ajax_nopriv_osp_create_paypal_pending_order', 'osp_ajax_create_paypal_pending_order');
+add_action('wp_ajax_osp_create_paypal_pending_order',        'osp_ajax_create_paypal_pending_order');
+
+function osp_ajax_create_paypal_pending_order(): void {
+    check_ajax_referer('osp_confirm_nonce', 'nonce');
+
+    $checkout_session_id = sanitize_text_field($_POST['checkout_session_id'] ?? '');
+
+    if (empty($checkout_session_id)) {
+        wp_send_json_error('Missing checkout_session_id');
+    }
+
+    // Return cached order if same session (idempotent — prevents double orders on retry)
+    $transient_key = 'osp_pp_pending_' . md5($checkout_session_id);
+    $cached        = get_transient($transient_key);
+    if ($cached && !empty($cached['wc_order_id'])) {
+        $existing = wc_get_order((int) $cached['wc_order_id']);
+        if ($existing && in_array($existing->get_status(), ['pending', 'on-hold'], true)) {
+            wp_send_json_success($cached);
+        }
+    }
+
+    // Get invoice_prefix
+    $gw             = osp_get_gateway_instance('paypal');
+    $invoice_prefix = $gw ? $gw->get_option('invoice_prefix', '') : '';
+
+    // Use WC checkout to create the order from the current cart + POST billing data
+    // WC()->checkout()->create_order() processes cart items, coupons, shipping, taxes
+    add_filter('woocommerce_checkout_posted_data', 'osp_inject_checkout_posted_data');
+    $_POST['payment_method'] = 'os_paypal';
+
+    try {
+        $wc_checkout = WC()->checkout();
+        $wc_order_id = $wc_checkout->create_order([]);
+    } catch (\Exception $e) {
+        remove_filter('woocommerce_checkout_posted_data', 'osp_inject_checkout_posted_data');
+        wp_send_json_error('Failed to create order: ' . $e->getMessage());
+    }
+
+    remove_filter('woocommerce_checkout_posted_data', 'osp_inject_checkout_posted_data');
+
+    if (is_wp_error($wc_order_id)) {
+        wp_send_json_error($wc_order_id->get_error_message());
+    }
+
+    $order = wc_get_order($wc_order_id);
+    if (!$order) {
+        wp_send_json_error('Order not found after creation');
+    }
+
+    $order->set_payment_method('os_paypal');
+    $order->set_payment_method_title('PayPal');
+    $order->update_meta_data('_osp_checkout_session_id', $checkout_session_id);
+    $order->update_status('pending', 'OneShield: Awaiting PayPal payment.');
+    $order->save();
+
+    $invoice_id = !empty($invoice_prefix)
+        ? $invoice_prefix . '-' . $wc_order_id
+        : (string) $wc_order_id;
+
+    $result = [
+        'wc_order_id' => $wc_order_id,
+        'invoice_id'  => $invoice_id,
+    ];
+
+    set_transient($transient_key, $result, 30 * MINUTE_IN_SECONDS);
+
+    wp_send_json_success($result);
+}
+
+// Helper: inject billing/shipping from POST into WC checkout data
+function osp_inject_checkout_posted_data(array $data): array {
+    $fields = [
+        'billing_first_name', 'billing_last_name', 'billing_email', 'billing_phone',
+        'billing_address_1', 'billing_address_2', 'billing_city', 'billing_state',
+        'billing_postcode', 'billing_country',
+        'shipping_first_name', 'shipping_last_name', 'shipping_address_1', 'shipping_address_2',
+        'shipping_city', 'shipping_state', 'shipping_postcode', 'shipping_country',
+        'order_comments',
+    ];
+    foreach ($fields as $field) {
+        if (isset($_POST[$field])) {
+            $data[$field] = sanitize_text_field($_POST[$field]);
+        }
+    }
+    $data['payment_method'] = 'os_paypal';
+    return $data;
+}
+
 // ── PayPal: return a stable invoice_id for the current checkout session ──────
 // Called cross-origin from Shield Site iframe before creating the PayPal order.
 // Uses a simple per-site sequence counter stored in WP options — no WC order created.

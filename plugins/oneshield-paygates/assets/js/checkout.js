@@ -421,14 +421,74 @@
         // Show loading overlay
         showOverlay();
 
+        var wcOrderId   = 0;
+        var invoiceId   = '';
+
         function doConfirm() {
             // postMessage to iframe: trigger Stripe/PayPal confirmation
             iframe.contentWindow.postMessage({
-                action:      'oneshield-confirm-payment',
-                txn_id:      osTxnId,
-                site_id:     osSiteId,
-                checkout_id: osCheckoutId,
+                action:       'oneshield-confirm-payment',
+                txn_id:       osTxnId,
+                site_id:      osSiteId,
+                checkout_id:  osCheckoutId,
+                wc_order_id:  wcOrderId,
+                invoice_id:   invoiceId,
             }, '*');
+        }
+
+        // For PayPal: create the real WC pending order first, then open PayPal popup
+        function doCreatePendingOrderThenConfirm(billingData) {
+            if (gateway !== 'paypal' || !osCheckoutId) {
+                doConfirm();
+                return;
+            }
+            var $form = $('form.checkout, form#order_review');
+            var pendingData = $.extend({
+                action:               'osp_create_paypal_pending_order',
+                nonce:                ospData.nonce || '',
+                checkout_session_id:  osCheckoutId,
+                billing_first_name:   $form.find('[name="billing_first_name"]').val() || '',
+                billing_last_name:    $form.find('[name="billing_last_name"]').val()  || '',
+                billing_email:        $form.find('[name="billing_email"]').val()      || '',
+                billing_phone:        $form.find('[name="billing_phone"]').val()      || '',
+                billing_address_1:    $form.find('[name="billing_address_1"]').val()  || '',
+                billing_address_2:    $form.find('[name="billing_address_2"]').val()  || '',
+                billing_city:         $form.find('[name="billing_city"]').val()       || '',
+                billing_state:        $form.find('[name="billing_state"]').val()      || '',
+                billing_postcode:     $form.find('[name="billing_postcode"]').val()   || '',
+                billing_country:      $form.find('[name="billing_country"]').val()    || '',
+                shipping_first_name:  $form.find('[name="shipping_first_name"]').val() || $form.find('[name="billing_first_name"]').val() || '',
+                shipping_last_name:   $form.find('[name="shipping_last_name"]').val()  || $form.find('[name="billing_last_name"]').val()  || '',
+                shipping_address_1:   $form.find('[name="shipping_address_1"]').val()  || $form.find('[name="billing_address_1"]').val()  || '',
+                shipping_address_2:   $form.find('[name="shipping_address_2"]').val()  || $form.find('[name="billing_address_2"]').val()  || '',
+                shipping_city:        $form.find('[name="shipping_city"]').val()       || $form.find('[name="billing_city"]').val()       || '',
+                shipping_state:       $form.find('[name="shipping_state"]').val()      || $form.find('[name="billing_state"]').val()      || '',
+                shipping_postcode:    $form.find('[name="shipping_postcode"]').val()   || $form.find('[name="billing_postcode"]').val()   || '',
+                shipping_country:     $form.find('[name="shipping_country"]').val()    || $form.find('[name="billing_country"]').val()    || '',
+                order_comments:       $form.find('[name="order_comments"]').val()      || '',
+            }, billingData || {});
+
+            $.post(ajaxUrl, pendingData, function(resp) {
+                if (resp && resp.success) {
+                    wcOrderId = resp.data.wc_order_id || 0;
+                    invoiceId = resp.data.invoice_id  || '';
+                    // Inject wc_order_id as hidden input so process_payment receives it
+                    var f = document.getElementById('order_review') || document.querySelector('form.checkout');
+                    if (f) {
+                        var ex = f.querySelector('#osp_paypal_wc_order_injected');
+                        if (ex) ex.remove();
+                        var inp = document.createElement('input');
+                        inp.type  = 'hidden';
+                        inp.id    = 'osp_paypal_wc_order_injected';
+                        inp.name  = 'osp_paypal_pending_wc_order_id';
+                        inp.value = wcOrderId;
+                        f.appendChild(inp);
+                    }
+                }
+                doConfirm();
+            }).fail(function() {
+                doConfirm(); // Fall back — invoice_id will be checkout-uuid
+            });
         }
 
         // If send_billing enabled for this gateway, push billing first
@@ -465,11 +525,10 @@
                 shipping_country:    $form.find('[name="shipping_country"]').val()    || $form.find('[name="billing_country"]').val()    || '',
             };
             $.post(ajaxUrl, billingData).always(function () {
-                // Always proceed even if billing update fails (non-fatal)
-                doConfirm();
+                doCreatePendingOrderThenConfirm();
             });
         } else {
-            doConfirm();
+            doCreatePendingOrderThenConfirm();
         }
 
         // Re-enable button + hide overlay after timeout in case iframe never responds

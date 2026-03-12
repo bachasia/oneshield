@@ -348,8 +348,8 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
         $os_txn_id       = sanitize_text_field($_POST['osp_paypal_os_transaction_id']  ?? '');
         $os_site_id      = (int) ($_POST['osp_paypal_os_site_id'] ?? 0);
         $os_checkout_id  = sanitize_text_field($_POST['osp_paypal_os_checkout_id']     ?? '');
-        $paypal_order_id = sanitize_text_field($_POST['osp_paypal_paypal_order_id']    ?? '');
-        $draft_order_id  = absint($_POST['osp_paypal_draft_order_id']                  ?? 0);
+        $paypal_order_id    = sanitize_text_field($_POST['osp_paypal_paypal_order_id']     ?? '');
+        $pending_wc_order_id = absint($_POST['osp_paypal_pending_wc_order_id']           ?? 0);
 
         if (empty($txn_id)) {
             wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');

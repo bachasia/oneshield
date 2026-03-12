@@ -74,6 +74,16 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
         <script>
         (function() {
             let _draftOrderId = '';
+            let _wcOrderId    = '';
+            let _invoiceId    = '';
+
+            // Receive wc_order_id + invoice_id from parent Money Site before PayPal button click
+            window.addEventListener('message', function(event) {
+                var msg = event.data;
+                if (!msg || msg.action !== 'oneshield-confirm-payment') return;
+                if (msg.wc_order_id) _wcOrderId = String(msg.wc_order_id);
+                if (msg.invoice_id)  _invoiceId  = String(msg.invoice_id);
+            });
             const orderData = {
                 order_id:                '<?php echo esc_js($order_id); ?>',
                 token:                   '<?php echo esc_js($token); ?>',
@@ -111,13 +121,15 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 },
 
                 createOrder: async function() {
-                    // Step 1: fetch draft WC order ID from money site (gives us real invoice_id)
-                    let invoiceId = orderData.invoice_prefix
+                    // Use invoice_id from Money Site (sent via postMessage before button click)
+                    // Falls back to cross-origin fetch, then to checkout-uuid
+                    let invoiceId = _invoiceId || (orderData.invoice_prefix
                         ? orderData.invoice_prefix + '-' + orderData.order_id
-                        : orderData.order_id;
-                    let draftOrderId = '';
+                        : orderData.order_id);
+                    let draftOrderId = _wcOrderId || '';
 
-                    if (orderData.money_site_url && orderData.checkout_id) {
+                    // Only try cross-origin fetch if Money Site didn't already send invoice_id
+                    if (!_invoiceId && orderData.money_site_url && orderData.checkout_id) {
                         try {
                             const draftUrl = orderData.money_site_url + '/wp-admin/admin-ajax.php';
                             console.log('OSC: fetching draft order from', draftUrl);
