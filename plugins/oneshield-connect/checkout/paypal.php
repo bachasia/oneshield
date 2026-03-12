@@ -124,10 +124,12 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             const draftResp = await fetch(draftUrl, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                body: new URLSearchParams({
-                                    action:               'osp_get_paypal_invoice_id',
-                                    checkout_session_id:  orderData.checkout_id,
-                                }),
+                            body: new URLSearchParams({
+                                action:               'osp_get_paypal_invoice_id',
+                                checkout_session_id:  orderData.checkout_id,
+                                amount:               orderData.amount,
+                                currency:             orderData.currency,
+                            }),
                             });
                             console.log('OSC: draft response status', draftResp.status);
                             const draftText = await draftResp.text();

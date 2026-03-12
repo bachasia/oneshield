@@ -201,6 +201,8 @@ function osp_ajax_get_paypal_invoice_id(): void {
     }
 
     $checkout_session_id = sanitize_text_field($_POST['checkout_session_id'] ?? '');
+    $amount              = (float) ($_POST['amount']   ?? 0);
+    $currency            = strtoupper(sanitize_text_field($_POST['currency'] ?? 'USD'));
 
     if (empty($checkout_session_id)) {
         wp_send_json_error('Missing checkout_session_id');
@@ -208,71 +210,43 @@ function osp_ajax_get_paypal_invoice_id(): void {
 
     // Use transient keyed to checkout_session_id so multiple calls return same draft order
     $transient_key = 'osp_paypal_draft_' . md5($checkout_session_id);
-    $cached = get_transient($transient_key);
-    if ($cached && !empty($cached['draft_order_id']) && wc_get_order($cached['draft_order_id'])) {
-        $draft_order = wc_get_order($cached['draft_order_id']);
-        // Only reuse if still pending/on-hold (not already completed/cancelled)
-        if (in_array($draft_order->get_status(), ['pending', 'on-hold'], true)) {
+    $cached        = get_transient($transient_key);
+    if ($cached && !empty($cached['draft_order_id'])) {
+        $draft_order = wc_get_order((int) $cached['draft_order_id']);
+        if ($draft_order && in_array($draft_order->get_status(), ['pending', 'on-hold'], true)) {
             wp_send_json_success($cached);
         }
     }
 
-    // Need WooCommerce session and cart to create a draft order
-    if (!WC()->cart || WC()->cart->is_empty()) {
-        wp_send_json_error('Cart is empty');
-    }
-
-    // Get PayPal gateway instance to read invoice_prefix
-    $gw = osp_get_gateway_instance('paypal');
+    // Get invoice_prefix from PayPal gateway settings
+    $gw             = osp_get_gateway_instance('paypal');
     $invoice_prefix = $gw ? $gw->get_option('invoice_prefix', '') : '';
 
-    // Create a pending WC order from the current cart
-    $checkout = WC()->checkout();
+    // Create a minimal pending WC order — no cart needed, just amount+currency.
+    // This is called cross-origin from the Shield Site iframe, so WC cart/session
+    // is unavailable. We only need the order ID for the invoice_id.
     $draft_order = wc_create_order([
-        'status'        => 'pending',
-        'customer_id'   => get_current_user_id(),
-        'customer_note' => '',
-        'created_via'   => 'oneshield_paypal_draft',
+        'status'      => 'pending',
+        'created_via' => 'oneshield_paypal_draft',
     ]);
 
     if (is_wp_error($draft_order)) {
         wp_send_json_error('Failed to create draft order: ' . $draft_order->get_error_message());
     }
 
-    // Copy cart items into draft order
-    foreach (WC()->cart->get_cart() as $cart_item) {
-        $draft_order->add_product(
-            $cart_item['data'],
-            $cart_item['quantity'],
-            [
-                'variation' => $cart_item['variation'] ?? [],
-                'totals'    => [
-                    'subtotal'     => $cart_item['line_subtotal'],
-                    'subtotal_tax' => $cart_item['line_subtotal_tax'],
-                    'total'        => $cart_item['line_total'],
-                    'tax'          => $cart_item['line_tax'],
-                ],
-            ]
-        );
-    }
-
-    // Copy fees, shipping, totals
-    foreach (WC()->cart->get_fees() as $fee) {
-        $draft_order->add_fee($fee);
-    }
-
-    $draft_order->set_currency(get_woocommerce_currency());
+    // Set order total manually — no line items needed for invoice_id purposes
+    $draft_order->set_total($amount > 0 ? $amount : 0);
+    $draft_order->set_currency(!empty($currency) ? $currency : get_woocommerce_currency());
     $draft_order->set_payment_method('os_paypal');
     $draft_order->set_payment_method_title('PayPal');
-    $draft_order->calculate_totals();
 
-    // Tag the draft so we can clean it up later
+    // Tag for cleanup + link to checkout session
     $draft_order->update_meta_data('_osp_paypal_draft', '1');
     $draft_order->update_meta_data('_osp_checkout_session_id', $checkout_session_id);
     $draft_order->save();
 
     $draft_order_id = $draft_order->get_id();
-    $invoice_id = !empty($invoice_prefix)
+    $invoice_id     = !empty($invoice_prefix)
         ? $invoice_prefix . '-' . $draft_order_id
         : (string) $draft_order_id;
 
@@ -281,7 +255,7 @@ function osp_ajax_get_paypal_invoice_id(): void {
         'invoice_id'     => $invoice_id,
     ];
 
-    // Cache for 30 minutes (PayPal checkout session lifespan)
+    // Cache for 30 minutes
     set_transient($transient_key, $result, 30 * MINUTE_IN_SECONDS);
 
     wp_send_json_success($result);
