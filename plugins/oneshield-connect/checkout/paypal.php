@@ -248,7 +248,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             action:          'osc_capture_paypal_order',
                             paypal_order_id: data.orderID,
                             order_id:        orderData.order_id,
-                            draft_order_id:  _draftOrderId,
+                            draft_order_id:  _wcOrderId,
                         }),
                     });
                     const result = await resp.json();

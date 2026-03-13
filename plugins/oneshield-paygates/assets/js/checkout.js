@@ -384,7 +384,7 @@
                     var draftInp = document.createElement('input');
                     draftInp.type  = 'hidden';
                     draftInp.id    = 'osp_paypal_draft_order_injected';
-                    draftInp.name  = 'osp_paypal_draft_order_id';
+                    draftInp.name  = 'osp_paypal_pending_wc_order_id';
                     draftInp.value = msg.draft_order_id;
                     form.appendChild(draftInp);
                 }
