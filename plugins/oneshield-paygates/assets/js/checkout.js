@@ -348,54 +348,11 @@
 
         var prefix = 'osp_' + gateway;
 
-        // Write transaction_id into ALL matching hidden inputs
-        document.querySelectorAll('[name="' + prefix + '_transaction_id"]').forEach(function(el) {
-            el.value = msg.transaction_id;
-        });
-
-        // Inject a fresh input directly into the form so WC AJAX
-        // serialize always picks it up, regardless of any re-renders.
-        var form = document.getElementById('order_review') || document.querySelector('form.checkout');
-        if (form) {
-            var existing = form.querySelector('#osp_txn_injected_' + gateway);
-            if (existing) existing.remove();
-            var injected = document.createElement('input');
-            injected.type  = 'hidden';
-            injected.id    = 'osp_txn_injected_' + gateway;
-            injected.name  = prefix + '_transaction_id';
-            injected.value = msg.transaction_id;
-            form.appendChild(injected);
-
-            // Also inject paypal_order_id and draft_order_id for use in process_payment
-            if (gateway === 'paypal') {
-                if (msg.paypal_order_id) {
-                    var existingPpOid = form.querySelector('#osp_paypal_order_id_injected');
-                    if (existingPpOid) existingPpOid.remove();
-                    var ppOid = document.createElement('input');
-                    ppOid.type  = 'hidden';
-                    ppOid.id    = 'osp_paypal_order_id_injected';
-                    ppOid.name  = 'osp_paypal_paypal_order_id';
-                    ppOid.value = msg.paypal_order_id;
-                    form.appendChild(ppOid);
-                }
-                if (msg.draft_order_id) {
-                    var existingDraft = form.querySelector('#osp_paypal_draft_order_injected');
-                    if (existingDraft) existingDraft.remove();
-                    var draftInp = document.createElement('input');
-                    draftInp.type  = 'hidden';
-                    draftInp.id    = 'osp_paypal_draft_order_injected';
-                    draftInp.name  = 'osp_paypal_pending_wc_order_id';
-                    draftInp.value = msg.draft_order_id;
-                    form.appendChild(draftInp);
-                }
-            }
-        }
-
         var osTxnInput      = document.querySelector('[name="' + prefix + '_os_transaction_id"]');
         var siteInput       = document.querySelector('[name="' + prefix + '_os_site_id"]');
         var checkoutIdInput = document.querySelector('[name="' + prefix + '_os_checkout_id"]');
 
-        // Show success overlay before re-submitting
+        // Show success overlay
         showOverlaySuccess();
 
         // Replace iframe with success UI
@@ -410,19 +367,56 @@
                 '</svg>' +
                 '<p style="margin:0;font-size:15px;font-weight:600;color:#15803d;">Payment Authorised</p>' +
                 '<p style="margin:6px 0 0;font-size:13px;color:#4ade80;">Completing your order…</p>' +
-                '</div>' +
-                '<input type="hidden" name="' + prefix + '_transaction_id"    value="' + escAttr(msg.transaction_id) + '" />' +
-                '<input type="hidden" name="' + prefix + '_os_transaction_id" value="' + escAttr(osTxnInput      ? osTxnInput.value      : '') + '" />' +
-                '<input type="hidden" name="' + prefix + '_os_site_id"        value="' + escAttr(siteInput        ? siteInput.value        : '') + '" />' +
-                '<input type="hidden" name="' + prefix + '_os_checkout_id"    value="' + escAttr(checkoutIdInput  ? checkoutIdInput.value  : '') + '" />';
+                '</div>';
         }
 
-        // Re-submit the WC checkout form to complete the order.
-        // Use a very short delay (100ms) just to let the success UI paint.
+        // ── PayPal: complete via AJAX (no WC form submit — avoids duplicate order) ──
+        if (gateway === 'paypal' && msg.draft_order_id) {
+            var billingData = collectCheckoutFields();
+            var completePayload = $.extend({
+                action:           'osp_complete_paypal_pending_order',
+                nonce:            ospData.nonce || '',
+                pending_order_id: msg.draft_order_id,
+                txn_id:           msg.transaction_id,
+                paypal_order_id:  msg.paypal_order_id || '',
+                os_checkout_id:   checkoutIdInput ? checkoutIdInput.value : '',
+                os_txn_id:        osTxnInput      ? osTxnInput.value      : '',
+                os_site_id:       siteInput        ? siteInput.value        : '',
+            }, billingData);
+
+            $.post(ajaxUrl, completePayload)
+                .done(function(resp) {
+                    if (resp && resp.success && resp.data && resp.data.redirect) {
+                        window.location.href = resp.data.redirect;
+                    } else {
+                        // Fallback: reload checkout page with error
+                        var errMsg = (resp && resp.data) ? resp.data : 'Order completion failed.';
+                        window.location.href = window.location.href;
+                    }
+                })
+                .fail(function() {
+                    window.location.reload();
+                });
+            return;
+        }
+
+        // ── Stripe (and PayPal fallback without pending order): submit WC form ──
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
         if (form) {
-            // If WC fires updated_checkout after we confirmed (e.g. coupon recalc),
-            // re-inject the transaction_id so it survives the DOM refresh.
+            // Write transaction_id into hidden inputs
+            document.querySelectorAll('[name="' + prefix + '_transaction_id"]').forEach(function(el) {
+                el.value = msg.transaction_id;
+            });
+            var existing = form.querySelector('#osp_txn_injected_' + gateway);
+            if (existing) existing.remove();
+            var injected = document.createElement('input');
+            injected.type  = 'hidden';
+            injected.id    = 'osp_txn_injected_' + gateway;
+            injected.name  = prefix + '_transaction_id';
+            injected.value = msg.transaction_id;
+            form.appendChild(injected);
+
+            // Re-inject txn_id if WC re-renders form before submit
             $(document.body).on('updated_checkout.osp_protect', function () {
                 if (!state[gateway] || !state[gateway].confirmed || !state[gateway].txnId) return;
                 var f = document.getElementById('order_review') || document.querySelector('form.checkout');
@@ -439,9 +433,6 @@
             });
 
             setTimeout(function () {
-                // Submit via WC's own AJAX checkout by triggering the form.
-                // state[gateway].confirmed = true ensures our click-intercept
-                // handler lets this through without blocking it again.
                 $(form).submit();
             }, 100);
         }

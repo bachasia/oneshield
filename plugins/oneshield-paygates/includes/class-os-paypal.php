@@ -343,73 +343,19 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     }
 
     public function process_payment($order_id) {
-        $order               = wc_get_order($order_id);
-        $txn_id              = sanitize_text_field($_POST['osp_paypal_transaction_id']    ?? '');
-        $os_txn_id           = sanitize_text_field($_POST['osp_paypal_os_transaction_id'] ?? '');
-        $os_site_id          = (int) ($_POST['osp_paypal_os_site_id']                     ?? 0);
-        $os_checkout_id      = sanitize_text_field($_POST['osp_paypal_os_checkout_id']    ?? '');
-        $paypal_order_id     = sanitize_text_field($_POST['osp_paypal_paypal_order_id']   ?? '');
-        $pending_wc_order_id = absint($_POST['osp_paypal_pending_wc_order_id']            ?? 0);
+        $order           = wc_get_order($order_id);
+        $txn_id          = sanitize_text_field($_POST['osp_paypal_transaction_id']    ?? '');
+        $os_txn_id       = sanitize_text_field($_POST['osp_paypal_os_transaction_id'] ?? '');
+        $os_site_id      = (int) ($_POST['osp_paypal_os_site_id']                     ?? 0);
+        $os_checkout_id  = sanitize_text_field($_POST['osp_paypal_os_checkout_id']    ?? '');
+        $paypal_order_id = sanitize_text_field($_POST['osp_paypal_paypal_order_id']   ?? '');
 
         if (empty($txn_id)) {
             wc_add_notice(__('Payment not completed. Please try again.', 'oneshield-paygates'), 'error');
             return ['result' => 'failure'];
         }
 
-        // ── Reuse pending order if one was pre-created for this PayPal invoice_id ──
-        // The pending order was created before the PayPal button was clicked so its
-        // ID could be used as the PayPal invoice_id.  WooCommerce has now also
-        // created a fresh order ($order_id) via the normal checkout flow — that one
-        // has the correct billing/shipping/items but the wrong ID.
-        // Strategy: copy billing+shipping+customer from the new order onto the
-        // pending order, mark the pending order as paid, then cancel+trash the new
-        // order so only one order remains in WooCommerce.
-        $pending_order = $pending_wc_order_id ? wc_get_order($pending_wc_order_id) : null;
-        if (
-            $pending_order &&
-            $pending_order->get_id() !== $order_id &&
-            in_array($pending_order->get_status(), ['pending', 'on-hold'], true)
-        ) {
-            // Copy billing address
-            $pending_order->set_billing_first_name($order->get_billing_first_name());
-            $pending_order->set_billing_last_name($order->get_billing_last_name());
-            $pending_order->set_billing_email($order->get_billing_email());
-            $pending_order->set_billing_phone($order->get_billing_phone());
-            $pending_order->set_billing_address_1($order->get_billing_address_1());
-            $pending_order->set_billing_address_2($order->get_billing_address_2());
-            $pending_order->set_billing_city($order->get_billing_city());
-            $pending_order->set_billing_state($order->get_billing_state());
-            $pending_order->set_billing_postcode($order->get_billing_postcode());
-            $pending_order->set_billing_country($order->get_billing_country());
-
-            // Copy shipping address
-            $pending_order->set_shipping_first_name($order->get_shipping_first_name() ?: $order->get_billing_first_name());
-            $pending_order->set_shipping_last_name($order->get_shipping_last_name()  ?: $order->get_billing_last_name());
-            $pending_order->set_shipping_address_1($order->get_shipping_address_1()  ?: $order->get_billing_address_1());
-            $pending_order->set_shipping_address_2($order->get_shipping_address_2()  ?: $order->get_billing_address_2());
-            $pending_order->set_shipping_city($order->get_shipping_city()            ?: $order->get_billing_city());
-            $pending_order->set_shipping_state($order->get_shipping_state()          ?: $order->get_billing_state());
-            $pending_order->set_shipping_postcode($order->get_shipping_postcode()    ?: $order->get_billing_postcode());
-            $pending_order->set_shipping_country($order->get_shipping_country()      ?: $order->get_billing_country());
-
-            // Copy customer ID (guest = 0)
-            $pending_order->set_customer_id($order->get_customer_id());
-
-            // Copy order notes / customer note
-            $pending_order->set_customer_note($order->get_customer_note());
-
-            $pending_order->save();
-
-            // Cancel+trash the WC-generated duplicate order
-            $order->update_status('cancelled', 'OneShield: replaced by pending order #' . $pending_wc_order_id . ' (PayPal invoice_id match).');
-            wp_trash_post($order_id);
-
-            // Switch to operating on the pending order from here on
-            $order    = $pending_order;
-            $order_id = $pending_wc_order_id;
-        }
-
-        // ── Collect billing for Panel (from the real order, now $order) ──────────
+        // ── Collect billing for Panel ─────────────────────────────────────────
         if (!empty($os_checkout_id)) {
             $billing = array_filter([
                 'first_name' => $order->get_billing_first_name(),
@@ -524,7 +470,7 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
     /**
      * Mark checkout session as completed via Gateway Panel API.
      */
-    private function complete_checkout_session(string $checkout_id, string $gateway_txn_id, string $wc_order_id = ''): void {
+    public function complete_checkout_session(string $checkout_id, string $gateway_txn_id, string $wc_order_id = ''): void {
         if (empty($this->gateway_url) || empty($this->token_secret)) {
             return;
         }

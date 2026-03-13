@@ -272,6 +272,127 @@ function osp_inject_checkout_posted_data(array $data): array {
     return $data;
 }
 
+// ── PayPal: complete a pre-created pending order after capture ────────────────
+// Called by checkout.js after PayPal capture succeeds.
+// Marks the pending order as processing, records the txn/meta, empties cart,
+// and returns the thank-you redirect URL — bypassing the normal WC checkout flow
+// so no duplicate order is ever created.
+add_action('wp_ajax_nopriv_osp_complete_paypal_pending_order', 'osp_ajax_complete_paypal_pending_order');
+add_action('wp_ajax_osp_complete_paypal_pending_order',        'osp_ajax_complete_paypal_pending_order');
+
+function osp_ajax_complete_paypal_pending_order(): void {
+    check_ajax_referer('osp_confirm_nonce', 'nonce');
+
+    $pending_order_id = absint($_POST['pending_order_id']   ?? 0);
+    $txn_id           = sanitize_text_field($_POST['txn_id']            ?? '');
+    $paypal_order_id  = sanitize_text_field($_POST['paypal_order_id']   ?? '');
+    $os_checkout_id   = sanitize_text_field($_POST['os_checkout_id']    ?? '');
+    $os_txn_id        = sanitize_text_field($_POST['os_txn_id']         ?? '');
+    $os_site_id       = absint($_POST['os_site_id']                     ?? 0);
+
+    if (!$pending_order_id || empty($txn_id)) {
+        wp_send_json_error('Missing pending_order_id or txn_id');
+    }
+
+    $order = wc_get_order($pending_order_id);
+    if (!$order) {
+        wp_send_json_error('Pending order not found: ' . $pending_order_id);
+    }
+
+    if (!in_array($order->get_status(), ['pending', 'on-hold'], true)) {
+        // Already completed (double-submit guard) — just return redirect URL
+        wp_send_json_success(['redirect' => $order->get_checkout_order_received_url()]);
+    }
+
+    // Update billing/shipping from POST (filled by collectCheckoutFields in checkout.js)
+    $fields = [
+        'billing_first_name', 'billing_last_name', 'billing_email', 'billing_phone',
+        'billing_address_1', 'billing_address_2', 'billing_city', 'billing_state',
+        'billing_postcode', 'billing_country',
+        'shipping_first_name', 'shipping_last_name', 'shipping_address_1', 'shipping_address_2',
+        'shipping_city', 'shipping_state', 'shipping_postcode', 'shipping_country',
+    ];
+    foreach ($fields as $field) {
+        $value = sanitize_text_field($_POST[$field] ?? '');
+        if ($value !== '') {
+            $setter = 'set_' . $field;
+            if (method_exists($order, $setter)) {
+                $order->$setter($value);
+            }
+        }
+    }
+
+    // Complete payment
+    $order->set_payment_method('os_paypal');
+    $order->set_payment_method_title('PayPal');
+    $order->payment_complete($txn_id);
+    $order->add_order_note(sprintf('OneShield: PayPal payment completed. Transaction ID: %s', $txn_id));
+
+    if (!empty($paypal_order_id)) {
+        $order->update_meta_data('_osp_paypal_order_id', $paypal_order_id);
+    }
+    if (!empty($os_checkout_id)) {
+        $order->update_meta_data('_os_checkout_id', $os_checkout_id);
+    }
+
+    // Persist shield site URL
+    if (WC()->session) {
+        $shield_url = (string) WC()->session->get('osp_paypal_shield_url', '');
+        if (!empty($shield_url)) {
+            $order->update_meta_data('_os_shield_url', $shield_url);
+            $order->update_meta_data('_os_shield_gateway', 'paypal');
+            WC()->session->__unset('osp_paypal_shield_url');
+        }
+    }
+
+    $order->save();
+
+    // Complete Gateway Panel session
+    if (!empty($os_checkout_id)) {
+        $gw = osp_get_gateway_instance('paypal');
+        if ($gw) {
+            $billing = array_filter([
+                'first_name' => $order->get_billing_first_name(),
+                'last_name'  => $order->get_billing_last_name(),
+                'email'      => $order->get_billing_email(),
+                'phone'      => $order->get_billing_phone(),
+                'address_1'  => $order->get_billing_address_1(),
+                'address_2'  => $order->get_billing_address_2(),
+                'city'       => $order->get_billing_city(),
+                'state'      => $order->get_billing_state(),
+                'postcode'   => $order->get_billing_postcode(),
+                'country'    => $order->get_billing_country(),
+            ]);
+            if (!empty($billing)) {
+                $shipping = array_filter([
+                    'first_name' => $order->get_shipping_first_name() ?: $order->get_billing_first_name(),
+                    'last_name'  => $order->get_shipping_last_name()  ?: $order->get_billing_last_name(),
+                    'address_1'  => $order->get_shipping_address_1()  ?: $order->get_billing_address_1(),
+                    'address_2'  => $order->get_shipping_address_2()  ?: $order->get_billing_address_2(),
+                    'city'       => $order->get_shipping_city()        ?: $order->get_billing_city(),
+                    'state'      => $order->get_shipping_state()       ?: $order->get_billing_state(),
+                    'postcode'   => $order->get_shipping_postcode()    ?: $order->get_billing_postcode(),
+                    'country'    => $order->get_shipping_country()     ?: $order->get_billing_country(),
+                ]);
+                $gw->send_billing_to_panel(0, $billing, $os_checkout_id, $shipping);
+            }
+            $gw->complete_checkout_session($os_checkout_id, $txn_id, (string) $order->get_id());
+        }
+    }
+
+    // Legacy confirm
+    if ($os_site_id && $os_txn_id) {
+        $gw = $gw ?? osp_get_gateway_instance('paypal');
+        if ($gw) {
+            $gw->confirm_with_panel($os_site_id, $order->get_id(), $txn_id);
+        }
+    }
+
+    WC()->cart->empty_cart();
+
+    wp_send_json_success(['redirect' => $order->get_checkout_order_received_url()]);
+}
+
 // ── PayPal: return a stable invoice_id for the current checkout session ──────
 // Called cross-origin from Shield Site iframe before creating the PayPal order.
 // Uses a simple per-site sequence counter stored in WP options — no WC order created.
