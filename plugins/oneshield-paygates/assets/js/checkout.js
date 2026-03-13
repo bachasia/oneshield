@@ -249,6 +249,7 @@
         // wc_order_id + invoice_id before calling PayPal createOrder.
         if (msg.action === 'oneshield-request-pending-order' && msg.gateway === 'paypal') {
             var checkoutId = $('[name="osp_paypal_os_checkout_id"]').val() || '';
+            console.log('[OSP] received oneshield-request-pending-order, checkoutId=', checkoutId, 'nonce=', ospData.nonce || '(empty)', 'ajaxUrl=', ajaxUrl);
             var payload = $.extend({
                 action:              'osp_create_paypal_pending_order',
                 nonce:               ospData.nonce || '',
@@ -257,6 +258,7 @@
 
             $.post(ajaxUrl, payload)
                 .done(function(resp) {
+                    console.log('[OSP] osp_create_paypal_pending_order response:', resp);
                     var reply = {
                         source:   'oneshield-paygates',
                         action:   'oneshield-pending-order-ready',
@@ -265,9 +267,11 @@
                         invoice_id:  resp && resp.data ? resp.data.invoice_id  : '',
                         message:  resp && !resp.success ? (resp.data || 'create pending order failed') : '',
                     };
+                    console.log('[OSP] sending oneshield-pending-order-ready reply:', reply);
                     event.source.postMessage(reply, '*');
                 })
-                .fail(function() {
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('[OSP] osp_create_paypal_pending_order AJAX failed:', textStatus, errorThrown, jqXHR.responseText);
                     event.source.postMessage({
                         source: 'oneshield-paygates',
                         action: 'oneshield-pending-order-ready',
