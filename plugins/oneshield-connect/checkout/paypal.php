@@ -173,38 +173,41 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         console.warn('OSC: postMessage path failed or timed out, pending=', pending);
                     }
 
-                    // Only try cross-origin fetch if Money Site didn't already send invoice_id
-                    if (!_invoiceId && orderData.money_site_url && orderData.checkout_id) {
-                        try {
-                            const draftUrl = orderData.money_site_url + '/wp-admin/admin-ajax.php';
-                            console.log('OSC: fetching draft order from', draftUrl);
-                            const draftResp = await fetch(draftUrl, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: new URLSearchParams({
-                                action:               'osp_get_paypal_invoice_id',
-                                checkout_session_id:  orderData.checkout_id,
-                                amount:               orderData.amount,
-                                currency:             orderData.currency,
-                            }),
-                            });
-                            console.log('OSC: draft response status', draftResp.status);
-                            const draftText = await draftResp.text();
-                            console.log('OSC: draft response body', draftText);
-                            let draftData;
-                            try { draftData = JSON.parse(draftText); } catch(pe) { draftData = null; }
-                            if (draftData && draftData.success) {
-                                invoiceId     = draftData.data.invoice_id;
-                                _draftOrderId = '';
-                                console.log('OSC: using invoice_id', invoiceId);
-                            } else {
-                                console.warn('OSC: invoice_id fetch failed', draftData);
+                    // Fallback: cross-origin sequence counter (only if postMessage failed)
+                    if (!_invoiceId) {
+                        if (orderData.money_site_url && orderData.checkout_id) {
+                            try {
+                                const draftUrl = orderData.money_site_url + '/wp-admin/admin-ajax.php';
+                                console.log('OSC: fallback — fetching sequence invoice_id from', draftUrl);
+                                const draftResp = await fetch(draftUrl, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                    body: new URLSearchParams({
+                                        action:               'osp_get_paypal_invoice_id',
+                                        checkout_session_id:  orderData.checkout_id,
+                                        amount:               orderData.amount,
+                                        currency:             orderData.currency,
+                                    }),
+                                });
+                                console.log('OSC: fallback response status', draftResp.status);
+                                const draftText = await draftResp.text();
+                                console.log('OSC: fallback response body', draftText);
+                                let draftData;
+                                try { draftData = JSON.parse(draftText); } catch(pe) { draftData = null; }
+                                if (draftData && draftData.success) {
+                                    invoiceId = draftData.data.invoice_id;
+                                    console.log('OSC: fallback using invoice_id', invoiceId);
+                                } else {
+                                    console.warn('OSC: fallback invoice_id fetch failed', draftData);
+                                }
+                            } catch (e) {
+                                console.error('OSC: fallback fetch error', e);
                             }
-                        } catch (e) {
-                            console.error('OSC: could not fetch draft order id', e);
+                        } else {
+                            console.warn('OSC: no money_site_url or checkout_id for fallback', orderData.money_site_url, orderData.checkout_id);
                         }
                     } else {
-                        console.warn('OSC: missing money_site_url or checkout_id', orderData.money_site_url, orderData.checkout_id);
+                        console.log('OSC: postMessage succeeded, skipping fallback. invoice_id=', _invoiceId);
                     }
 
                     // Step 2: create PayPal order with correct invoice_id
