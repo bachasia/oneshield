@@ -147,28 +147,30 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 },
 
                 createOrder: async function() {
-                    // Use invoice_id from Money Site (sent via postMessage before button click)
-                    // Falls back to cross-origin fetch, then to checkout-uuid
-                    let invoiceId = _invoiceId || (orderData.invoice_prefix
+                    // Always reset per-attempt state so retries get a fresh invoice_id
+                    // (cached _invoiceId from a previous attempt on the same page would
+                    //  skip the postMessage path entirely and reuse a stale value).
+                    _invoiceId   = '';
+                    _wcOrderId   = '';
+
+                    let invoiceId    = orderData.invoice_prefix
                         ? orderData.invoice_prefix + '-' + orderData.order_id
-                        : orderData.order_id);
-                    let draftOrderId = _wcOrderId || '';
+                        : orderData.order_id;
+                    let draftOrderId = '';
 
                     // Preferred path: ask parent (Money Site) to create pending WC order
                     // using same-origin cart/session, then return wc_order_id + invoice_id.
-                    if (!_invoiceId) {
-                        console.log('OSC: calling requestPendingOrderFromParent...');
-                        const pending = await requestPendingOrderFromParent();
-                        console.log('OSC: requestPendingOrderFromParent resolved with', pending);
-                        if (pending && pending.success && pending.invoice_id) {
-                            invoiceId    = String(pending.invoice_id);
-                            draftOrderId = String(pending.wc_order_id || '');
-                            _invoiceId   = invoiceId;
-                            _wcOrderId   = draftOrderId;
-                            console.log('OSC: using parent-provided invoice_id', invoiceId);
-                        } else {
-                            console.warn('OSC: postMessage path failed or timed out, pending=', pending);
-                        }
+                    console.log('OSC: calling requestPendingOrderFromParent...');
+                    const pending = await requestPendingOrderFromParent();
+                    console.log('OSC: requestPendingOrderFromParent resolved with', pending);
+                    if (pending && pending.success && pending.invoice_id) {
+                        invoiceId    = String(pending.invoice_id);
+                        draftOrderId = String(pending.wc_order_id || '');
+                        _invoiceId   = invoiceId;
+                        _wcOrderId   = draftOrderId;
+                        console.log('OSC: using parent-provided invoice_id', invoiceId);
+                    } else {
+                        console.warn('OSC: postMessage path failed or timed out, pending=', pending);
                     }
 
                     // Only try cross-origin fetch if Money Site didn't already send invoice_id
