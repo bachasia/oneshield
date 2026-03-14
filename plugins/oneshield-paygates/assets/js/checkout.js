@@ -202,13 +202,15 @@
         var $placeOrder = $('#place_order');
         var $ppWrap     = $('#osp-paypal-button-wrap');
 
-        if (gateway === 'paypal') {
-            // Keep Place Order button visible — WC validates form on click.
-            // The PayPal iframe wrap is hidden (only used for the fullscreen popup).
-            $placeOrder.show();
-            $ppWrap.hide();
+        // Always show Place Order — WC validates the form on click.
+        $placeOrder.show();
+
+        if (gateway === 'paypal' && $ppWrap.length) {
+            // Keep iframe in DOM and loaded (so postMessage works), but visually hidden.
+            // Use visibility+height instead of display:none so the iframe loads normally.
+            $ppWrap.css({ visibility: 'hidden', height: '0', overflow: 'hidden', 'margin-top': '0' });
         } else {
-            $placeOrder.show();
+            $ppWrap.css({ visibility: '', height: '', overflow: '', 'margin-top': '' });
             $ppWrap.hide();
         }
     }
@@ -259,6 +261,8 @@
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
+            // Make wrap visible so fullscreen iframe is seen
+            $('#osp-paypal-button-wrap').css({ visibility: 'visible', height: '', overflow: '', 'margin-top': '12px' }).show();
             document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
             // Tell iframe to stretch its body to 100vh so the PayPal SDK dark
