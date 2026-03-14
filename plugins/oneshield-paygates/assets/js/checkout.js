@@ -26,22 +26,26 @@
     var ajaxUrl        = ospData.ajax_url || '';
     var sendBillingGws = ospData.send_billing_gateways || [];
 
-    // ── Inject PayPal fullscreen CSS ────────────────────────────────────────
-    // When PayPal SDK overlay is detected inside iframe, parent makes iframe
-    // position:fixed to cover the full viewport (same as zaniolo.shop method).
+    // ── Inject PayPal dark overlay (parent-side div) ─────────────────────────
+    // A semi-transparent dark div injected directly into the money site page.
+    // Shown immediately when paypal_overlay_open is received — covers the entire
+    // viewport including the iframe, so PayPal buttons inside iframe are never
+    // visible at the top of the page during popup load.
     (function () {
         var s = document.createElement('style');
-        s.id = 'osp-pp-fullscreen-style';
-        s.textContent = [
-            '.osp-pp-fullscreen{',
-                'position:fixed!important;',
-                'top:0!important;left:0!important;',
-                'width:100%!important;height:100%!important;',
-                'z-index:99999999!important;',
-                'border:none!important;',
-            '}',
-        ].join('');
+        s.id = 'osp-pp-overlay-style';
+        s.textContent = '#osp-pp-dark-overlay{display:none;position:fixed;inset:0;z-index:99999998;background:rgba(0,0,0,0.65);}';
         document.head.appendChild(s);
+
+        var overlay = document.createElement('div');
+        overlay.id = 'osp-pp-dark-overlay';
+        if (document.body) {
+            document.body.appendChild(overlay);
+        } else {
+            document.addEventListener('DOMContentLoaded', function() {
+                document.body.appendChild(overlay);
+            });
+        }
     })();
 
     function cleanupLegacyPayPalOverlay() {
@@ -254,18 +258,22 @@
             }
         }
 
-        // PayPal SDK overlay opened inside iframe → make iframe fullscreen.
+        // PayPal SDK overlay opened inside iframe → show dark overlay on parent page.
+        // This instantly covers the entire viewport (including the iframe) so PayPal
+        // buttons inside the iframe are never visible at the top during load.
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
-            setPayPalIframeFullscreen(true);
+            var darkOverlay = document.getElementById('osp-pp-dark-overlay');
+            if (darkOverlay) darkOverlay.style.display = 'block';
         }
 
-        // PayPal overlay gone → restore iframe.
+        // PayPal overlay gone → hide parent dark overlay.
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
-            setPayPalIframeFullscreen(false);
+            var darkOverlay = document.getElementById('osp-pp-dark-overlay');
+            if (darkOverlay) darkOverlay.style.display = 'none';
             togglePayPalIframePosition();
         }
 
@@ -648,23 +656,9 @@
             .replace(/>/g, '&gt;');
     }
 
-    // ── setPayPalIframeFullscreen ────────────────────────────────────────────
-    // Toggles the osp-pp-fullscreen CSS class on the iframe.
-    // The class sets position:fixed so the iframe covers the full viewport,
-    // creating the dark overlay effect (PayPal SDK injects its own dark bg
-    // inside the iframe). No DOM reparenting — same approach as zaniolo.shop.
-    function setPayPalIframeFullscreen(open) {
-        var iframe = document.getElementById('osp-iframe-paypal');
-        if (!iframe) return;
-        if (open) {
-            iframe.classList.add('osp-pp-fullscreen');
-        } else {
-            iframe.classList.remove('osp-pp-fullscreen');
-            // Restore last known height
-            if (_lastPaypalIframeHeight > 0) {
-                iframe.style.height = _lastPaypalIframeHeight + 'px';
-            }
-        }
-    }
+    // ── setPayPalIframeFullscreen: NO-OP ────────────────────────────────────────
+    // The dark overlay is now a separate div on the parent page (not iframe CSS).
+    // This stub is kept so no ReferenceError is thrown by any residual callers.
+    function setPayPalIframeFullscreen() { /* no-op */ }
 
 })(jQuery);
