@@ -371,36 +371,38 @@
         }
 
         // ── PayPal: complete via AJAX (no WC form submit — avoids duplicate order) ──
-        if (gateway === 'paypal' && msg.draft_order_id) {
+        console.log('[OSP] payment success msg:', JSON.stringify(msg));
+        if (gateway === 'paypal') {
             var billingData = collectCheckoutFields();
             var completePayload = $.extend({
                 action:           'osp_complete_paypal_pending_order',
                 nonce:            ospData.nonce || '',
-                pending_order_id: msg.draft_order_id,
+                pending_order_id: msg.draft_order_id || '',
                 txn_id:           msg.transaction_id,
                 paypal_order_id:  msg.paypal_order_id || '',
                 os_checkout_id:   checkoutIdInput ? checkoutIdInput.value : '',
                 os_txn_id:        osTxnInput      ? osTxnInput.value      : '',
                 os_site_id:       siteInput        ? siteInput.value        : '',
             }, billingData);
+            console.log('[OSP] calling osp_complete_paypal_pending_order, pending_order_id=', msg.draft_order_id);
 
             $.post(ajaxUrl, completePayload)
                 .done(function(resp) {
+                    console.log('[OSP] osp_complete_paypal_pending_order resp:', resp);
                     if (resp && resp.success && resp.data && resp.data.redirect) {
                         window.location.href = resp.data.redirect;
                     } else {
-                        // Fallback: reload checkout page with error
-                        var errMsg = (resp && resp.data) ? resp.data : 'Order completion failed.';
-                        window.location.href = window.location.href;
+                        window.location.reload();
                     }
                 })
-                .fail(function() {
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('[OSP] osp_complete_paypal_pending_order failed:', textStatus, errorThrown, jqXHR.responseText);
                     window.location.reload();
                 });
             return;
         }
 
-        // ── Stripe (and PayPal fallback without pending order): submit WC form ──
+        // ── Stripe: submit WC form ──────────────────────────────────────────────
         var form = document.getElementById('order_review') || document.querySelector('form.checkout');
         if (form) {
             // Write transaction_id into hidden inputs
