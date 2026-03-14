@@ -57,6 +57,11 @@
     var isConfirming = false;
     var confirmTimeoutId = null;
 
+    // Track whether PayPal popup overlay is currently open/fullscreen.
+    // While true, togglePayPalIframePosition must NOT run — it would
+    // make #osp-paypal-button-wrap re-appear at the top of the page.
+    var _isPaypalOverlayOpen = false;
+
     // ── Loading overlay ─────────────────────────────────────────────────────
 
     var $overlay = null;
@@ -173,6 +178,12 @@
     // never destroys it. We simply show/hide it here.
 
     function togglePayPalIframePosition() {
+        // While the PayPal popup overlay is open the iframe is position:fixed fullscreen.
+        // Running this function would call $ppWrap.show() and make the wrap
+        // (and any non-fullscreen content) visible at the top of the page.
+        // Freeze completely until the overlay closes.
+        if (_isPaypalOverlayOpen) return;
+
         var gateway     = getActiveOspGateway();
         var $placeOrder = $('#place_order');
         var $ppWrap     = $('#osp-paypal-button-wrap');
@@ -236,13 +247,21 @@
         // PayPal overlay detected inside iframe — make iframe fullscreen.
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
+            _isPaypalOverlayOpen = true;
+            // Explicitly hide wrap + Place Order while overlay is open so the
+            // setInterval freeze (above) doesn't leave stale visible elements.
+            $('#osp-paypal-button-wrap').hide();
+            $('#place_order').hide();
             setPayPalIframeFullscreen(true);
         }
 
         // PayPal overlay gone — restore iframe to normal.
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
+            _isPaypalOverlayOpen = false;
             setPayPalIframeFullscreen(false);
+            // Re-apply visibility now that overlay is gone.
+            togglePayPalIframePosition();
         }
 
         // Iframe asks parent (Money Site) to create pending WC order and return
@@ -591,6 +610,7 @@
         state.paypal.confirmed = false;
         state.paypal.txnId     = '';
         isConfirming = false;
+        _isPaypalOverlayOpen = false; // Safety reset in case overlay closed without postMessage
         if (confirmTimeoutId) {
             clearTimeout(confirmTimeoutId);
             confirmTimeoutId = null;
