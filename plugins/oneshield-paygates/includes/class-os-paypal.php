@@ -312,6 +312,12 @@ class OS_PayPal_Gateway extends OS_Payment_Base {
             $params['product_name'] = $product_name;
         }
 
+        // Pass shipping total so Shield Site can build the correct PayPal breakdown
+        $shipping_total = (float) WC()->cart->get_shipping_total();
+        if ($shipping_total > 0) {
+            $params['shipping_total'] = number_format($shipping_total, 2, '.', '');
+        }
+
         return $params;
     }
 

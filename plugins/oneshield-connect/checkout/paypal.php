@@ -32,6 +32,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
     $product_name            = sanitize_text_field($_GET['product_name'] ?? '');
     $money_site_url          = sanitize_text_field($_GET['money_site_url'] ?? '');
     $checkout_id             = sanitize_text_field($_GET['checkout_id'] ?? '');
+    $shipping_total          = sanitize_text_field($_GET['shipping_total'] ?? '0');
 
     ?>
     <!DOCTYPE html>
@@ -141,6 +142,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 product_name:            '<?php echo esc_js($product_name); ?>',
                 money_site_url:          '<?php echo esc_js(rtrim($money_site_url, '/')); ?>',
                 checkout_id:             '<?php echo esc_js($checkout_id); ?>',
+                shipping_total:          '<?php echo esc_js($shipping_total); ?>',
             };
 
             function setPaypalFullscreen(open) {
@@ -239,6 +241,9 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                         draftOrderId = String(pending.wc_order_id || '');
                         _invoiceId   = invoiceId;
                         _wcOrderId   = draftOrderId;
+                        if (pending.shipping_total !== undefined) {
+                            orderData.shipping_total = String(pending.shipping_total || '0');
+                        }
                     } else {
                         console.warn('OSC: postMessage path failed or timed out, pending=', pending);
                     }
@@ -265,6 +270,9 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                                 if (draftData && draftData.success && draftData.data.invoice_id) {
                                     invoiceId  = draftData.data.invoice_id;
                                     _invoiceId = invoiceId;
+                                    if (draftData.data.shipping_total !== undefined) {
+                                        orderData.shipping_total = String(draftData.data.shipping_total || '0');
+                                    }
                                 } else {
                                     console.warn('OSC: fallback invoice_id fetch failed', draftData);
                                 }
@@ -291,6 +299,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                             random_title_list:       orderData.random_title_list,
                             product_name:            orderData.product_name,
                             draft_order_id:          draftOrderId,
+                            shipping_total:          orderData.shipping_total,
                         }),
                     });
                     const data = await resp.json();
@@ -447,6 +456,7 @@ function osc_ajax_create_paypal_order(): void {
     $user_define_title       = sanitize_text_field($_POST['user_define_title'] ?? '');
     $random_title_list       = sanitize_text_field($_POST['random_title_list'] ?? '');
     $product_name            = sanitize_text_field($_POST['product_name'] ?? '');
+    $shipping_total          = (float) sanitize_text_field($_POST['shipping_total'] ?? '0');
 
     // Use WC order ID as the canonical identifier wherever possible.
     // Falls back to checkout session ID only if no WC order was created yet.
@@ -473,20 +483,31 @@ function osc_ajax_create_paypal_order(): void {
     $config   = osc_get_paypal_config();
     $api_base = ($config['mode'] === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
+    $item_total = max(0, (float) $amount - $shipping_total);
+
+    $amount_breakdown = [
+        'item_total' => ['currency_code' => $currency, 'value' => number_format($item_total, 2, '.', '')],
+    ];
+
+    if ($shipping_total > 0) {
+        $amount_breakdown['shipping'] = [
+            'currency_code' => $currency,
+            'value'         => number_format($shipping_total, 2, '.', ''),
+        ];
+    }
+
     $purchase_unit = [
         'reference_id' => $canonical_id,  // WC order ID (or session ID as fallback)
         'invoice_id'   => $invoice_id,
         'amount'       => [
             'currency_code' => $currency,
             'value'         => $amount,
-            'breakdown'     => [
-                'item_total' => ['currency_code' => $currency, 'value' => $amount],
-            ],
+            'breakdown'     => $amount_breakdown,
         ],
         'items' => [[
             'name'       => $item_name,
             'sku'        => '1',  // sequential per-order item ID, resets each transaction
-            'unit_amount'=> ['currency_code' => $currency, 'value' => $amount],
+            'unit_amount'=> ['currency_code' => $currency, 'value' => number_format($item_total, 2, '.', '')],
             'quantity'   => '1',
         ]],
     ];

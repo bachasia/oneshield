@@ -287,9 +287,12 @@ function osp_ajax_create_paypal_pending_order(): void {
         ? $invoice_prefix . '-' . $wc_order_id
         : (string) $wc_order_id;
 
+    $shipping_total = number_format((float) $order->get_shipping_total(), 2, '.', '');
+
     $result = [
-        'wc_order_id' => $wc_order_id,
-        'invoice_id'  => $invoice_id,
+        'wc_order_id'    => $wc_order_id,
+        'invoice_id'     => $invoice_id,
+        'shipping_total' => $shipping_total,
     ];
 
     set_transient($transient_key, $result, 30 * MINUTE_IN_SECONDS);
