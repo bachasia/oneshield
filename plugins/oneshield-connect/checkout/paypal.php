@@ -143,7 +143,12 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 },
 
                 onClick: function() {
-                    // Keep parent iframe fullscreen for the whole popup flow.
+                    // Immediately hide the button container so they don't appear
+                    // at the top of the fullscreen iframe while PayPal popup loads.
+                    // The setInterval will take over once the SDK overlay appears.
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
+                    // Tell parent to make iframe fullscreen immediately on click.
                     setPaypalFullscreen(true);
                 },
 
