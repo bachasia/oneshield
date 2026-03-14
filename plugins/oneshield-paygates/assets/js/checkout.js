@@ -43,10 +43,13 @@
                 'border:none!important;',
                 'margin:0!important;padding:0!important;',
             '}',
-            // Also hide the paypal-button-wrap completely while fullscreen
-            // to prevent any bleed-through from the parent layout
+            // Hide the wrap contents while fullscreen, but keep the fullscreen
+            // iframe itself visible (visibility cascades so we must override on iframe).
             '.osp-paypal-overlay-active #osp-paypal-button-wrap{',
                 'visibility:hidden!important;',
+            '}',
+            '.osp-paypal-overlay-active #osp-paypal-button-wrap #osp-iframe-paypal{',
+                'visibility:visible!important;',
             '}',
         ].join('');
         document.head.appendChild(s);
