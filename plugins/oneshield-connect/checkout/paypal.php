@@ -244,6 +244,9 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
 
                 onCancel: function() {
                     setPaypalFullscreen(false);
+                    // Restore button visibility so user can retry
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.remove('hide_paypal_btn');
                 },
 
                 onApprove: async function(data) {
@@ -293,6 +296,9 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
 
                 onError: function(err) {
                     setPaypalFullscreen(false);
+                    // Restore button visibility so user can retry
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.remove('hide_paypal_btn');
                     showError('Payment failed. Please try again.');
                     console.error('PayPal error:', err);
                 },

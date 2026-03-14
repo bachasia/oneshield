@@ -29,8 +29,8 @@
     // ── Inject PayPal fullscreen iframe CSS ──────────────────────────────────
     // When paypal_overlay_open is received, make the iframe position:fixed so
     // the PayPal SDK overlay inside it expands to cover the full money-site page.
-    // PayPal buttons inside the iframe are hidden immediately in onClick (paypal.php)
-    // so they don't flash at the top while the iframe goes fullscreen.
+    // PayPal buttons inside the iframe are hidden via onClick (paypal.php) BEFORE
+    // the iframe goes fullscreen, preventing the flash-at-top-of-page bug.
     (function () {
         var s = document.createElement('style');
         s.id = 'osp-pp-fullscreen-style';
@@ -38,9 +38,15 @@
             '.osp-pp-fullscreen{',
                 'position:fixed!important;',
                 'top:0!important;left:0!important;',
-                'width:100%!important;height:100%!important;',
+                'width:100vw!important;height:100vh!important;',
                 'z-index:99999999!important;',
                 'border:none!important;',
+                'margin:0!important;padding:0!important;',
+            '}',
+            // Also hide the paypal-button-wrap completely while fullscreen
+            // to prevent any bleed-through from the parent layout
+            '.osp-paypal-overlay-active #osp-paypal-button-wrap{',
+                'visibility:hidden!important;',
             '}',
         ].join('');
         document.head.appendChild(s);
@@ -257,18 +263,20 @@
         }
 
         // PayPal SDK overlay opened inside iframe → make iframe fullscreen.
-        // PayPal buttons in the iframe are already hidden via onClick (paypal.php),
-        // so the iframe will show only the PayPal SDK overlay at fullscreen.
+        // Buttons in iframe are already hidden via onClick (paypal.php).
+        // Also add class to body to hide wrap via CSS, preventing flash.
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
+            document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
         }
 
-        // PayPal overlay gone → restore iframe to normal.
+        // PayPal overlay closed → restore iframe, remove body class, re-show wrap.
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
+            document.body.classList.remove('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(false);
             togglePayPalIframePosition();
         }
@@ -625,6 +633,8 @@
             confirmTimeoutId = null;
         }
         hideOverlay();
+        document.body.classList.remove('osp-paypal-overlay-active');
+        setPayPalIframeFullscreen(false);
         cleanupLegacyPayPalOverlay();
         // Re-apply PayPal iframe toggle in case Place Order button re-appeared
         togglePayPalIframePosition();
@@ -638,6 +648,8 @@
             confirmTimeoutId = null;
         }
         hideOverlay();
+        document.body.classList.remove('osp-paypal-overlay-active');
+        setPayPalIframeFullscreen(false);
         $('#place_order').prop('disabled', false).css('opacity', '');
     });
 
@@ -653,13 +665,17 @@
     }
 
     // ── setPayPalIframeFullscreen ─────────────────────────────────────────
-    // Toggle osp-pp-fullscreen CSS class on the iframe so the PayPal SDK
-    // overlay inside it expands to cover the full money-site viewport.
+    // Toggle osp-pp-fullscreen class on the iframe so the PayPal SDK overlay
+    // inside it expands to cover the full money-site viewport (position:fixed).
+    // Buttons are hidden by paypal.php onClick BEFORE this runs, so no flash.
     function setPayPalIframeFullscreen(open) {
         var iframe = document.getElementById('osp-iframe-paypal');
         if (!iframe) return;
         if (open) {
             iframe.classList.add('osp-pp-fullscreen');
+            // Ensure iframe scrolls to top so PayPal overlay fills viewport correctly
+            iframe.scrollIntoView({ block: 'start', behavior: 'instant' });
+            window.scrollTo(0, 0);
         } else {
             iframe.classList.remove('osp-pp-fullscreen');
             if (_lastPaypalIframeHeight > 0) {
