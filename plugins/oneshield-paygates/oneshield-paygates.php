@@ -233,6 +233,30 @@ function osp_ajax_create_paypal_pending_order(): void {
         wp_send_json_error('Order not found after creation');
     }
 
+    // Always stamp customer-entered checkout fields onto the pending order.
+    // This avoids admin/user-session defaults (e.g. "Zidoadmin") leaking into
+    // the pre-created order row.
+    $order->set_customer_id(0);
+    $order->set_billing_first_name(sanitize_text_field($_POST['billing_first_name'] ?? ''));
+    $order->set_billing_last_name(sanitize_text_field($_POST['billing_last_name'] ?? ''));
+    $order->set_billing_email(sanitize_email($_POST['billing_email'] ?? ''));
+    $order->set_billing_phone(sanitize_text_field($_POST['billing_phone'] ?? ''));
+    $order->set_billing_address_1(sanitize_text_field($_POST['billing_address_1'] ?? ''));
+    $order->set_billing_address_2(sanitize_text_field($_POST['billing_address_2'] ?? ''));
+    $order->set_billing_city(sanitize_text_field($_POST['billing_city'] ?? ''));
+    $order->set_billing_state(sanitize_text_field($_POST['billing_state'] ?? ''));
+    $order->set_billing_postcode(sanitize_text_field($_POST['billing_postcode'] ?? ''));
+    $order->set_billing_country(sanitize_text_field($_POST['billing_country'] ?? ''));
+
+    $order->set_shipping_first_name(sanitize_text_field($_POST['shipping_first_name'] ?? ($_POST['billing_first_name'] ?? '')));
+    $order->set_shipping_last_name(sanitize_text_field($_POST['shipping_last_name'] ?? ($_POST['billing_last_name'] ?? '')));
+    $order->set_shipping_address_1(sanitize_text_field($_POST['shipping_address_1'] ?? ($_POST['billing_address_1'] ?? '')));
+    $order->set_shipping_address_2(sanitize_text_field($_POST['shipping_address_2'] ?? ($_POST['billing_address_2'] ?? '')));
+    $order->set_shipping_city(sanitize_text_field($_POST['shipping_city'] ?? ($_POST['billing_city'] ?? '')));
+    $order->set_shipping_state(sanitize_text_field($_POST['shipping_state'] ?? ($_POST['billing_state'] ?? '')));
+    $order->set_shipping_postcode(sanitize_text_field($_POST['shipping_postcode'] ?? ($_POST['billing_postcode'] ?? '')));
+    $order->set_shipping_country(sanitize_text_field($_POST['shipping_country'] ?? ($_POST['billing_country'] ?? '')));
+
     $order->set_payment_method('os_paypal');
     $order->set_payment_method_title('PayPal');
     $order->update_meta_data('_osp_checkout_session_id', $checkout_session_id);
