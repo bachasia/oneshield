@@ -26,7 +26,23 @@
     var ajaxUrl        = ospData.ajax_url || '';
     var sendBillingGws = ospData.send_billing_gateways || [];
 
-    // Legacy cleanup only (no fullscreen CSS injected — PayPal opens native popup via allow-popups-to-escape-sandbox)
+    // ── Inject PayPal fullscreen CSS ────────────────────────────────────────
+    // When PayPal SDK overlay is detected inside iframe, parent makes iframe
+    // position:fixed to cover the full viewport (same as zaniolo.shop method).
+    (function () {
+        var s = document.createElement('style');
+        s.id = 'osp-pp-fullscreen-style';
+        s.textContent = [
+            '.osp-pp-fullscreen{',
+                'position:fixed!important;',
+                'top:0!important;left:0!important;',
+                'width:100%!important;height:100%!important;',
+                'z-index:99999999!important;',
+                'border:none!important;',
+            '}',
+        ].join('');
+        document.head.appendChild(s);
+    })();
 
     function cleanupLegacyPayPalOverlay() {
         var legacyOverlay = document.getElementById('osp-pp-fs');
@@ -52,9 +68,9 @@
     var isConfirming = false;
     var confirmTimeoutId = null;
 
-    // PayPal popup opens natively via allow-popups-to-escape-sandbox.
-    // No fullscreen iframe tracking needed.
-    var _isPaypalOverlayOpen = false; // kept for backward compat, always false
+    // Tracks whether PayPal SDK overlay is active inside the iframe.
+    // While true: iframe is position:fixed fullscreen, togglePayPalIframePosition is frozen.
+    var _isPaypalOverlayOpen = false;
 
     // ── Loading overlay ─────────────────────────────────────────────────────
 
@@ -238,12 +254,18 @@
             }
         }
 
-        // PayPal overlay messages — ignored. PayPal opens a native popup via
-        // allow-popups-to-escape-sandbox; no fullscreen iframe manipulation needed.
-        if (msg.action === 'paypal_overlay_open' || msg.action === 'paypal_overlay_close') {
+        // PayPal SDK overlay opened inside iframe → make iframe fullscreen.
+        if (msg.action === 'paypal_overlay_open') {
+            cleanupLegacyPayPalOverlay();
+            _isPaypalOverlayOpen = true;
+            setPayPalIframeFullscreen(true);
+        }
+
+        // PayPal overlay gone → restore iframe.
+        if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
-            // Re-apply visibility so Place Order / PayPal wrap stay correct.
+            setPayPalIframeFullscreen(false);
             togglePayPalIframePosition();
         }
 
@@ -626,10 +648,23 @@
             .replace(/>/g, '&gt;');
     }
 
-    // ── setPayPalIframeFullscreen: NO-OP ─────────────────────────────────────
-    // PayPal SDK opens a native browser popup via allow-popups-to-escape-sandbox.
-    // No iframe reparenting or position:fixed manipulation is needed or wanted.
-    // This stub exists only so any residual calls do not throw a ReferenceError.
-    function setPayPalIframeFullscreen() { /* intentionally empty */ }
+    // ── setPayPalIframeFullscreen ────────────────────────────────────────────
+    // Toggles the osp-pp-fullscreen CSS class on the iframe.
+    // The class sets position:fixed so the iframe covers the full viewport,
+    // creating the dark overlay effect (PayPal SDK injects its own dark bg
+    // inside the iframe). No DOM reparenting — same approach as zaniolo.shop.
+    function setPayPalIframeFullscreen(open) {
+        var iframe = document.getElementById('osp-iframe-paypal');
+        if (!iframe) return;
+        if (open) {
+            iframe.classList.add('osp-pp-fullscreen');
+        } else {
+            iframe.classList.remove('osp-pp-fullscreen');
+            // Restore last known height
+            if (_lastPaypalIframeHeight > 0) {
+                iframe.style.height = _lastPaypalIframeHeight + 'px';
+            }
+        }
+    }
 
 })(jQuery);

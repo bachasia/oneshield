@@ -126,8 +126,10 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             };
 
             function setPaypalFullscreen(open) {
-                // No-op: PayPal opens a native popup via allow-popups-to-escape-sandbox.
-                // The fullscreen iframe approach has been removed from checkout.js.
+                window.parent.postMessage({
+                    source: 'oneshield-connect',
+                    action: open ? 'paypal_overlay_open' : 'paypal_overlay_close',
+                }, '*');
             }
 
             paypal.Buttons({
@@ -329,8 +331,22 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 }
             }, 50);
 
-            // PayPal opens a native popup window — no overlay detection needed.
+            // Poll for PayPal SDK overlay injected inside this iframe.
+            // When detected, tell parent to make iframe fullscreen (covers money site with dark overlay).
+            // This is the same technique used by zaniolo.shop / mecom-payment-proxy.
+            var _ppOverlayActive = false;
+            setInterval(function() {
+                var overlayOpen = !!document.querySelector('[id*="paypal-overlay-uid"]');
+                if (overlayOpen && !_ppOverlayActive) {
+                    _ppOverlayActive = true;
+                    setPaypalFullscreen(true);
+                } else if (!overlayOpen && _ppOverlayActive) {
+                    _ppOverlayActive = false;
+                    setPaypalFullscreen(false);
+                }
+            }, 50);
         })();
+
         </script>
     </body>
     </html>
