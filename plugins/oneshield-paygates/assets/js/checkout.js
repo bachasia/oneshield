@@ -359,9 +359,10 @@
                         source:   'oneshield-paygates',
                         action:   'oneshield-pending-order-ready',
                         success:  !!(resp && resp.success),
-                        wc_order_id: resp && resp.data ? resp.data.wc_order_id : '',
-                        invoice_id:  resp && resp.data ? resp.data.invoice_id  : '',
-                        message:  resp && !resp.success ? (resp.data || 'create pending order failed') : '',
+                        wc_order_id:   resp && resp.data ? resp.data.wc_order_id   : '',
+                        invoice_id:    resp && resp.data ? resp.data.invoice_id    : '',
+                        shipping_total: resp && resp.data ? resp.data.shipping_total : '',
+                        message:       resp && !resp.success ? (resp.data || 'create pending order failed') : '',
                     };
                     console.log('[OSP] sending oneshield-pending-order-ready reply:', reply);
                     event.source.postMessage(reply, '*');
