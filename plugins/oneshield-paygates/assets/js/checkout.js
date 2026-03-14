@@ -26,26 +26,24 @@
     var ajaxUrl        = ospData.ajax_url || '';
     var sendBillingGws = ospData.send_billing_gateways || [];
 
-    // ── Inject PayPal dark overlay (parent-side div) ─────────────────────────
-    // A semi-transparent dark div injected directly into the money site page.
-    // Shown immediately when paypal_overlay_open is received — covers the entire
-    // viewport including the iframe, so PayPal buttons inside iframe are never
-    // visible at the top of the page during popup load.
+    // ── Inject PayPal fullscreen iframe CSS ──────────────────────────────────
+    // When paypal_overlay_open is received, make the iframe position:fixed so
+    // the PayPal SDK overlay inside it expands to cover the full money-site page.
+    // PayPal buttons inside the iframe are hidden immediately in onClick (paypal.php)
+    // so they don't flash at the top while the iframe goes fullscreen.
     (function () {
         var s = document.createElement('style');
-        s.id = 'osp-pp-overlay-style';
-        s.textContent = '#osp-pp-dark-overlay{display:none;position:fixed;inset:0;z-index:99999998;background:rgba(0,0,0,0.65);}';
+        s.id = 'osp-pp-fullscreen-style';
+        s.textContent = [
+            '.osp-pp-fullscreen{',
+                'position:fixed!important;',
+                'top:0!important;left:0!important;',
+                'width:100%!important;height:100%!important;',
+                'z-index:99999999!important;',
+                'border:none!important;',
+            '}',
+        ].join('');
         document.head.appendChild(s);
-
-        var overlay = document.createElement('div');
-        overlay.id = 'osp-pp-dark-overlay';
-        if (document.body) {
-            document.body.appendChild(overlay);
-        } else {
-            document.addEventListener('DOMContentLoaded', function() {
-                document.body.appendChild(overlay);
-            });
-        }
     })();
 
     function cleanupLegacyPayPalOverlay() {
@@ -258,29 +256,22 @@
             }
         }
 
-        // PayPal SDK overlay opened inside iframe → show dark overlay on parent page
-        // and hide the iframe so it cannot show through the overlay.
+        // PayPal SDK overlay opened inside iframe → make iframe fullscreen.
+        // PayPal buttons in the iframe are already hidden via onClick (paypal.php),
+        // so the iframe will show only the PayPal SDK overlay at fullscreen.
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
-            var darkOverlay = document.getElementById('osp-pp-dark-overlay');
-            if (darkOverlay) darkOverlay.style.display = 'block';
-            // Hide iframe so it cannot bleed through the overlay
-            var ppIframe = document.getElementById('osp-iframe-paypal');
-            if (ppIframe) ppIframe.style.visibility = 'hidden';
+            setPayPalIframeFullscreen(true);
         }
 
-        // PayPal overlay gone → hide parent dark overlay, restore iframe.
+        // PayPal overlay gone → restore iframe to normal.
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
-            var darkOverlay = document.getElementById('osp-pp-dark-overlay');
-            if (darkOverlay) darkOverlay.style.display = 'none';
-            var ppIframe = document.getElementById('osp-iframe-paypal');
-            if (ppIframe) ppIframe.style.visibility = '';
+            setPayPalIframeFullscreen(false);
             togglePayPalIframePosition();
         }
-
 
         // Iframe asks parent (Money Site) to create pending WC order and return
         // wc_order_id + invoice_id before calling PayPal createOrder.
@@ -661,9 +652,20 @@
             .replace(/>/g, '&gt;');
     }
 
-    // ── setPayPalIframeFullscreen: NO-OP ────────────────────────────────────────
-    // The dark overlay is now a separate div on the parent page (not iframe CSS).
-    // This stub is kept so no ReferenceError is thrown by any residual callers.
-    function setPayPalIframeFullscreen() { /* no-op */ }
+    // ── setPayPalIframeFullscreen ─────────────────────────────────────────
+    // Toggle osp-pp-fullscreen CSS class on the iframe so the PayPal SDK
+    // overlay inside it expands to cover the full money-site viewport.
+    function setPayPalIframeFullscreen(open) {
+        var iframe = document.getElementById('osp-iframe-paypal');
+        if (!iframe) return;
+        if (open) {
+            iframe.classList.add('osp-pp-fullscreen');
+        } else {
+            iframe.classList.remove('osp-pp-fullscreen');
+            if (_lastPaypalIframeHeight > 0) {
+                iframe.style.height = _lastPaypalIframeHeight + 'px';
+            }
+        }
+    }
 
 })(jQuery);
