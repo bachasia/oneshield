@@ -111,6 +111,26 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 if (msg.wc_order_id) _wcOrderId = String(msg.wc_order_id);
                 if (msg.invoice_id)  _invoiceId  = String(msg.invoice_id);
             });
+
+            // When parent stretches iframe to fullscreen, stretch html+body so
+            // the PayPal SDK dark overlay (position:fixed inside iframe) fills
+            // the entire iframe viewport instead of just the button height.
+            window.addEventListener('message', function(event) {
+                var msg = event.data;
+                if (!msg || msg.source !== 'oneshield-paygates' || msg.action !== 'osp-iframe-fullscreen') return;
+                if (msg.open) {
+                    document.documentElement.style.height = '100%';
+                    document.documentElement.style.minHeight = '100vh';
+                    document.body.style.height = '100%';
+                    document.body.style.minHeight = '100vh';
+                } else {
+                    document.documentElement.style.height = '';
+                    document.documentElement.style.minHeight = '';
+                    document.body.style.height = '';
+                    document.body.style.minHeight = '';
+                }
+            });
+
             const orderData = {
                 order_id:                '<?php echo esc_js($order_id); ?>',
                 token:                   '<?php echo esc_js($token); ?>',

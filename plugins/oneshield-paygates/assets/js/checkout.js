@@ -270,6 +270,16 @@
             _isPaypalOverlayOpen = true;
             document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
+            // Tell iframe to stretch its body to 100vh so the PayPal SDK dark
+            // overlay (position:fixed inside iframe) fills the entire iframe viewport.
+            var ppIframe = document.getElementById('osp-iframe-paypal');
+            if (ppIframe && ppIframe.contentWindow) {
+                ppIframe.contentWindow.postMessage({
+                    source: 'oneshield-paygates',
+                    action: 'osp-iframe-fullscreen',
+                    open:   true,
+                }, '*');
+            }
         }
 
         // PayPal overlay closed → restore iframe, remove body class, re-show wrap.
@@ -278,6 +288,15 @@
             _isPaypalOverlayOpen = false;
             document.body.classList.remove('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(false);
+            // Tell iframe to restore its body height
+            var ppIframe = document.getElementById('osp-iframe-paypal');
+            if (ppIframe && ppIframe.contentWindow) {
+                ppIframe.contentWindow.postMessage({
+                    source: 'oneshield-paygates',
+                    action: 'osp-iframe-fullscreen',
+                    open:   false,
+                }, '*');
+            }
             togglePayPalIframePosition();
         }
 
