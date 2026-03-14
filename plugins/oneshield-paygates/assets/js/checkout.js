@@ -258,24 +258,29 @@
             }
         }
 
-        // PayPal SDK overlay opened inside iframe → show dark overlay on parent page.
-        // This instantly covers the entire viewport (including the iframe) so PayPal
-        // buttons inside the iframe are never visible at the top during load.
+        // PayPal SDK overlay opened inside iframe → show dark overlay on parent page
+        // and hide the iframe so it cannot show through the overlay.
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
             var darkOverlay = document.getElementById('osp-pp-dark-overlay');
             if (darkOverlay) darkOverlay.style.display = 'block';
+            // Hide iframe so it cannot bleed through the overlay
+            var ppIframe = document.getElementById('osp-iframe-paypal');
+            if (ppIframe) ppIframe.style.visibility = 'hidden';
         }
 
-        // PayPal overlay gone → hide parent dark overlay.
+        // PayPal overlay gone → hide parent dark overlay, restore iframe.
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
             var darkOverlay = document.getElementById('osp-pp-dark-overlay');
             if (darkOverlay) darkOverlay.style.display = 'none';
+            var ppIframe = document.getElementById('osp-iframe-paypal');
+            if (ppIframe) ppIframe.style.visibility = '';
             togglePayPalIframePosition();
         }
+
 
         // Iframe asks parent (Money Site) to create pending WC order and return
         // wc_order_id + invoice_id before calling PayPal createOrder.
