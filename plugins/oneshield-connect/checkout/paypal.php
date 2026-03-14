@@ -50,6 +50,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 min-height: 0;
             }
             #paypal-button-container { min-height: 45px; }
+            #paypal-button-container.hide_paypal_btn { display: none !important; }
             #error-message {
                 color: #dc2626;
                 font-size: 13px;
@@ -340,9 +341,13 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 if (overlayOpen && !_ppOverlayActive) {
                     _ppOverlayActive = true;
                     setPaypalFullscreen(true);
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
                 } else if (!overlayOpen && _ppOverlayActive) {
                     _ppOverlayActive = false;
                     setPaypalFullscreen(false);
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.remove('hide_paypal_btn');
                 }
             }, 50);
         })();
