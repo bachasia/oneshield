@@ -248,10 +248,6 @@
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
-            // Explicitly hide wrap + Place Order while overlay is open so the
-            // setInterval freeze (above) doesn't leave stale visible elements.
-            $('#osp-paypal-button-wrap').hide();
-            $('#place_order').hide();
             setPayPalIframeFullscreen(true);
         }
 
@@ -645,9 +641,14 @@
             .replace(/>/g, '&gt;');
     }
 
-    // ── PayPal fullscreen iframe (competitor-style) ─────────────────────────
+    // ── PayPal fullscreen iframe (reparent-to-body approach) ──────────────────
+    // When PayPal overlay opens, the iframe is moved to <body> (direct child)
+    // so that position:fixed works independently of any ancestor display:none.
+    // Without reparenting, display:none on the wrap would hide the fixed iframe too.
 
-    var _ppAncestorRestore = [];
+    var _ppAncestorRestore      = [];
+    var _ppIframeOriginalParent = null;
+    var _ppIframeNextSibling    = null;
 
     function relaxPayPalIframeAncestors(iframe) {
         if (_ppAncestorRestore.length) return;
@@ -706,9 +707,27 @@
     function setPayPalIframeFullscreen(open) {
         var iframe = document.getElementById('osp-iframe-paypal');
         if (!iframe) return;
+
         if (open) {
+            // Step 1: Reparent iframe to <body> BEFORE adding fullscreen class.
+            // This makes position:fixed relative to viewport without any ancestor interference.
+            // (display:none on a parent would hide fixed children — reparenting avoids this.)
+            if (!_ppIframeOriginalParent) {
+                _ppIframeOriginalParent = iframe.parentElement;
+                _ppIframeNextSibling    = iframe.nextSibling;
+                document.body.appendChild(iframe);
+
+                // Now safe to hide the empty wrap (iframe is no longer inside it).
+                var wrap = document.getElementById('osp-paypal-button-wrap');
+                if (wrap) wrap.style.display = 'none';
+                // Keep Place Order hidden too
+                var placeOrder = document.getElementById('place_order');
+                if (placeOrder) placeOrder.style.display = 'none';
+            }
+
             relaxPayPalIframeAncestors(iframe);
             iframe.classList.add('osp-pp-fullscreen');
+
         } else {
             iframe.classList.remove('osp-pp-fullscreen');
             restorePayPalIframeAncestors();
