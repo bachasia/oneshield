@@ -173,12 +173,15 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height:  45,
                 },
 
-                onClick: function() {
-                    // Do NOT hide buttons or go fullscreen here — onClick fires for
-                    // every button (PayPal, Debit/Credit card, etc.). Fullscreen is
-                    // triggered only when the PayPal SDK actually opens its popup
-                    // overlay (paypal_overlay_open postMessage), which does NOT happen
-                    // for the inline "Pay with Debit or Credit Card" flow.
+                onClick: function(data) {
+                    // Only go fullscreen for PayPal button (opens a popup overlay).
+                    // "Pay with Debit or Credit Card" (card, paylater, etc.) renders
+                    // inline inside the iframe — no fullscreen needed, iframe auto-resizes.
+                    if (data && data.fundingSource === 'paypal') {
+                        var btnContainer = document.getElementById('paypal-button-container');
+                        if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
+                        setPaypalFullscreen(true);
+                    }
                 },
 
                 createOrder: async function() {
