@@ -205,6 +205,26 @@ function osp_ajax_create_paypal_pending_order(): void {
         }
     }
 
+    // Mutex lock: prevent race condition where two concurrent requests both pass the
+    // cache check above before either has written the result. Use a short-lived transient
+    // as a lightweight advisory lock. If we can't acquire the lock, wait briefly and
+    // re-check the result cache — the other request will have written it by then.
+    $lock_key = 'osp_pp_lock_' . md5($checkout_session_id);
+    if (!get_transient($lock_key)) {
+        set_transient($lock_key, 1, 10); // Lock TTL: 10 seconds
+    } else {
+        // Another request is creating the order — wait and re-check cache.
+        usleep(600000); // 600ms
+        $cached = get_transient($transient_key);
+        if ($cached && !empty($cached['wc_order_id'])) {
+            $existing = wc_get_order((int) $cached['wc_order_id']);
+            if ($existing && in_array($existing->get_status(), ['pending', 'on-hold'], true)) {
+                wp_send_json_success($cached);
+            }
+        }
+        // If still not cached, fall through and create (last-resort safety)
+    }
+
     // Get invoice_prefix
     $gw             = osp_get_gateway_instance('paypal');
     $invoice_prefix = $gw ? $gw->get_option('invoice_prefix', '') : '';
@@ -273,6 +293,7 @@ function osp_ajax_create_paypal_pending_order(): void {
     ];
 
     set_transient($transient_key, $result, 30 * MINUTE_IN_SECONDS);
+    delete_transient($lock_key); // Release mutex — other requests can now read cache
 
     wp_send_json_success($result);
 }
