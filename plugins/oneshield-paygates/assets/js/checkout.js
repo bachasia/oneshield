@@ -26,12 +26,7 @@
     var ajaxUrl        = ospData.ajax_url || '';
     var sendBillingGws = ospData.send_billing_gateways || [];
 
-    // ── Inject PayPal fullscreen CSS immediately ────────────────────────────
-    (function () {
-        var s = document.createElement('style');
-        s.textContent = '.osp-pp-fullscreen{position:fixed!important;z-index:99999!important;top:0!important;left:0!important;width:100%!important;height:100vh!important;}#osp-pp-fs,#osp-pp-fs-style{display:none!important;}';
-        document.head.appendChild(s);
-    })();
+    // Legacy cleanup only (no fullscreen CSS injected — PayPal opens native popup via allow-popups-to-escape-sandbox)
 
     function cleanupLegacyPayPalOverlay() {
         var legacyOverlay = document.getElementById('osp-pp-fs');
@@ -57,10 +52,9 @@
     var isConfirming = false;
     var confirmTimeoutId = null;
 
-    // Track whether PayPal popup overlay is currently open/fullscreen.
-    // While true, togglePayPalIframePosition must NOT run — it would
-    // make #osp-paypal-button-wrap re-appear at the top of the page.
-    var _isPaypalOverlayOpen = false;
+    // PayPal popup opens natively via allow-popups-to-escape-sandbox.
+    // No fullscreen iframe tracking needed.
+    var _isPaypalOverlayOpen = false; // kept for backward compat, always false
 
     // ── Loading overlay ─────────────────────────────────────────────────────
 
@@ -244,19 +238,12 @@
             }
         }
 
-        // PayPal overlay detected inside iframe — make iframe fullscreen.
-        if (msg.action === 'paypal_overlay_open') {
-            cleanupLegacyPayPalOverlay();
-            _isPaypalOverlayOpen = true;
-            setPayPalIframeFullscreen(true);
-        }
-
-        // PayPal overlay gone — restore iframe to normal.
-        if (msg.action === 'paypal_overlay_close') {
+        // PayPal overlay messages — ignored. PayPal opens a native popup via
+        // allow-popups-to-escape-sandbox; no fullscreen iframe manipulation needed.
+        if (msg.action === 'paypal_overlay_open' || msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
-            setPayPalIframeFullscreen(false);
-            // Re-apply visibility now that overlay is gone.
+            // Re-apply visibility so Place Order / PayPal wrap stay correct.
             togglePayPalIframePosition();
         }
 
@@ -606,15 +593,13 @@
         state.paypal.confirmed = false;
         state.paypal.txnId     = '';
         isConfirming = false;
-        _isPaypalOverlayOpen = false; // Safety reset in case overlay closed without postMessage
+        _isPaypalOverlayOpen = false;
         if (confirmTimeoutId) {
             clearTimeout(confirmTimeoutId);
             confirmTimeoutId = null;
         }
         hideOverlay();
         cleanupLegacyPayPalOverlay();
-        // Always restore PayPal iframe to normal size
-        setPayPalIframeFullscreen(false);
         // Re-apply PayPal iframe toggle in case Place Order button re-appeared
         togglePayPalIframePosition();
     });
@@ -641,115 +626,10 @@
             .replace(/>/g, '&gt;');
     }
 
-    // ── PayPal fullscreen iframe (reparent-to-body approach) ──────────────────
-    // When PayPal overlay opens, the iframe is moved to <body> (direct child)
-    // so that position:fixed works independently of any ancestor display:none.
-    // Without reparenting, display:none on the wrap would hide the fixed iframe too.
-
-    var _ppAncestorRestore      = [];
-    var _ppIframeOriginalParent = null;
-    var _ppIframeNextSibling    = null;
-
-    function relaxPayPalIframeAncestors(iframe) {
-        if (_ppAncestorRestore.length) return;
-
-        var node = iframe.parentElement;
-        while (node && node !== document.documentElement) {
-            _ppAncestorRestore.push({
-                el: node,
-                overflow: node.style.getPropertyValue('overflow'),
-                overflowPriority: node.style.getPropertyPriority('overflow'),
-                overflowX: node.style.getPropertyValue('overflow-x'),
-                overflowXPriority: node.style.getPropertyPriority('overflow-x'),
-                overflowY: node.style.getPropertyValue('overflow-y'),
-                overflowYPriority: node.style.getPropertyPriority('overflow-y'),
-                transform: node.style.getPropertyValue('transform'),
-                transformPriority: node.style.getPropertyPriority('transform'),
-                contain: node.style.getPropertyValue('contain'),
-                containPriority: node.style.getPropertyPriority('contain')
-            });
-
-            node.style.setProperty('overflow', 'visible', 'important');
-            node.style.setProperty('overflow-x', 'visible', 'important');
-            node.style.setProperty('overflow-y', 'visible', 'important');
-            node.style.setProperty('transform', 'none', 'important');
-            node.style.setProperty('contain', 'none', 'important');
-
-            node = node.parentElement;
-        }
-    }
-
-    function restorePayPalIframeAncestors() {
-        if (!_ppAncestorRestore.length) return;
-
-        _ppAncestorRestore.forEach(function (item) {
-            if (!item.el) return;
-
-            if (item.overflow) item.el.style.setProperty('overflow', item.overflow, item.overflowPriority || '');
-            else item.el.style.removeProperty('overflow');
-
-            if (item.overflowX) item.el.style.setProperty('overflow-x', item.overflowX, item.overflowXPriority || '');
-            else item.el.style.removeProperty('overflow-x');
-
-            if (item.overflowY) item.el.style.setProperty('overflow-y', item.overflowY, item.overflowYPriority || '');
-            else item.el.style.removeProperty('overflow-y');
-
-            if (item.transform) item.el.style.setProperty('transform', item.transform, item.transformPriority || '');
-            else item.el.style.removeProperty('transform');
-
-            if (item.contain) item.el.style.setProperty('contain', item.contain, item.containPriority || '');
-            else item.el.style.removeProperty('contain');
-        });
-
-        _ppAncestorRestore = [];
-    }
-
-    function setPayPalIframeFullscreen(open) {
-        var iframe = document.getElementById('osp-iframe-paypal');
-        if (!iframe) return;
-
-        if (open) {
-            // Step 1: Reparent iframe to <body> BEFORE adding fullscreen class.
-            // This makes position:fixed relative to viewport without any ancestor interference.
-            // (display:none on a parent would hide fixed children — reparenting avoids this.)
-            if (!_ppIframeOriginalParent) {
-                _ppIframeOriginalParent = iframe.parentElement;
-                _ppIframeNextSibling    = iframe.nextSibling;
-                document.body.appendChild(iframe);
-
-                // Now safe to hide the empty wrap (iframe is no longer inside it).
-                var wrap = document.getElementById('osp-paypal-button-wrap');
-                if (wrap) wrap.style.display = 'none';
-                // Keep Place Order hidden too
-                var placeOrder = document.getElementById('place_order');
-                if (placeOrder) placeOrder.style.display = 'none';
-            }
-
-            relaxPayPalIframeAncestors(iframe);
-            iframe.classList.add('osp-pp-fullscreen');
-
-        } else {
-            iframe.classList.remove('osp-pp-fullscreen');
-            restorePayPalIframeAncestors();
-
-            // Reparent iframe back to original position in DOM.
-            // Without this the iframe stays as a direct body child (outside
-            // the payment wrap) and renders at the wrong position on screen.
-            if (_ppIframeOriginalParent) {
-                if (_ppIframeNextSibling && _ppIframeNextSibling.parentElement === _ppIframeOriginalParent) {
-                    _ppIframeOriginalParent.insertBefore(iframe, _ppIframeNextSibling);
-                } else {
-                    _ppIframeOriginalParent.appendChild(iframe);
-                }
-                _ppIframeOriginalParent = null;
-                _ppIframeNextSibling    = null;
-            }
-
-            // Restore iframe height to last known value
-            if (_lastPaypalIframeHeight > 0) {
-                iframe.style.height = _lastPaypalIframeHeight + 'px';
-            }
-        }
-    }
+    // ── setPayPalIframeFullscreen: NO-OP ─────────────────────────────────────
+    // PayPal SDK opens a native browser popup via allow-popups-to-escape-sandbox.
+    // No iframe reparenting or position:fixed manipulation is needed or wanted.
+    // This stub exists only so any residual calls do not throw a ReferenceError.
+    function setPayPalIframeFullscreen() { /* intentionally empty */ }
 
 })(jQuery);

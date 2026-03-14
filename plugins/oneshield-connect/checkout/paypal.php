@@ -126,10 +126,8 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             };
 
             function setPaypalFullscreen(open) {
-                window.parent.postMessage({
-                    source: 'oneshield-connect',
-                    action: open ? 'paypal_overlay_open' : 'paypal_overlay_close',
-                }, '*');
+                // No-op: PayPal opens a native popup via allow-popups-to-escape-sandbox.
+                // The fullscreen iframe approach has been removed from checkout.js.
             }
 
             paypal.Buttons({
@@ -331,15 +329,7 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 }
             }, 50);
 
-            // PayPal SDK injects paypal-overlay-uid-* into this iframe during
-            // popup/card flow. Force fullscreen while detected, but do not send
-            // auto-close here to avoid flicker; close is handled by callbacks.
-            setInterval(function() {
-                var overlayOpen = !!document.querySelector('[id*="paypal-overlay-uid"]');
-                if (overlayOpen) {
-                    setPaypalFullscreen(true);
-                }
-            }, 50);
+            // PayPal opens a native popup window — no overlay detection needed.
         })();
         </script>
     </body>
