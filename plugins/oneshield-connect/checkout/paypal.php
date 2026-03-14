@@ -112,24 +112,6 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 if (msg.invoice_id)  _invoiceId  = String(msg.invoice_id);
             });
 
-            // When parent stretches iframe to fullscreen, stretch html+body so
-            // the PayPal SDK dark overlay (position:fixed inside iframe) fills
-            // the entire iframe viewport instead of just the button height.
-            window.addEventListener('message', function(event) {
-                var msg = event.data;
-                if (!msg || msg.source !== 'oneshield-paygates' || msg.action !== 'osp-iframe-fullscreen') return;
-                if (msg.open) {
-                    document.documentElement.style.height = '100%';
-                    document.documentElement.style.minHeight = '100vh';
-                    document.body.style.height = '100%';
-                    document.body.style.minHeight = '100vh';
-                } else {
-                    document.documentElement.style.height = '';
-                    document.documentElement.style.minHeight = '';
-                    document.body.style.height = '';
-                    document.body.style.minHeight = '';
-                }
-            });
 
             const orderData = {
                 order_id:                '<?php echo esc_js($order_id); ?>',
@@ -147,6 +129,20 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             };
 
             function setPaypalFullscreen(open) {
+                // Stretch/restore html+body so PayPal SDK overlay (position:fixed)
+                // fills the entire iframe viewport when fullscreen.
+                if (open) {
+                    document.documentElement.style.height    = '100%';
+                    document.documentElement.style.minHeight = '100vh';
+                    document.body.style.height               = '100%';
+                    document.body.style.minHeight            = '100vh';
+                    document.body.style.background           = 'transparent';
+                } else {
+                    document.documentElement.style.height    = '';
+                    document.documentElement.style.minHeight = '';
+                    document.body.style.height               = '';
+                    document.body.style.minHeight            = '';
+                }
                 window.parent.postMessage({
                     source: 'oneshield-connect',
                     action: open ? 'paypal_overlay_open' : 'paypal_overlay_close',
@@ -162,14 +158,45 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height:  45,
                 },
 
-                onClick: function() {
-                    // Immediately hide the button container so they don't appear
-                    // at the top of the fullscreen iframe while PayPal popup loads.
-                    // The setInterval will take over once the SDK overlay appears.
-                    var btnContainer = document.getElementById('paypal-button-container');
-                    if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
-                    // Tell parent to make iframe fullscreen immediately on click.
-                    setPaypalFullscreen(true);
+                onClick: function(data, actions) {
+                    // Ask the parent (Money Site) to validate the WC checkout form
+                    // before opening the PayPal popup. If validation fails, reject
+                    // so the popup never opens and errors are shown on the page.
+                    return new Promise(function(resolve, reject) {
+                        var done = false;
+                        var timer = setTimeout(function() {
+                            if (done) return;
+                            done = true;
+                            window.removeEventListener('message', onValidateMsg);
+                            // Timeout — allow through (WC will catch missing fields on submit)
+                            resolve();
+                        }, 5000);
+
+                        function onValidateMsg(event) {
+                            var msg = event.data;
+                            if (!msg || msg.source !== 'oneshield-paygates' || msg.action !== 'oneshield-validate-result') return;
+                            if (done) return;
+                            done = true;
+                            clearTimeout(timer);
+                            window.removeEventListener('message', onValidateMsg);
+                            if (msg.valid) {
+                                var btnContainer = document.getElementById('paypal-button-container');
+                                if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
+                                setPaypalFullscreen(true);
+                                resolve();
+                            } else {
+                                setPaypalFullscreen(false);
+                                reject();
+                            }
+                        }
+
+                        window.addEventListener('message', onValidateMsg);
+                        window.parent.postMessage({
+                            source:  'oneshield-connect',
+                            action:  'oneshield-validate-checkout',
+                            gateway: 'paypal',
+                        }, '*');
+                    });
                 },
 
                 createOrder: async function() {

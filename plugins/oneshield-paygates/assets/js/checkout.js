@@ -336,6 +336,64 @@
                 });
         }
 
+        // Iframe asks parent to validate the WC checkout form before opening PayPal popup.
+        // We trigger WC's own checkout validation by temporarily clicking Place Order,
+        // intercepting any validation errors, then reply with valid: true/false.
+        if (msg.action === 'oneshield-validate-checkout' && msg.gateway === 'paypal') {
+            var $form     = $('form.checkout, form#order_review');
+            var $iframe   = $(getIframe('paypal'));
+            var iframeSrc = $iframe[0] || null;
+
+            // Use WC's built-in checkout_place_order validation pipeline:
+            // trigger the form's submit event with WC validation hooks enabled,
+            // but intercept it before it actually submits.
+            var validationErrors = [];
+            var $required = $form.find('.validate-required');
+            var valid = true;
+
+            $required.each(function() {
+                var $field = $(this);
+                var $input = $field.find('input, select, textarea').first();
+                if (!$input.length) return;
+                var val = $input.val();
+                if (val === null || val === undefined || String(val).trim() === '' || val === 'undefined') {
+                    valid = false;
+                    $field.addClass('woocommerce-invalid woocommerce-invalid-required-field');
+                    $field.removeClass('woocommerce-validated');
+                } else {
+                    $field.addClass('woocommerce-validated');
+                    $field.removeClass('woocommerce-invalid woocommerce-invalid-required-field');
+                }
+            });
+
+            // Also validate email format
+            var $emailField = $form.find('[name="billing_email"]');
+            if ($emailField.length) {
+                var emailVal = $emailField.val() || '';
+                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(emailVal)) {
+                    valid = false;
+                    $emailField.closest('.validate-required, .form-row').addClass('woocommerce-invalid woocommerce-invalid-required-field');
+                }
+            }
+
+            if (!valid) {
+                // Scroll to first invalid field
+                var $firstInvalid = $form.find('.woocommerce-invalid').first();
+                if ($firstInvalid.length) {
+                    $('html, body').animate({ scrollTop: $firstInvalid.offset().top - 120 }, 300);
+                }
+            }
+
+            if (iframeSrc) {
+                event.source.postMessage({
+                    source:  'oneshield-paygates',
+                    action:  'oneshield-validate-result',
+                    valid:   valid,
+                }, '*');
+            }
+        }
+
         // When iframe Stripe Elements is ready, push billing_country immediately
         // so the Payment Element can use it in confirmPayment billing_details.
         // This runs before the user clicks Place Order, giving the iframe the
