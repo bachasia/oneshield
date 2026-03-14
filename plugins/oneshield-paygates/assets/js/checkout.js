@@ -202,15 +202,17 @@
         var $placeOrder = $('#place_order');
         var $ppWrap     = $('#osp-paypal-button-wrap');
 
-        // Always show Place Order — WC validates the form on click.
-        $placeOrder.show();
-
-        if (gateway === 'paypal' && $ppWrap.length) {
-            // Keep iframe in DOM and loaded (so postMessage works), but visually hidden.
-            // Use visibility+height instead of display:none so the iframe loads normally.
-            $ppWrap.css({ visibility: 'hidden', height: '0', overflow: 'hidden', 'margin-top': '0' });
+        if (gateway === 'paypal') {
+            if ($ppWrap.length) {
+                // Hide Place Order, show the native PayPal button iframe instead.
+                $placeOrder.hide();
+                $ppWrap.css({ visibility: '', height: '', overflow: '', 'margin-top': '' }).show();
+            } else {
+                // Iframe not rendered (API error) — fall back to Place Order.
+                $placeOrder.show();
+            }
         } else {
-            $ppWrap.css({ visibility: '', height: '', overflow: '', 'margin-top': '' });
+            $placeOrder.show();
             $ppWrap.hide();
         }
     }
@@ -261,8 +263,6 @@
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
-            // Make wrap visible so fullscreen iframe is seen
-            $('#osp-paypal-button-wrap').css({ visibility: 'visible', height: '', overflow: '', 'margin-top': '12px' }).show();
             document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
             // Tell iframe to stretch its body to 100vh so the PayPal SDK dark
@@ -293,6 +293,49 @@
                 }, '*');
             }
             togglePayPalIframePosition();
+        }
+
+        // Iframe asks parent to validate WC checkout form before PayPal createOrder runs.
+        // Replies with valid: true/false so createOrder can cancel if form is incomplete.
+        if (msg.action === 'oneshield-validate-checkout' && msg.gateway === 'paypal') {
+            var $vForm  = $('form.checkout, form#order_review');
+            var vValid  = true;
+
+            $vForm.find('.validate-required').each(function() {
+                var $row   = $(this);
+                var $input = $row.find('input:not([type=hidden]), select, textarea').first();
+                if (!$input.length) return;
+                var val = $.trim($input.val() || '');
+                if (val === '' || val === 'undefined') {
+                    vValid = false;
+                    $row.addClass('woocommerce-invalid woocommerce-invalid-required-field');
+                    $row.removeClass('woocommerce-validated');
+                } else {
+                    $row.addClass('woocommerce-validated');
+                    $row.removeClass('woocommerce-invalid woocommerce-invalid-required-field');
+                }
+            });
+
+            var vEmail = $.trim($vForm.find('[name="billing_email"]').val() || '');
+            if (vEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vEmail)) {
+                vValid = false;
+                $vForm.find('[name="billing_email"]').closest('.form-row')
+                    .addClass('woocommerce-invalid woocommerce-invalid-required-field')
+                    .removeClass('woocommerce-validated');
+            }
+
+            if (!vValid) {
+                var $firstInvalid = $vForm.find('.woocommerce-invalid').first();
+                if ($firstInvalid.length) {
+                    $('html, body').animate({ scrollTop: $firstInvalid.offset().top - 120 }, 300);
+                }
+            }
+
+            event.source.postMessage({
+                source: 'oneshield-paygates',
+                action: 'oneshield-validate-result',
+                valid:  vValid,
+            }, '*');
         }
 
         // Iframe asks parent (Money Site) to create pending WC order and return

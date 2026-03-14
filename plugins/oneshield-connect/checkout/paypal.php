@@ -180,6 +180,41 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                 },
 
                 createOrder: async function() {
+                    // ── Step 0: ask parent to validate the WC checkout form ──────
+                    // createOrder is async so we CAN await here. If validation fails,
+                    // return null — PayPal SDK will close the popup without an error.
+                    const isValid = await new Promise(function(resolve) {
+                        var done  = false;
+                        var timer = setTimeout(function() {
+                            if (done) return;
+                            done = true;
+                            window.removeEventListener('message', onMsg);
+                            resolve(true); // timeout → assume valid, let PayPal proceed
+                        }, 5000);
+                        function onMsg(e) {
+                            var m = e.data;
+                            if (!m || m.source !== 'oneshield-paygates' || m.action !== 'oneshield-validate-result') return;
+                            if (done) return;
+                            done = true;
+                            clearTimeout(timer);
+                            window.removeEventListener('message', onMsg);
+                            resolve(!!m.valid);
+                        }
+                        window.addEventListener('message', onMsg);
+                        window.parent.postMessage({
+                            source:  'oneshield-connect',
+                            action:  'oneshield-validate-checkout',
+                            gateway: 'paypal',
+                        }, '*');
+                    });
+
+                    if (!isValid) {
+                        setPaypalFullscreen(false);
+                        var btnContainer = document.getElementById('paypal-button-container');
+                        if (btnContainer) btnContainer.classList.remove('hide_paypal_btn');
+                        return null;
+                    }
+
                     // Always reset per-attempt state so retries get a fresh invoice_id
                     // (cached _invoiceId from a previous attempt on the same page would
                     //  skip the postMessage path entirely and reuse a stale value).
