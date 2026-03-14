@@ -345,7 +345,6 @@
         // wc_order_id + invoice_id before calling PayPal createOrder.
         if (msg.action === 'oneshield-request-pending-order' && msg.gateway === 'paypal') {
             var checkoutId = $('[name="osp_paypal_os_checkout_id"]').val() || '';
-            console.log('[OSP] received oneshield-request-pending-order, checkoutId=', checkoutId, 'nonce=', ospData.nonce || '(empty)', 'ajaxUrl=', ajaxUrl);
             var payload = $.extend({
                 action:              'osp_create_paypal_pending_order',
                 nonce:               ospData.nonce || '',
@@ -354,7 +353,6 @@
 
             $.post(ajaxUrl, payload)
                 .done(function(resp) {
-                    console.log('[OSP] osp_create_paypal_pending_order response:', resp);
                     var reply = {
                         source:   'oneshield-paygates',
                         action:   'oneshield-pending-order-ready',
@@ -364,7 +362,6 @@
                         shipping_total: resp && resp.data ? resp.data.shipping_total : '',
                         message:       resp && !resp.success ? (resp.data || 'create pending order failed') : '',
                     };
-                    console.log('[OSP] sending oneshield-pending-order-ready reply:', reply);
                     event.source.postMessage(reply, '*');
                 })
                 .fail(function(jqXHR, textStatus, errorThrown) {
@@ -468,7 +465,6 @@
         }
 
         // ── PayPal: complete via AJAX (no WC form submit — avoids duplicate order) ──
-        console.log('[OSP] payment success msg:', JSON.stringify(msg));
         if (gateway === 'paypal') {
             var billingData = collectCheckoutFields();
             var completePayload = $.extend({
@@ -481,11 +477,8 @@
                 os_txn_id:        osTxnInput      ? osTxnInput.value      : '',
                 os_site_id:       siteInput        ? siteInput.value        : '',
             }, billingData);
-            console.log('[OSP] calling osp_complete_paypal_pending_order, pending_order_id=', msg.draft_order_id);
-
             $.post(ajaxUrl, completePayload)
                 .done(function(resp) {
-                    console.log('[OSP] osp_complete_paypal_pending_order resp:', resp);
                     if (resp && resp.success && resp.data && resp.data.redirect) {
                         window.location.href = resp.data.redirect;
                     } else {
