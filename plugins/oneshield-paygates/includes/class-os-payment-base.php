@@ -321,7 +321,7 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
                 style="width:100%;height:<?php echo $initial_height; ?>px;border:none;display:block;overflow:hidden;"
                 scrolling="no"
                 allow="payment"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
                 referrerpolicy="no-referrer"
                 onload="var l=document.getElementById('<?php echo esc_attr($loading_id); ?>');if(l)l.style.display='none';"
             ></iframe>

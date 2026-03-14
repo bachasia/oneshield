@@ -731,6 +731,24 @@
         } else {
             iframe.classList.remove('osp-pp-fullscreen');
             restorePayPalIframeAncestors();
+
+            // Reparent iframe back to original position in DOM.
+            // Without this the iframe stays as a direct body child (outside
+            // the payment wrap) and renders at the wrong position on screen.
+            if (_ppIframeOriginalParent) {
+                if (_ppIframeNextSibling && _ppIframeNextSibling.parentElement === _ppIframeOriginalParent) {
+                    _ppIframeOriginalParent.insertBefore(iframe, _ppIframeNextSibling);
+                } else {
+                    _ppIframeOriginalParent.appendChild(iframe);
+                }
+                _ppIframeOriginalParent = null;
+                _ppIframeNextSibling    = null;
+            }
+
+            // Restore iframe height to last known value
+            if (_lastPaypalIframeHeight > 0) {
+                iframe.style.height = _lastPaypalIframeHeight + 'px';
+            }
         }
     }
 
