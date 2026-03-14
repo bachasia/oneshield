@@ -226,32 +226,29 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     _invoiceId   = '';
                     _wcOrderId   = '';
 
-                    let invoiceId    = orderData.invoice_prefix
-                        ? orderData.invoice_prefix + '-' + orderData.order_id
-                        : orderData.order_id;
+                    // invoiceId starts empty — PHP will build it from draft_order_id if we
+                    // don't provide an override, so we never fall back to checkout session ID.
+                    let invoiceId    = '';
                     let draftOrderId = '';
 
                     // Preferred path: ask parent (Money Site) to create pending WC order
                     // using same-origin cart/session, then return wc_order_id + invoice_id.
-                    console.log('OSC: calling requestPendingOrderFromParent...');
                     const pending = await requestPendingOrderFromParent();
-                    console.log('OSC: requestPendingOrderFromParent resolved with', pending);
                     if (pending && pending.success && pending.invoice_id) {
                         invoiceId    = String(pending.invoice_id);
                         draftOrderId = String(pending.wc_order_id || '');
                         _invoiceId   = invoiceId;
                         _wcOrderId   = draftOrderId;
-                        console.log('OSC: using parent-provided invoice_id', invoiceId);
                     } else {
                         console.warn('OSC: postMessage path failed or timed out, pending=', pending);
                     }
 
-                    // Fallback: cross-origin sequence counter (only if postMessage failed)
+                    // Fallback: cross-origin AJAX to get a sequence-based invoice_id
+                    // (only if postMessage failed — i.e. no WC order was created)
                     if (!_invoiceId) {
                         if (orderData.money_site_url && orderData.checkout_id) {
                             try {
                                 const draftUrl = orderData.money_site_url + '/wp-admin/admin-ajax.php';
-                                console.log('OSC: fallback — fetching sequence invoice_id from', draftUrl);
                                 const draftResp = await fetch(draftUrl, {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -262,25 +259,21 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                                         currency:             orderData.currency,
                                     }),
                                 });
-                                console.log('OSC: fallback response status', draftResp.status);
                                 const draftText = await draftResp.text();
-                                console.log('OSC: fallback response body', draftText);
                                 let draftData;
                                 try { draftData = JSON.parse(draftText); } catch(pe) { draftData = null; }
-                                if (draftData && draftData.success) {
-                                    invoiceId = draftData.data.invoice_id;
-                                    console.log('OSC: fallback using invoice_id', invoiceId);
+                                if (draftData && draftData.success && draftData.data.invoice_id) {
+                                    invoiceId  = draftData.data.invoice_id;
+                                    _invoiceId = invoiceId;
                                 } else {
                                     console.warn('OSC: fallback invoice_id fetch failed', draftData);
                                 }
                             } catch (e) {
                                 console.error('OSC: fallback fetch error', e);
                             }
-                        } else {
-                            console.warn('OSC: no money_site_url or checkout_id for fallback', orderData.money_site_url, orderData.checkout_id);
                         }
-                    } else {
-                        console.log('OSC: postMessage succeeded, skipping fallback. invoice_id=', _invoiceId);
+                        // If both paths failed, leave invoiceId empty — PHP will use
+                        // draft_order_id or order_id as canonical fallback.
                     }
 
                     // Step 2: create PayPal order with correct invoice_id
@@ -443,9 +436,10 @@ add_action('wp_ajax_osc_create_paypal_order', 'osc_ajax_create_paypal_order');
 function osc_ajax_create_paypal_order(): void {
     // Skip nonce: cross-origin iframe blocks cookies → nonce always fails.
 
-    $amount   = sanitize_text_field($_POST['amount'] ?? '0');
-    $currency = sanitize_text_field($_POST['currency'] ?? 'USD');
-    $order_id = sanitize_text_field($_POST['order_id'] ?? '');
+    $amount         = sanitize_text_field($_POST['amount'] ?? '0');
+    $currency       = sanitize_text_field($_POST['currency'] ?? 'USD');
+    $order_id       = sanitize_text_field($_POST['order_id'] ?? '');       // checkout session ID
+    $draft_order_id = sanitize_text_field($_POST['draft_order_id'] ?? ''); // real WC order ID
 
     // Order info settings passed from money site via session meta → $_GET
     $invoice_id_override     = sanitize_text_field($_POST['invoice_id_override'] ?? '');
@@ -454,17 +448,22 @@ function osc_ajax_create_paypal_order(): void {
     $random_title_list       = sanitize_text_field($_POST['random_title_list'] ?? '');
     $product_name            = sanitize_text_field($_POST['product_name'] ?? '');
 
-    // Resolve item name based on overwrite_product_title setting
+    // Use WC order ID as the canonical identifier wherever possible.
+    // Falls back to checkout session ID only if no WC order was created yet.
+    $canonical_id = !empty($draft_order_id) ? $draft_order_id : $order_id;
+
+    // Resolve item name — use canonical_id so shortcodes like [order_id] show WC order ID
     $item_name = osc_resolve_paypal_item_name(
         $overwrite_product_title,
         $product_name,
         $user_define_title,
         $random_title_list,
-        $order_id
+        $canonical_id
     );
 
-    // Use invoice_id from JS (which fetched draft order id from money site), fallback to order_id
-    $invoice_id = !empty($invoice_id_override) ? $invoice_id_override : $order_id;
+    // invoice_id: prefer the JS-resolved value (already has prefix + WC order ID),
+    // fallback to canonical_id (WC order ID or session ID).
+    $invoice_id = !empty($invoice_id_override) ? $invoice_id_override : $canonical_id;
 
     $access_token = osc_get_paypal_access_token();
     if (is_wp_error($access_token)) {
@@ -475,7 +474,7 @@ function osc_ajax_create_paypal_order(): void {
     $api_base = ($config['mode'] === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
     $purchase_unit = [
-        'reference_id' => $order_id,
+        'reference_id' => $canonical_id,  // WC order ID (or session ID as fallback)
         'invoice_id'   => $invoice_id,
         'amount'       => [
             'currency_code' => $currency,
@@ -486,6 +485,7 @@ function osc_ajax_create_paypal_order(): void {
         ],
         'items' => [[
             'name'       => $item_name,
+            'sku'        => $canonical_id,  // item SKU = WC order ID
             'unit_amount'=> ['currency_code' => $currency, 'value' => $amount],
             'quantity'   => '1',
         ]],
