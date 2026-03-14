@@ -240,6 +240,78 @@
     // NOTE: a second updated_checkout listener at the bottom also calls this for
     // consistency — keeping them separate makes the toggle self-contained here.
 
+    // ── PayPal click guard: validate WC form before forwarding click to iframe ──
+    // The PayPal button lives in a cross-origin iframe — we can't intercept its
+    // click directly. Instead, a transparent div (#osp-paypal-click-guard) sits
+    // on top of the iframe and captures all clicks first.
+
+    function ospValidateCheckoutForm() {
+        var $form = $('form.checkout, form#order_review');
+        var valid = true;
+
+        $form.find('.validate-required').each(function() {
+            var $row   = $(this);
+            var $input = $row.find('input:not([type=hidden]), select, textarea').first();
+            if (!$input.length) return;
+            var val = $.trim($input.val() || '');
+            if (val === '' || val === 'undefined') {
+                valid = false;
+                $row.addClass('woocommerce-invalid woocommerce-invalid-required-field');
+                $row.removeClass('woocommerce-validated');
+            } else {
+                $row.addClass('woocommerce-validated');
+                $row.removeClass('woocommerce-invalid woocommerce-invalid-required-field');
+            }
+        });
+
+        // Email format check
+        var emailVal = $.trim($form.find('[name="billing_email"]').val() || '');
+        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+            valid = false;
+            $form.find('[name="billing_email"]').closest('.form-row')
+                .addClass('woocommerce-invalid woocommerce-invalid-required-field')
+                .removeClass('woocommerce-validated');
+        }
+
+        if (!valid) {
+            var $first = $form.find('.woocommerce-invalid').first();
+            if ($first.length) {
+                $('html, body').animate({ scrollTop: $first.offset().top - 120 }, 300);
+            }
+        }
+        return valid;
+    }
+
+    $(document).on('click', '#osp-paypal-click-guard', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!ospValidateCheckoutForm()) {
+            return; // errors highlighted, popup blocked
+        }
+
+        // Valid — hide guard and forward click into iframe via postMessage
+        var $guard  = $('#osp-paypal-click-guard');
+        var $iframe = $('#osp-iframe-paypal');
+        $guard.hide();
+        if ($iframe.length && $iframe[0].contentWindow) {
+            $iframe[0].contentWindow.postMessage({
+                source: 'oneshield-paygates',
+                action: 'trigger-paypal-click',
+            }, '*');
+        }
+
+        // Restore guard after a short delay in case user cancels PayPal popup
+        setTimeout(function() {
+            if (!_isPaypalOverlayOpen) {
+                $guard.show();
+            }
+        }, 3000);
+    });
+
+    // Hide guard when PayPal overlay opens, restore when it closes
+    // (handled via _isPaypalOverlayOpen flag already set in postMessage listeners)
+
     // ── Auto-resize iframe ──────────────────────────────────────────────────
 
     // Track last known PayPal iframe height so we can restore it after overlay closes.
@@ -268,6 +340,7 @@
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
+            $('#osp-paypal-click-guard').hide();
             document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
             // Tell iframe to stretch its body to 100vh so the PayPal SDK dark
@@ -286,6 +359,7 @@
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
+            $('#osp-paypal-click-guard').show();
             document.body.classList.remove('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(false);
             // Tell iframe to restore its body height

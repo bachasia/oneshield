@@ -107,9 +107,24 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
             // Receive wc_order_id + invoice_id from parent Money Site before PayPal button click
             window.addEventListener('message', function(event) {
                 var msg = event.data;
-                if (!msg || msg.action !== 'oneshield-confirm-payment') return;
-                if (msg.wc_order_id) _wcOrderId = String(msg.wc_order_id);
-                if (msg.invoice_id)  _invoiceId  = String(msg.invoice_id);
+                if (!msg) return;
+
+                if (msg.action === 'oneshield-confirm-payment') {
+                    if (msg.wc_order_id) _wcOrderId = String(msg.wc_order_id);
+                    if (msg.invoice_id)  _invoiceId  = String(msg.invoice_id);
+                }
+
+                // Parent validated the checkout form and told us to trigger the PayPal button
+                if (msg.source === 'oneshield-paygates' && msg.action === 'trigger-paypal-click') {
+                    var btn = document.querySelector('#paypal-button-container .paypal-button');
+                    if (btn) {
+                        btn.click();
+                    } else {
+                        // Fallback: find any clickable element inside the container
+                        var anyBtn = document.querySelector('#paypal-button-container [role="button"], #paypal-button-container button');
+                        if (anyBtn) anyBtn.click();
+                    }
+                }
             });
 
 
@@ -158,45 +173,10 @@ function osc_render_paypal_checkout(string $order_id, string $token): void {
                     height:  45,
                 },
 
-                onClick: function(data, actions) {
-                    // Ask the parent (Money Site) to validate the WC checkout form
-                    // before opening the PayPal popup. If validation fails, reject
-                    // so the popup never opens and errors are shown on the page.
-                    return new Promise(function(resolve, reject) {
-                        var done = false;
-                        var timer = setTimeout(function() {
-                            if (done) return;
-                            done = true;
-                            window.removeEventListener('message', onValidateMsg);
-                            // Timeout — allow through (WC will catch missing fields on submit)
-                            resolve();
-                        }, 5000);
-
-                        function onValidateMsg(event) {
-                            var msg = event.data;
-                            if (!msg || msg.source !== 'oneshield-paygates' || msg.action !== 'oneshield-validate-result') return;
-                            if (done) return;
-                            done = true;
-                            clearTimeout(timer);
-                            window.removeEventListener('message', onValidateMsg);
-                            if (msg.valid) {
-                                var btnContainer = document.getElementById('paypal-button-container');
-                                if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
-                                setPaypalFullscreen(true);
-                                resolve();
-                            } else {
-                                setPaypalFullscreen(false);
-                                reject();
-                            }
-                        }
-
-                        window.addEventListener('message', onValidateMsg);
-                        window.parent.postMessage({
-                            source:  'oneshield-connect',
-                            action:  'oneshield-validate-checkout',
-                            gateway: 'paypal',
-                        }, '*');
-                    });
+                onClick: function() {
+                    var btnContainer = document.getElementById('paypal-button-container');
+                    if (btnContainer) btnContainer.classList.add('hide_paypal_btn');
+                    setPaypalFullscreen(true);
                 },
 
                 createOrder: async function() {
