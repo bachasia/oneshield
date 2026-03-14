@@ -485,7 +485,7 @@ function osc_ajax_create_paypal_order(): void {
         ],
         'items' => [[
             'name'       => $item_name,
-            'sku'        => $canonical_id,  // item SKU = WC order ID
+            'sku'        => '1',  // sequential per-order item ID, resets each transaction
             'unit_amount'=> ['currency_code' => $currency, 'value' => $amount],
             'quantity'   => '1',
         ]],
