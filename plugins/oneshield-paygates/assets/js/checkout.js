@@ -196,10 +196,6 @@
     // never destroys it. We simply show/hide it here.
 
     function togglePayPalIframePosition() {
-        // While the PayPal popup overlay is open the iframe is position:fixed fullscreen.
-        // Running this function would call $ppWrap.show() and make the wrap
-        // (and any non-fullscreen content) visible at the top of the page.
-        // Freeze completely until the overlay closes.
         if (_isPaypalOverlayOpen) return;
 
         var gateway     = getActiveOspGateway();
@@ -207,14 +203,10 @@
         var $ppWrap     = $('#osp-paypal-button-wrap');
 
         if (gateway === 'paypal') {
-            // Only hide Place Order if the PayPal iframe wrap actually exists in DOM.
-            if ($ppWrap.length) {
-                $placeOrder.hide();
-                $ppWrap.show();
-            } else {
-                // Wrap not rendered (API error) — fall back to Place Order button.
-                $placeOrder.show();
-            }
+            // Keep Place Order button visible — WC validates form on click.
+            // The PayPal iframe wrap is hidden (only used for the fullscreen popup).
+            $placeOrder.show();
+            $ppWrap.hide();
         } else {
             $placeOrder.show();
             $ppWrap.hide();
@@ -234,83 +226,10 @@
     $(document.body).on('payment_method_selected updated_checkout', function () {
         togglePayPalIframePosition();
     });
-    setInterval(togglePayPalIframePosition, 200);
 
     // Run after WooCommerce updates checkout (Place Order button may re-appear)
     // NOTE: a second updated_checkout listener at the bottom also calls this for
     // consistency — keeping them separate makes the toggle self-contained here.
-
-    // ── PayPal click guard: validate WC form before forwarding click to iframe ──
-    // The PayPal button lives in a cross-origin iframe — we can't intercept its
-    // click directly. Instead, a transparent div (#osp-paypal-click-guard) sits
-    // on top of the iframe and captures all clicks first.
-
-    function ospValidateCheckoutForm() {
-        var $form = $('form.checkout, form#order_review');
-        var valid = true;
-
-        $form.find('.validate-required').each(function() {
-            var $row   = $(this);
-            var $input = $row.find('input:not([type=hidden]), select, textarea').first();
-            if (!$input.length) return;
-            var val = $.trim($input.val() || '');
-            if (val === '' || val === 'undefined') {
-                valid = false;
-                $row.addClass('woocommerce-invalid woocommerce-invalid-required-field');
-                $row.removeClass('woocommerce-validated');
-            } else {
-                $row.addClass('woocommerce-validated');
-                $row.removeClass('woocommerce-invalid woocommerce-invalid-required-field');
-            }
-        });
-
-        // Email format check
-        var emailVal = $.trim($form.find('[name="billing_email"]').val() || '');
-        if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-            valid = false;
-            $form.find('[name="billing_email"]').closest('.form-row')
-                .addClass('woocommerce-invalid woocommerce-invalid-required-field')
-                .removeClass('woocommerce-validated');
-        }
-
-        if (!valid) {
-            var $first = $form.find('.woocommerce-invalid').first();
-            if ($first.length) {
-                $('html, body').animate({ scrollTop: $first.offset().top - 120 }, 300);
-            }
-        }
-        return valid;
-    }
-
-    $(document).on('click', '#osp-paypal-click-guard', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!ospValidateCheckoutForm()) {
-            return; // errors highlighted, popup blocked
-        }
-
-        // Valid — hide guard and forward click into iframe via postMessage
-        var $guard  = $('#osp-paypal-click-guard');
-        var $iframe = $('#osp-iframe-paypal');
-        $guard.hide();
-        if ($iframe.length && $iframe[0].contentWindow) {
-            $iframe[0].contentWindow.postMessage({
-                source: 'oneshield-paygates',
-                action: 'trigger-paypal-click',
-            }, '*');
-        }
-
-        // Restore guard after a short delay in case user cancels PayPal popup
-        setTimeout(function() {
-            if (!_isPaypalOverlayOpen) {
-                $guard.show();
-            }
-        }, 3000);
-    });
-
-    // Hide guard when PayPal overlay opens, restore when it closes
-    // (handled via _isPaypalOverlayOpen flag already set in postMessage listeners)
 
     // ── Auto-resize iframe ──────────────────────────────────────────────────
 
@@ -340,7 +259,6 @@
         if (msg.action === 'paypal_overlay_open') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = true;
-            $('#osp-paypal-click-guard').hide();
             document.body.classList.add('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(true);
             // Tell iframe to stretch its body to 100vh so the PayPal SDK dark
@@ -359,7 +277,6 @@
         if (msg.action === 'paypal_overlay_close') {
             cleanupLegacyPayPalOverlay();
             _isPaypalOverlayOpen = false;
-            $('#osp-paypal-click-guard').show();
             document.body.classList.remove('osp-paypal-overlay-active');
             setPayPalIframeFullscreen(false);
             // Tell iframe to restore its body height
@@ -408,64 +325,6 @@
                         message: 'network_error',
                     }, '*');
                 });
-        }
-
-        // Iframe asks parent to validate the WC checkout form before opening PayPal popup.
-        // We trigger WC's own checkout validation by temporarily clicking Place Order,
-        // intercepting any validation errors, then reply with valid: true/false.
-        if (msg.action === 'oneshield-validate-checkout' && msg.gateway === 'paypal') {
-            var $form     = $('form.checkout, form#order_review');
-            var $iframe   = $(getIframe('paypal'));
-            var iframeSrc = $iframe[0] || null;
-
-            // Use WC's built-in checkout_place_order validation pipeline:
-            // trigger the form's submit event with WC validation hooks enabled,
-            // but intercept it before it actually submits.
-            var validationErrors = [];
-            var $required = $form.find('.validate-required');
-            var valid = true;
-
-            $required.each(function() {
-                var $field = $(this);
-                var $input = $field.find('input, select, textarea').first();
-                if (!$input.length) return;
-                var val = $input.val();
-                if (val === null || val === undefined || String(val).trim() === '' || val === 'undefined') {
-                    valid = false;
-                    $field.addClass('woocommerce-invalid woocommerce-invalid-required-field');
-                    $field.removeClass('woocommerce-validated');
-                } else {
-                    $field.addClass('woocommerce-validated');
-                    $field.removeClass('woocommerce-invalid woocommerce-invalid-required-field');
-                }
-            });
-
-            // Also validate email format
-            var $emailField = $form.find('[name="billing_email"]');
-            if ($emailField.length) {
-                var emailVal = $emailField.val() || '';
-                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(emailVal)) {
-                    valid = false;
-                    $emailField.closest('.validate-required, .form-row').addClass('woocommerce-invalid woocommerce-invalid-required-field');
-                }
-            }
-
-            if (!valid) {
-                // Scroll to first invalid field
-                var $firstInvalid = $form.find('.woocommerce-invalid').first();
-                if ($firstInvalid.length) {
-                    $('html, body').animate({ scrollTop: $firstInvalid.offset().top - 120 }, 300);
-                }
-            }
-
-            if (iframeSrc) {
-                event.source.postMessage({
-                    source:  'oneshield-paygates',
-                    action:  'oneshield-validate-result',
-                    valid:   valid,
-                }, '*');
-            }
         }
 
         // When iframe Stripe Elements is ready, push billing_country immediately

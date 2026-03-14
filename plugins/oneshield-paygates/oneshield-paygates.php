@@ -526,12 +526,6 @@ function osp_render_paypal_iframe_outside(): void {
                 referrerpolicy="no-referrer"
                 onload="var l=document.getElementById('<?php echo esc_attr($loading_id); ?>');if(l)l.style.display='none';"
             ></iframe>
-            <!-- Transparent overlay: intercepts clicks to run WC validation before
-                 forwarding the click into the cross-origin PayPal iframe. Hidden once
-                 PayPal overlay opens (osp-paypal-overlay-active body class). -->
-            <div id="osp-paypal-click-guard"
-                 style="position:absolute;inset:0;z-index:10;cursor:pointer;background:transparent;"
-                 aria-hidden="true"></div>
             <div id="<?php echo esc_attr($loading_id); ?>"
                  style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;font-size:13px;color:#9ca3af;">
                 <?php esc_html_e('Loading payment form…', 'oneshield-paygates'); ?>
