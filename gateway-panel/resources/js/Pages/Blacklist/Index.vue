@@ -16,14 +16,20 @@
           <p class="text-xs text-gray-400 mt-0.5">Use system-managed entries for specific field types</p>
         </div>
         <div class="flex flex-wrap gap-x-6 gap-y-3">
-          <label v-for="field in systemFields" :key="field.key" class="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              v-model="form[field.key]"
-              class="w-4 h-4 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer"
-            />
-            <span class="text-sm text-gray-700">{{ field.label }}</span>
-          </label>
+          <div v-for="field in systemFields" :key="field.key" class="flex items-center gap-2.5">
+            <button
+              type="button"
+              @click="form[field.key] = !form[field.key]"
+              :class="form[field.key] ? 'bg-indigo-600' : 'bg-gray-200'"
+              class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer"
+            >
+              <span
+                :class="form[field.key] ? 'translate-x-4' : 'translate-x-0.5'"
+                class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+              />
+            </button>
+            <span class="text-sm text-gray-700 select-none cursor-pointer" @click="form[field.key] = !form[field.key]">{{ field.label }}</span>
+          </div>
         </div>
       </div>
 
@@ -180,7 +186,7 @@ const props = defineProps({
   shields:                       { type: Array,   default: () => [] },
 });
 
-// Labels for the system blacklist checkboxes
+// Labels for the system blacklist toggles
 const systemFields = [
   { key: 'use_system_blacklist_emails',   label: 'Emails' },
   { key: 'use_system_blacklist_cities',   label: 'Cities' },
