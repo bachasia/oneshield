@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="favicon.ico" type="image/x-icon" />
+  <title>Get Started — OneShieldX</title>
+  <meta name="description" content="Get started with OneShieldX. Contact our team to set up bulletproof payment routing for your WooCommerce store." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+          colors: {
+            brand: {
+              amber: '#F59E0B',
+              gold:  '#FBBF24',
+              purple:'#8B5CF6',
+              dark:  '#0F172A',
+              navy:  '#0D1526',
+            }
+          },
+          animation: {
+            'float': 'float 8s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%,100%': { transform: 'translateY(0px) scale(1)' },
+              '50%': { transform: 'translateY(-6px) scale(1.01)' },
+            },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0F172A; color: #F8FAFC; }
+
+    .glass {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .text-gradient {
+      background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 40%, #8B5CF6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .text-gradient-purple {
+      background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #F59E0B, #FBBF24);
+      color: #0F172A;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 24px rgba(245,158,11,0.35);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 40px rgba(245,158,11,0.55);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #F8FAFC;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .btn-outline:hover {
+      border-color: rgba(245,158,11,0.6);
+      background: rgba(245,158,11,0.08);
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.22;
+      pointer-events: none;
+    }
+
+    /* Form input styles */
+    .form-input {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #F8FAFC;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: rgba(245,158,11,0.5);
+      background: rgba(255,255,255,0.09);
+    }
+    .form-input::placeholder { color: #475569; }
+
+    /* Select arrow fix for dark bg */
+    select.form-input option { background: #0F172A; color: #F8FAFC; }
+
+    nav { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0D1526; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+
+<!-- ===================== NAVBAR ===================== -->
+<nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10" style="background:rgba(15,23,42,0.85)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="landing.html" class="flex items-center gap-2 cursor-pointer">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#8B5CF6)">
+        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight">OneShield<span class="text-gradient-purple">X</span></span>
+    </a>
+
+    <!-- Nav links desktop -->
+    <div class="hidden md:flex items-center gap-8">
+      <a href="landing.html#features" data-i18n="nav_features" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Features</a>
+      <a href="landing.html#how-it-works" data-i18n="nav_how_it_works" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">How it works</a>
+      <a href="landing.html#pricing" data-i18n="nav_pricing" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Pricing</a>
+      <a href="landing.html#faq" data-i18n="nav_faq" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">FAQ</a>
+    </div>
+
+    <!-- CTA -->
+    <div class="flex items-center gap-3">
+      <!-- Language switcher -->
+      <div class="flex items-center gap-0.5 glass rounded-lg p-0.5 text-xs font-semibold cursor-pointer" id="langSwitcher" style="border-color:rgba(255,255,255,0.15)">
+        <button id="btnEN" onclick="setLang('en')" class="px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer" aria-label="Switch to English">EN</button>
+        <button id="btnVI" onclick="setLang('vi')" class="px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer" aria-label="Chuyển sang Tiếng Việt">VI</button>
+      </div>
+      <a href="/account/admin" data-i18n="nav_login" class="hidden sm:block text-sm btn-outline px-4 py-2 rounded-lg cursor-pointer">Log in</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== MAIN ===================== -->
+<main class="relative min-h-screen flex items-center pt-16 overflow-hidden">
+  <!-- Background orbs -->
+  <div class="orb w-96 h-96 bg-amber-400" style="top:-5%;left:-10%"></div>
+  <div class="orb w-80 h-80 bg-purple-600" style="top:30%;right:-8%"></div>
+  <div class="orb w-64 h-64 bg-amber-500" style="bottom:5%;left:35%"></div>
+
+  <!-- Grid overlay -->
+  <div class="absolute inset-0 opacity-5" style="background-image: linear-gradient(#94a3b8 1px, transparent 1px), linear-gradient(90deg, #94a3b8 1px, transparent 1px); background-size: 60px 60px;"></div>
+
+  <div class="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
+    <div class="grid lg:grid-cols-2 gap-16 items-start">
+
+      <!-- Left: Info -->
+      <div>
+        <div class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 mb-8 cursor-default">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+          <span data-i18n="page_badge">Get started today</span>
+        </div>
+
+        <h1 class="text-4xl lg:text-5xl font-extrabold leading-tight mb-5">
+          <span data-i18n="page_h1">Start protecting<br/>
+          your <span class="text-gradient">payments</span></span>
+        </h1>
+        <p data-i18n="page_desc" class="text-slate-400 text-lg leading-relaxed mb-10 max-w-md">
+          Tell us about your store and we'll get you set up with the right plan. Most merchants go live within 10 minutes.
+        </p>
+
+        <!-- Trust points -->
+        <div class="space-y-4 mb-10">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25)">
+              <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <span data-i18n="trust1" class="text-sm text-slate-300">No credit card required to start</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25)">
+              <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <span data-i18n="trust2" class="text-sm text-slate-300">Setup under 10 minutes with WooCommerce plugin</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25)">
+              <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <span data-i18n="trust3" class="text-sm text-slate-300">Dedicated onboarding support on Enterprise plan</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25)">
+              <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            </div>
+            <span data-i18n="trust4" class="text-sm text-slate-300">Cancel anytime — no lock-in contracts</span>
+          </div>
+        </div>
+
+        <!-- Direct contact -->
+        <div class="glass rounded-2xl p-5" style="border-color:rgba(245,158,11,0.18)">
+          <p data-i18n="direct_contact_label" class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Or reach us directly</p>
+          <div class="flex flex-col gap-2.5">
+            <a href="mailto:hello@oneshieldx.com" class="flex items-center gap-3 text-sm text-slate-300 hover:text-amber-400 transition-colors duration-200 cursor-pointer">
+              <svg class="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+              hello@oneshieldx.com
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Contact form -->
+      <div class="glass rounded-3xl p-8 md:p-10" style="border-color:rgba(245,158,11,0.15)">
+        <h2 data-i18n="form_heading" class="text-xl font-bold mb-1">Tell us about your store</h2>
+        <p data-i18n="form_subheading" class="text-sm text-slate-400 mb-7">We'll reach out within 24 hours to get you set up.</p>
+
+        <form id="contactForm" class="space-y-5" novalidate>
+          <!-- Name -->
+          <div>
+            <label for="name" data-i18n="label_name" class="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Full name</label>
+            <input
+              id="name" name="name" type="text" autocomplete="name" required
+              placeholder="John Smith"
+              data-i18n="placeholder_name"
+              class="form-input w-full px-4 py-3 rounded-xl text-sm"
+            />
+          </div>
+
+          <!-- Email -->
+          <div>
+            <label for="email" data-i18n="label_email" class="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Email address</label>
+            <input
+              id="email" name="email" type="email" autocomplete="email" required
+              placeholder="john@yourstore.com"
+              data-i18n="placeholder_email"
+              class="form-input w-full px-4 py-3 rounded-xl text-sm"
+            />
+          </div>
+
+          <!-- Monthly volume -->
+          <div>
+            <label for="volume" data-i18n="label_volume" class="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Monthly transaction volume</label>
+            <select id="volume" name="volume" data-i18n-opt="volume_options" class="form-input w-full px-4 py-3 rounded-xl text-sm cursor-pointer">
+              <option value="">Select range...</option>
+              <option value="under-10k">Under $10,000/mo</option>
+              <option value="10k-50k">$10,000 – $50,000/mo</option>
+              <option value="50k-200k">$50,000 – $200,000/mo</option>
+              <option value="200k-plus">$200,000+/mo</option>
+            </select>
+          </div>
+
+          <!-- Plan interest -->
+          <div>
+            <label for="plan" data-i18n="label_plan" class="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Plan interested in</label>
+            <select id="plan" name="plan" data-i18n-opt="plan_options" class="form-input w-full px-4 py-3 rounded-xl text-sm cursor-pointer">
+              <option value="">Not sure yet</option>
+              <option value="trial">Trial — $0/mo (1 shield)</option>
+              <option value="starter">Starter — $49/mo (5 shields)</option>
+              <option value="pro">Pro — $99/mo (15 shields) ★ Most popular</option>
+              <option value="enterprise">Enterprise — Custom pricing</option>
+            </select>
+          </div>
+
+          <!-- Message -->
+          <div>
+            <label for="message" class="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2"><span data-i18n="label_message">Anything else?</span> <span class="text-slate-600 normal-case font-normal">(<span data-i18n="label_optional">optional</span>)</span></label>
+            <textarea
+              id="message" name="message" rows="3"
+              placeholder="Tell us about your current setup or any questions..."
+              data-i18n="placeholder_message"
+              class="form-input w-full px-4 py-3 rounded-xl text-sm resize-none"
+            ></textarea>
+          </div>
+
+          <!-- Submit -->
+          <button
+            type="submit"
+            id="submitBtn"
+            class="btn-primary w-full px-6 py-3.5 rounded-xl text-sm inline-flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span data-i18n="submit_btn">Get started now</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </button>
+
+          <!-- Error / success message -->
+          <div id="formMsg" class="hidden text-sm text-center rounded-xl px-4 py-3"></div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="border-t border-white/8 py-10" style="background:rgba(13,21,38,0.8)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <div class="w-6 h-6 rounded-md flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#8B5CF6)">
+        <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <span class="font-bold text-sm">OneShield<span class="text-gradient-purple">X</span></span>
+    </div>
+    <p class="text-xs text-slate-500">&copy; 2026 OneShieldX. All rights reserved.</p>
+    <a href="landing.html" data-i18n="footer_back" class="text-xs text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">← Back to home</a>
+  </div>
+</footer>
+
+<script>
+  const form = document.getElementById('contactForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const formMsg = document.getElementById('formMsg');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    // Basic client-side validation
+    var lang = localStorage.getItem('osx-lang') || 'en';
+    var t = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[lang]) || {};
+    if (!name) { showMsg(t.err_name || 'Please enter your full name.', 'error'); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showMsg(t.err_email || 'Please enter a valid email address.', 'error'); return; }
+
+    // Disable button while submitting
+    submitBtn.disabled = true;
+    var sendingText = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[localStorage.getItem('osx-lang') || 'en'] && TRANSLATIONS[localStorage.getItem('osx-lang') || 'en']['btn_sending']) || 'Sending...';
+    submitBtn.innerHTML = `
+      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      ${sendingText}
+    `;
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          volume: document.getElementById('volume').value,
+          plan: document.getElementById('plan').value,
+          message: document.getElementById('message').value.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        var lang2 = localStorage.getItem('osx-lang') || 'en';
+        var t2 = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[lang2]) || {};
+        showMsg(t2.success_msg || "Thanks! We'll reach out within 24 hours.", 'success');
+        form.reset();
+      } else {
+        throw new Error('Server error');
+      }
+    } catch {
+      // Fallback: open email client if API not available
+      const subject = encodeURIComponent('OneShieldX — Getting Started');
+      const body = encodeURIComponent(
+        `Name: ${name}\nEmail: ${email}\nVolume: ${document.getElementById('volume').value}\nPlan: ${document.getElementById('plan').value}\n\n${document.getElementById('message').value.trim()}`
+      );
+      window.location.href = `mailto:hello@oneshieldx.com?subject=${subject}&body=${body}`;
+    } finally {
+      submitBtn.disabled = false;
+      var btnText = (typeof TRANSLATIONS !== 'undefined' && TRANSLATIONS[localStorage.getItem('osx-lang') || 'en'] && TRANSLATIONS[localStorage.getItem('osx-lang') || 'en']['submit_btn']) || 'Get started now';
+      submitBtn.innerHTML = `<span data-i18n="submit_btn">${btnText}</span> <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>`;
+    }
+  });
+
+  function showMsg(text, type) {
+    formMsg.textContent = text;
+    formMsg.className = type === 'success'
+      ? 'text-sm text-center rounded-xl px-4 py-3 text-emerald-400 bg-emerald-400/10 border border-emerald-400/20'
+      : 'text-sm text-center rounded-xl px-4 py-3 text-red-400 bg-red-400/10 border border-red-400/20';
+    formMsg.classList.remove('hidden');
+    setTimeout(() => formMsg.classList.add('hidden'), 5000);
+  }
+</script>
+
+<!-- i18n: EN/VI language switcher -->
+<script>
+const TRANSLATIONS = {
+  en: {
+    // Navbar
+    nav_features: 'Features',
+    nav_how_it_works: 'How it works',
+    nav_pricing: 'Pricing',
+    nav_faq: 'FAQ',
+    nav_login: 'Log in',
+    // Page hero
+    page_badge: 'Get started today',
+    page_h1: 'Start protecting<br/>your <span class="text-gradient">payments</span>',
+    page_desc: "Tell us about your store and we'll get you set up with the right plan. Most merchants go live within 10 minutes.",
+    // Trust points
+    trust1: 'No credit card required to start',
+    trust2: 'Setup under 10 minutes with WooCommerce plugin',
+    trust3: 'Dedicated onboarding support on Enterprise plan',
+    trust4: 'Cancel anytime — no lock-in contracts',
+    // Direct contact
+    direct_contact_label: 'Or reach us directly',
+    // Form
+    form_heading: 'Tell us about your store',
+    form_subheading: "We'll reach out within 24 hours to get you set up.",
+    label_name: 'Full name',
+    placeholder_name: 'John Smith',
+    label_email: 'Email address',
+    placeholder_email: 'john@yourstore.com',
+    label_volume: 'Monthly transaction volume',
+    label_plan: 'Plan interested in',
+    label_message: 'Anything else?',
+    label_optional: 'optional',
+    placeholder_message: 'Tell us about your current setup or any questions...',
+    submit_btn: 'Get started now',
+    btn_sending: 'Sending...',
+    // Select options (volume)
+    volume_options: ['Select range...', 'Under $10,000/mo', '$10,000 – $50,000/mo', '$50,000 – $200,000/mo', '$200,000+/mo'],
+    // Select options (plan)
+    plan_options: ['Not sure yet', 'Trial — $0/mo (1 shield)', 'Starter — $49/mo (5 shields)', 'Pro — $99/mo (15 shields) ★ Most popular', 'Enterprise — Custom pricing'],
+    // Validation / feedback
+    err_name: 'Please enter your full name.',
+    err_email: 'Please enter a valid email address.',
+    success_msg: "Thanks! We'll reach out within 24 hours.",
+    // Footer
+    footer_back: '← Back to home',
+  },
+  vi: {
+    // Navbar
+    nav_features: 'Tính năng',
+    nav_how_it_works: 'Cách hoạt động',
+    nav_pricing: 'Bảng giá',
+    nav_faq: 'Câu hỏi thường gặp',
+    nav_login: 'Đăng nhập',
+    // Page hero
+    page_badge: 'Bắt đầu ngay hôm nay',
+    page_h1: 'Bắt đầu bảo vệ<br/>khoản <span class="text-gradient">thanh toán</span> của bạn',
+    page_desc: 'Cho chúng tôi biết về cửa hàng của bạn và chúng tôi sẽ thiết lập gói phù hợp. Hầu hết merchant ra mắt trong vòng 10 phút.',
+    // Trust points
+    trust1: 'Không cần thẻ tín dụng để bắt đầu',
+    trust2: 'Cài đặt dưới 10 phút với plugin WooCommerce',
+    trust3: 'Hỗ trợ onboarding chuyên biệt với gói Enterprise',
+    trust4: 'Hủy bất cứ lúc nào — không ràng buộc hợp đồng',
+    // Direct contact
+    direct_contact_label: 'Hoặc liên hệ trực tiếp với chúng tôi',
+    // Form
+    form_heading: 'Hãy cho chúng tôi biết về cửa hàng của bạn',
+    form_subheading: 'Chúng tôi sẽ liên hệ trong vòng 24 giờ để thiết lập cho bạn.',
+    label_name: 'Họ và tên',
+    placeholder_name: 'Nguyễn Văn A',
+    label_email: 'Địa chỉ email',
+    placeholder_email: 'ban@cuahangcuaban.com',
+    label_volume: 'Khối lượng giao dịch hàng tháng',
+    label_plan: 'Gói quan tâm',
+    label_message: 'Thông tin khác?',
+    label_optional: 'không bắt buộc',
+    placeholder_message: 'Cho chúng tôi biết về hệ thống hiện tại hoặc câu hỏi của bạn...',
+    submit_btn: 'Bắt đầu ngay',
+    btn_sending: 'Đang gửi...',
+    // Select options (volume)
+    volume_options: ['Chọn khoảng...', 'Dưới $10.000/tháng', '$10.000 – $50.000/tháng', '$50.000 – $200.000/tháng', '$200.000+/tháng'],
+    // Select options (plan)
+    plan_options: ['Chưa chắc', 'Trial — $0/tháng (1 shield)', 'Starter — $49/tháng (5 shield)', 'Pro — $99/tháng (15 shield) ★ Phổ biến nhất', 'Enterprise — Giá tùy chỉnh'],
+    // Validation / feedback
+    err_name: 'Vui lòng nhập họ và tên của bạn.',
+    err_email: 'Vui lòng nhập địa chỉ email hợp lệ.',
+    success_msg: 'Cảm ơn bạn! Chúng tôi sẽ liên hệ trong vòng 24 giờ.',
+    // Footer
+    footer_back: '← Quay lại trang chủ',
+  }
+};
+
+function setLang(lang) {
+  localStorage.setItem('osx-lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    var t = TRANSLATIONS[lang];
+    if (!t || !t[key]) return;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.placeholder = t[key];
+    } else {
+      el.innerHTML = t[key];
+    }
+  });
+  // Update select options
+  document.querySelectorAll('[data-i18n-opt]').forEach(function(sel) {
+    var key = sel.getAttribute('data-i18n-opt');
+    var opts = TRANSLATIONS[lang][key];
+    if (!opts) return;
+    Array.from(sel.options).forEach(function(opt, i) {
+      if (opts[i]) opt.text = opts[i];
+    });
+  });
+  // Active button style
+  var activeClass = 'px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer text-brand-dark bg-gradient-to-r from-brand-amber to-brand-gold';
+  var inactiveClass = 'px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer text-slate-400';
+  document.getElementById('btnEN').className = lang === 'en' ? activeClass : inactiveClass;
+  document.getElementById('btnVI').className = lang === 'vi' ? activeClass : inactiveClass;
+  // Update html lang attribute
+  document.documentElement.lang = lang === 'vi' ? 'vi' : 'en';
+}
+
+// Init on load
+(function() {
+  var saved = localStorage.getItem('osx-lang') || 'en';
+  setLang(saved);
+})();
+</script>
+
+</body>
+</html>
