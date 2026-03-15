@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AdminSetupController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Panel\BlacklistController;
 use App\Http\Controllers\Panel\DashboardController;
 use App\Http\Controllers\Panel\ShieldSiteController;
 use App\Http\Controllers\Panel\GroupController;
@@ -74,6 +75,11 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
     Route::get('transactions/export/csv', [TransactionController::class, 'export'])->name('transactions.export');
     Route::get('transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
     Route::post('transactions/{transaction}/refund', [TransactionController::class, 'refund'])->name('transactions.refund');
+
+    // Blacklist management
+    Route::get('blacklist', [BlacklistController::class, 'index'])->name('blacklist.index');
+    Route::post('blacklist', [BlacklistController::class, 'store'])->name('blacklist.store');
+    Route::delete('blacklist/{entry}', [BlacklistController::class, 'destroy'])->name('blacklist.destroy');
 
     // Settings
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
