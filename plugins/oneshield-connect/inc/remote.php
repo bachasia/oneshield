@@ -101,30 +101,6 @@ function osc_run_heartbeat(): void {
         // Persist credentials pushed from Gateway Panel
         osc_sync_credentials($body['credentials'] ?? []);
 
-        // Sync blacklist protection settings
-        $config = $body['config'] ?? [];
-        if (array_key_exists('blacklist_action', $config)) {
-            update_option('osc_blacklist_action', sanitize_text_field($config['blacklist_action'] ?? 'hide'));
-        }
-        if (array_key_exists('trap_shield_id', $config)) {
-            $trap_id = $config['trap_shield_id'] ? absint($config['trap_shield_id']) : null;
-            update_option('osc_trap_shield_id', $trap_id);
-        }
-        // Option C: store full merged blacklist pushed by heartbeat into wp_options.
-        // autoload=false → only read on checkout, not on every WP page.
-        // This eliminates the HTTP call to /api/blacklist at checkout time.
-        if (isset($body['blacklist']) && is_array($body['blacklist'])) {
-            $list = [
-                'emails'   => array_map('strtolower', (array) ($body['blacklist']['emails']   ?? [])),
-                'cities'   => array_map('strtolower', (array) ($body['blacklist']['cities']   ?? [])),
-                'states'   => array_map('strtolower', (array) ($body['blacklist']['states']   ?? [])),
-                'zipcodes' => array_map('strtolower', (array) ($body['blacklist']['zipcodes'] ?? [])),
-                '_pushed_at' => time(), // staleness guard: fallback to HTTP after 24h without heartbeat
-            ];
-            update_option('osc_blacklist_data', $list, false); // false = no autoload
-        }
-        // Bust transient so next checkout reads from wp_options (not stale cache)
-        delete_transient('osc_blacklist');
     }
 }
 

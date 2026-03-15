@@ -37,6 +37,7 @@ function osp_init_gateways(): void {
     require_once OSP_PLUGIN_DIR . 'includes/class-os-request.php';
     require_once OSP_PLUGIN_DIR . 'includes/class-os-ipn-handler.php';
     require_once OSP_PLUGIN_DIR . 'includes/functions.php';
+    require_once OSP_PLUGIN_DIR . 'includes/blacklist.php';
 
     // Register payment gateways
     add_filter('woocommerce_payment_gateways', 'osp_add_gateways');
