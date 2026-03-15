@@ -7,50 +7,24 @@ use App\Models\BlacklistEntry;
 class BlacklistService
 {
     /**
-     * Check if an email or billing address matches any blacklist entry.
+     * Check if any customer field matches a blacklist entry.
+     * Each field is compared against its respective type (email, city, state, zipcode).
      */
-    public function isBlacklisted(string $email, string $address): bool
+    public function isBlacklisted(string $email, string $city, string $state, string $zipcode): bool
     {
-        $emailLower = strtolower(trim($email));
-        $addrNorm   = $this->normalizeAddress($address);
-
-        if ($emailLower && BlacklistEntry::where('type', 'email')->where('value', $emailLower)->exists()) {
-            return true;
-        }
-
-        if ($addrNorm && BlacklistEntry::where('type', 'address')->where('value', $addrNorm)->exists()) {
-            return true;
-        }
-
-        return false;
+        return BlacklistEntry::isBlacklisted([
+            'email'   => $email,
+            'city'    => $city,
+            'state'   => $state,
+            'zipcode' => $zipcode,
+        ]);
     }
 
     /**
-     * Normalize an address for consistent comparison:
-     * lowercase, remove punctuation, collapse spaces, abbreviate common street types.
+     * Normalize a field value: lowercase + trim.
      */
-    public function normalizeAddress(string $addr): string
+    public function normalize(string $value): string
     {
-        $addr = strtolower(trim($addr));
-        $addr = preg_replace('/[^\w\s]/', '', $addr);   // remove punctuation
-        $addr = preg_replace('/\s+/', ' ', $addr);       // collapse spaces
-
-        // Common street type abbreviations
-        $replacements = [
-            'street'    => 'st',
-            'avenue'    => 'ave',
-            'boulevard' => 'blvd',
-            'drive'     => 'dr',
-            'lane'      => 'ln',
-            'road'      => 'rd',
-            'court'     => 'ct',
-            'place'     => 'pl',
-        ];
-
-        foreach ($replacements as $full => $abbr) {
-            $addr = preg_replace('/\b' . $full . '\b/', $abbr, $addr);
-        }
-
-        return trim($addr);
+        return strtolower(trim($value));
     }
 }

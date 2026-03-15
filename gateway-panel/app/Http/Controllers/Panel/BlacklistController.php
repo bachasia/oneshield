@@ -12,86 +12,59 @@ use Inertia\Response;
 class BlacklistController extends Controller
 {
     /**
-     * Display blacklist entries with stats.
+     * Display blacklist editor with all entries grouped by type as textarea strings.
      * GET /blacklist
      */
-    public function index(Request $request): Response
+    public function index(): Response
     {
-        $query = BlacklistEntry::query();
-
-        // Filter by type
-        if ($request->type && in_array($request->type, ['email', 'address'])) {
-            $query->where('type', $request->type);
-        }
-
-        // Filter by source
-        if ($request->source && in_array($request->source, ['pgprints', 'custom'])) {
-            $query->where('source', $request->source);
-        }
-
-        $entries = $query->latest()->paginate(50)->withQueryString();
-
-        // Stats
-        $stats = [
-            'total'    => BlacklistEntry::count(),
-            'pgprints' => BlacklistEntry::where('source', 'pgprints')->count(),
-            'custom'   => BlacklistEntry::where('source', 'custom')->count(),
-            'emails'   => BlacklistEntry::where('type', 'email')->count(),
-            'addresses' => BlacklistEntry::where('type', 'address')->count(),
-        ];
-
-        $lastImport = BlacklistEntry::where('source', 'pgprints')
-            ->latest('updated_at')
-            ->first()
-            ?->updated_at
-            ?->toIso8601String();
+        $join = fn (string $type): string => BlacklistEntry::where('type', $type)
+            ->orderBy('value')
+            ->pluck('value')
+            ->implode("\n");
 
         return Inertia::render('Blacklist/Index', [
-            'entries'    => $entries,
-            'stats'      => $stats,
-            'lastImport' => $lastImport,
-            'filters'    => $request->only(['type', 'source']),
+            'emails'   => $join('email'),
+            'cities'   => $join('city'),
+            'states'   => $join('state'),
+            'zipcodes' => $join('zipcode'),
         ]);
     }
 
     /**
-     * Store a new custom blacklist entry.
-     * POST /blacklist
+     * Replace all entries for each type with the submitted newline-separated values.
+     * POST /blacklist/save
      */
-    public function store(Request $request): RedirectResponse
+    public function save(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'type'  => 'required|in:email,address',
-            'value' => 'required|string|max:500',
-            'notes' => 'nullable|string|max:500',
+        $request->validate([
+            'emails'   => 'nullable|string',
+            'cities'   => 'nullable|string',
+            'states'   => 'nullable|string',
+            'zipcodes' => 'nullable|string',
         ]);
 
-        $value = strtolower(trim($validated['value']));
+        $types = [
+            'email'   => $request->input('emails', ''),
+            'city'    => $request->input('cities', ''),
+            'state'   => $request->input('states', ''),
+            'zipcode' => $request->input('zipcodes', ''),
+        ];
 
-        if ($validated['type'] === 'address') {
-            $value = app(\App\Services\BlacklistService::class)->normalizeAddress($value);
+        foreach ($types as $type => $raw) {
+            // Parse lines: trim, lowercase, filter empty
+            $values = array_values(array_filter(
+                array_map(fn ($v) => strtolower(trim($v)), explode("\n", $raw ?? '')),
+                fn ($v) => $v !== ''
+            ));
+
+            // Replace all entries for this type
+            BlacklistEntry::where('type', $type)->delete();
+
+            foreach ($values as $value) {
+                BlacklistEntry::create(['type' => $type, 'value' => $value]);
+            }
         }
 
-        BlacklistEntry::firstOrCreate(
-            ['type' => $validated['type'], 'value' => $value],
-            ['source' => 'custom', 'notes' => $validated['notes'] ?? null]
-        );
-
-        return back()->with('success', 'Blacklist entry added.');
-    }
-
-    /**
-     * Delete a custom blacklist entry (pgprints entries are protected).
-     * DELETE /blacklist/{entry}
-     */
-    public function destroy(BlacklistEntry $entry): RedirectResponse
-    {
-        if ($entry->source !== 'custom') {
-            return back()->with('error', 'Cannot delete pgprints entries.');
-        }
-
-        $entry->delete();
-
-        return back()->with('success', 'Entry removed.');
+        return back()->with('success', 'Blacklist saved.');
     }
 }

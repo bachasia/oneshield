@@ -1,6 +1,5 @@
 <?php
 
-use App\Console\Commands\ImportPgprintsBlacklist;
 use App\Services\CheckoutSessionService;
 use App\Services\SiteRouterService;
 use Illuminate\Foundation\Inspiring;
@@ -11,9 +10,6 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
-
-// One-time import of pgprints.io test-buyer blacklist
-Artisan::registerCommand(new ImportPgprintsBlacklist());
 
 /*
 |--------------------------------------------------------------------------

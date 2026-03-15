@@ -78,8 +78,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
 
     // Blacklist management
     Route::get('blacklist', [BlacklistController::class, 'index'])->name('blacklist.index');
-    Route::post('blacklist', [BlacklistController::class, 'store'])->name('blacklist.store');
-    Route::delete('blacklist/{entry}', [BlacklistController::class, 'destroy'])->name('blacklist.destroy');
+    Route::post('blacklist/save', [BlacklistController::class, 'save'])->name('blacklist.save');
 
     // Settings
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
