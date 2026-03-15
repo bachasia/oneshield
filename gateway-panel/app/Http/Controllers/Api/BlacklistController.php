@@ -9,17 +9,34 @@ use Illuminate\Http\JsonResponse;
 class BlacklistController extends Controller
 {
     /**
-     * Return all blacklist entries grouped by type for WC plugin caching.
+     * Return blacklist entries for the authenticated tenant, merged with system entries
+     * if the tenant has use_system_blacklist enabled.
      * GET /api/blacklist
      *
      * Response: { emails, cities, states, zipcodes, updated_at }
      */
     public function index(): JsonResponse
     {
-        $emails   = BlacklistEntry::where('type', 'email')->pluck('value')->all();
-        $cities   = BlacklistEntry::where('type', 'city')->pluck('value')->all();
-        $states   = BlacklistEntry::where('type', 'state')->pluck('value')->all();
-        $zipcodes = BlacklistEntry::where('type', 'zipcode')->pluck('value')->all();
+        $user = request()->user();
+
+        // Fetch customer-specific entries (scoped by user_id)
+        $customerQuery = BlacklistEntry::where('is_system', false)
+            ->where('user_id', $user->id);
+
+        $emails   = (clone $customerQuery)->where('type', 'email')->pluck('value')->all();
+        $cities   = (clone $customerQuery)->where('type', 'city')->pluck('value')->all();
+        $states   = (clone $customerQuery)->where('type', 'state')->pluck('value')->all();
+        $zipcodes = (clone $customerQuery)->where('type', 'zipcode')->pluck('value')->all();
+
+        // Merge system entries if tenant has the toggle enabled
+        if ($user->use_system_blacklist) {
+            $systemQuery = BlacklistEntry::where('is_system', true);
+
+            $emails   = array_values(array_unique(array_merge($emails,   (clone $systemQuery)->where('type', 'email')->pluck('value')->all())));
+            $cities   = array_values(array_unique(array_merge($cities,   (clone $systemQuery)->where('type', 'city')->pluck('value')->all())));
+            $states   = array_values(array_unique(array_merge($states,   (clone $systemQuery)->where('type', 'state')->pluck('value')->all())));
+            $zipcodes = array_values(array_unique(array_merge($zipcodes, (clone $systemQuery)->where('type', 'zipcode')->pluck('value')->all())));
+        }
 
         $latestEntry = BlacklistEntry::latest('updated_at')->first();
         $updatedAt   = $latestEntry?->updated_at?->toIso8601String() ?? '';

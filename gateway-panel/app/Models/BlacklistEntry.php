@@ -14,6 +14,12 @@ class BlacklistEntry extends Model
         'type',
         'value',
         'notes',
+        'is_system',
+        'user_id',
+    ];
+
+    protected $casts = [
+        'is_system' => 'boolean',
     ];
 
     // ── Scopes ────────────────────────────────────────────────────────────

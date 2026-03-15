@@ -7,6 +7,28 @@
       <p class="text-sm text-gray-500 mt-0.5">Block known test-buyers from using OneShield payment methods</p>
     </div>
 
+    <!-- System Blacklist Toggle -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4 flex items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold text-gray-700">Use system default blacklist</p>
+        <p class="text-xs text-gray-400 mt-0.5">Include globally managed entries maintained by OneShieldX</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        :aria-checked="useSystemBlacklist"
+        @click="toggleSystem"
+        :disabled="toggling"
+        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
+        :class="useSystemBlacklist ? 'bg-indigo-600' : 'bg-gray-200'"
+      >
+        <span
+          class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+          :class="useSystemBlacklist ? 'translate-x-6' : 'translate-x-1'"
+        />
+      </button>
+    </div>
+
     <form @submit.prevent="submit">
 
       <!-- Customer Information -->
@@ -100,14 +122,17 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 
 const props = defineProps({
-  emails:   { type: String, default: '' },
-  cities:   { type: String, default: '' },
-  states:   { type: String, default: '' },
-  zipcodes: { type: String, default: '' },
+  emails:               { type: String, default: '' },
+  cities:               { type: String, default: '' },
+  states:               { type: String, default: '' },
+  zipcodes:             { type: String, default: '' },
+  use_system_blacklist: { type: Boolean, default: true },
 });
 
 const form = useForm({
@@ -116,6 +141,22 @@ const form = useForm({
   states:   props.states,
   zipcodes: props.zipcodes,
 });
+
+const useSystemBlacklist = ref(props.use_system_blacklist);
+const toggling = ref(false);
+
+async function toggleSystem() {
+  toggling.value = true;
+  const newValue = !useSystemBlacklist.value;
+  try {
+    await axios.patch('/blacklist/toggle-system', { use_system_blacklist: newValue });
+    useSystemBlacklist.value = newValue;
+  } catch {
+    // revert on failure — no change
+  } finally {
+    toggling.value = false;
+  }
+}
 
 function submit() {
   form.post('/blacklist/save');

@@ -9,6 +9,7 @@ use App\Http\Controllers\Panel\GroupController;
 use App\Http\Controllers\Panel\TransactionController;
 use App\Http\Controllers\Panel\SettingsController;
 use App\Http\Controllers\SuperAdmin\SuperAdminController;
+use App\Http\Controllers\SuperAdmin\SystemBlacklistController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,6 +44,10 @@ Route::middleware(['auth', 'super_admin'])->prefix('admin')->name('admin.')->gro
     Route::patch('/tenants/{tenant}/suspend',            [SuperAdminController::class, 'suspendTenant'])->name('tenants.suspend');
     Route::patch('/tenants/{tenant}/unsuspend',          [SuperAdminController::class, 'unsuspendTenant'])->name('tenants.unsuspend');
     Route::post('/tenants/{tenant}/impersonate',         [SuperAdminController::class, 'impersonate'])->name('tenants.impersonate');
+
+    // System-level blacklist (super admin managed, global)
+    Route::get('/system-blacklist',       [SystemBlacklistController::class, 'index'])->name('system-blacklist.index');
+    Route::post('/system-blacklist/save', [SystemBlacklistController::class, 'save'])->name('system-blacklist.save');
 });
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
@@ -79,6 +84,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
     // Blacklist management
     Route::get('blacklist', [BlacklistController::class, 'index'])->name('blacklist.index');
     Route::post('blacklist/save', [BlacklistController::class, 'save'])->name('blacklist.save');
+    Route::patch('blacklist/toggle-system', [BlacklistController::class, 'toggleSystem'])->name('blacklist.toggle-system');
 
     // Settings
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');

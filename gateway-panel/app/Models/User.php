@@ -22,6 +22,7 @@ class User extends Authenticatable
         'token_secret',
         'cors_origins',
         'is_super_admin',
+        'use_system_blacklist',
     ];
 
     protected $hidden = [
@@ -40,8 +41,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
-            'is_super_admin'    => 'boolean',
-            'cors_origins'      => 'array',
+            'is_super_admin'        => 'boolean',
+            'cors_origins'          => 'array',
+            'use_system_blacklist'  => 'boolean',
         ];
     }
 

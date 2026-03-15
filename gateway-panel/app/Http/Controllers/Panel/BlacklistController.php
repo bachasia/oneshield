@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Panel;
 
 use App\Http\Controllers\Controller;
 use App\Models\BlacklistEntry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,21 +18,26 @@ class BlacklistController extends Controller
      */
     public function index(): Response
     {
-        $join = fn (string $type): string => BlacklistEntry::where('type', $type)
+        $userId = auth()->id();
+
+        $join = fn (string $type): string => BlacklistEntry::where('is_system', false)
+            ->where('user_id', $userId)
+            ->where('type', $type)
             ->orderBy('value')
             ->pluck('value')
             ->implode("\n");
 
         return Inertia::render('Blacklist/Index', [
-            'emails'   => $join('email'),
-            'cities'   => $join('city'),
-            'states'   => $join('state'),
-            'zipcodes' => $join('zipcode'),
+            'emails'               => $join('email'),
+            'cities'               => $join('city'),
+            'states'               => $join('state'),
+            'zipcodes'             => $join('zipcode'),
+            'use_system_blacklist' => (bool) auth()->user()->use_system_blacklist,
         ]);
     }
 
     /**
-     * Replace all entries for each type with the submitted newline-separated values.
+     * Replace all entries for this user for each type with submitted newline-separated values.
      * POST /blacklist/save
      */
     public function save(Request $request): RedirectResponse
@@ -42,6 +48,8 @@ class BlacklistController extends Controller
             'states'   => 'nullable|string',
             'zipcodes' => 'nullable|string',
         ]);
+
+        $userId = auth()->id();
 
         $types = [
             'email'   => $request->input('emails', ''),
@@ -57,14 +65,39 @@ class BlacklistController extends Controller
                 fn ($v) => $v !== ''
             ));
 
-            // Replace all entries for this type
-            BlacklistEntry::where('type', $type)->delete();
+            // Replace all customer entries for this type and user
+            BlacklistEntry::where('is_system', false)
+                ->where('user_id', $userId)
+                ->where('type', $type)
+                ->delete();
 
             foreach ($values as $value) {
-                BlacklistEntry::create(['type' => $type, 'value' => $value]);
+                BlacklistEntry::create([
+                    'type'      => $type,
+                    'value'     => $value,
+                    'is_system' => false,
+                    'user_id'   => $userId,
+                ]);
             }
         }
 
         return back()->with('success', 'Blacklist saved.');
+    }
+
+    /**
+     * Toggle whether this account uses the system default blacklist.
+     * PATCH /blacklist/toggle-system
+     */
+    public function toggleSystem(Request $request): JsonResponse
+    {
+        $request->validate([
+            'use_system_blacklist' => 'required|boolean',
+        ]);
+
+        auth()->user()->update([
+            'use_system_blacklist' => $request->boolean('use_system_blacklist'),
+        ]);
+
+        return response()->json(['ok' => true]);
     }
 }
