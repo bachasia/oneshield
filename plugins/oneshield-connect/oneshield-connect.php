@@ -29,6 +29,9 @@ require_once OSC_PLUGIN_DIR . 'checkout/stripe-webhook.php';
 require_once OSC_PLUGIN_DIR . 'checkout/paypal.php';
 require_once OSC_PLUGIN_DIR . 'inc/order.php';
 
+// Blacklist protection (buyer check + cache)
+require_once OSC_PLUGIN_DIR . 'inc/blacklist.php';
+
 // WooCommerce payment gateway integration
 require_once OSC_PLUGIN_DIR . 'inc/gateway.php';
 

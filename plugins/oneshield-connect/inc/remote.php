@@ -100,6 +100,16 @@ function osc_run_heartbeat(): void {
 
         // Persist credentials pushed from Gateway Panel
         osc_sync_credentials($body['credentials'] ?? []);
+
+        // Sync blacklist protection settings
+        $config = $body['config'] ?? [];
+        if (array_key_exists('blacklist_action', $config)) {
+            update_option('osc_blacklist_action', sanitize_text_field($config['blacklist_action'] ?? 'hide'));
+        }
+        if (array_key_exists('trap_shield_id', $config)) {
+            $trap_id = $config['trap_shield_id'] ? absint($config['trap_shield_id']) : null;
+            update_option('osc_trap_shield_id', $trap_id);
+        }
     }
 }
 

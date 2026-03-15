@@ -194,6 +194,47 @@ function osc_load_gateway_classes(): void {
     }
 }
 
+// ── Blacklist Gateway Filter ──────────────────────────────────────────────
+
+/**
+ * Hide or trap blacklisted buyers at checkout.
+ *
+ * - action=hide  → remove all OneShield gateways from the available list
+ * - action=trap  → store trap_shield_id in WC session so checkout payload uses it
+ */
+add_filter('woocommerce_available_payment_gateways', 'osc_blacklist_gateway_filter');
+
+function osc_blacklist_gateway_filter(array $gateways): array {
+    // Skip on admin pages or non-checkout contexts
+    if (is_admin() || !function_exists('is_checkout') || !is_checkout()) {
+        return $gateways;
+    }
+
+    $action = get_option('osc_blacklist_action', 'hide'); // 'hide' | 'trap'
+
+    // Bail early if not blacklisted (most buyers)
+    if (!osc_is_buyer_blacklisted()) {
+        return $gateways;
+    }
+
+    if ($action === 'hide') {
+        // Remove all OneShield gateways — buyer sees no OneShield payment option
+        return array_filter($gateways, function ($gw) {
+            return strpos($gw->id, 'oneshield') === false;
+        });
+    }
+
+    if ($action === 'trap') {
+        // Store trap shield ID in session — picked up in checkout payload builders
+        $trap_id = get_option('osc_trap_shield_id');
+        if ($trap_id) {
+            WC()->session->set('osc_trap_shield_id', (int) $trap_id);
+        }
+    }
+
+    return $gateways;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /**

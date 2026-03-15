@@ -267,6 +267,15 @@ abstract class OS_Payment_Base extends WC_Payment_Gateway {
             ],
         ];
 
+        // Blacklist trap: if a trap shield ID is set in session, override site selection.
+        // The gateway filter (woocommerce_available_payment_gateways) sets this when
+        // the buyer is blacklisted and the shield's blacklist_action is 'trap'.
+        $trap_shield_id = WC()->session ? (int) WC()->session->get('osc_trap_shield_id') : 0;
+        if ($trap_shield_id > 0) {
+            $payload['shield_id'] = $trap_shield_id;
+            WC()->session->__unset('osc_trap_shield_id');
+        }
+
         // Collect extra params from settings to pass through to the iframe (simple flags only)
         $extra_params = $this->get_iframe_extra_params();
         $payload['extra_params'] = $extra_params;
