@@ -22,7 +22,10 @@ class User extends Authenticatable
         'token_secret',
         'cors_origins',
         'is_super_admin',
-        'use_system_blacklist',
+        'use_system_blacklist_emails',
+        'use_system_blacklist_cities',
+        'use_system_blacklist_states',
+        'use_system_blacklist_zipcodes',
         'blacklist_action',
         'trap_shield_id',
     ];
@@ -43,10 +46,13 @@ class User extends Authenticatable
         return [
             'email_verified_at'    => 'datetime',
             'password'             => 'hashed',
-            'is_super_admin'       => 'boolean',
-            'cors_origins'         => 'array',
-            'use_system_blacklist' => 'boolean',
-            'trap_shield_id'       => 'integer',
+            'is_super_admin'                => 'boolean',
+            'cors_origins'                  => 'array',
+            'use_system_blacklist_emails'   => 'boolean',
+            'use_system_blacklist_cities'   => 'boolean',
+            'use_system_blacklist_states'   => 'boolean',
+            'use_system_blacklist_zipcodes' => 'boolean',
+            'trap_shield_id'                => 'integer',
         ];
     }
 

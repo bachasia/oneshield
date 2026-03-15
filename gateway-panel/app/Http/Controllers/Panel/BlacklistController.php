@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Panel;
 use App\Http\Controllers\Controller;
 use App\Models\BlacklistEntry;
 use App\Models\ShieldSite;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -38,14 +37,17 @@ class BlacklistController extends Controller
             ->get(['id', 'name']);
 
         return Inertia::render('Blacklist/Index', [
-            'emails'               => $join('email'),
-            'cities'               => $join('city'),
-            'states'               => $join('state'),
-            'zipcodes'             => $join('zipcode'),
-            'use_system_blacklist' => (bool) $user->use_system_blacklist,
-            'blacklist_action'     => $user->blacklist_action ?? 'hide',
-            'trap_shield_id'       => $user->trap_shield_id,
-            'shields'              => $shields,
+            'emails'                        => $join('email'),
+            'cities'                        => $join('city'),
+            'states'                        => $join('state'),
+            'zipcodes'                      => $join('zipcode'),
+            'use_system_blacklist_emails'   => (bool) $user->use_system_blacklist_emails,
+            'use_system_blacklist_cities'   => (bool) $user->use_system_blacklist_cities,
+            'use_system_blacklist_states'   => (bool) $user->use_system_blacklist_states,
+            'use_system_blacklist_zipcodes' => (bool) $user->use_system_blacklist_zipcodes,
+            'blacklist_action'              => $user->blacklist_action ?? 'hide',
+            'trap_shield_id'                => $user->trap_shield_id,
+            'shields'                       => $shields,
         ]);
     }
 
@@ -57,12 +59,16 @@ class BlacklistController extends Controller
     public function save(Request $request): RedirectResponse
     {
         $request->validate([
-            'emails'           => 'nullable|string',
-            'cities'           => 'nullable|string',
-            'states'           => 'nullable|string',
-            'zipcodes'         => 'nullable|string',
-            'blacklist_action' => 'required|in:hide,trap',
-            'trap_shield_id'   => 'nullable|integer|exists:shield_sites,id',
+            'emails'                        => 'nullable|string',
+            'cities'                        => 'nullable|string',
+            'states'                        => 'nullable|string',
+            'zipcodes'                      => 'nullable|string',
+            'blacklist_action'              => 'required|in:hide,trap',
+            'trap_shield_id'               => 'nullable|integer|exists:shield_sites,id',
+            'use_system_blacklist_emails'   => 'nullable|boolean',
+            'use_system_blacklist_cities'   => 'nullable|boolean',
+            'use_system_blacklist_states'   => 'nullable|boolean',
+            'use_system_blacklist_zipcodes' => 'nullable|boolean',
         ]);
 
         $user   = auth()->user();
@@ -83,12 +89,16 @@ class BlacklistController extends Controller
             );
         }
 
-        // Save global blacklist protection settings on the user
+        // Save global blacklist protection settings and per-type system flags on the user
         $user->update([
-            'blacklist_action' => $request->input('blacklist_action'),
-            'trap_shield_id'   => $request->input('blacklist_action') === 'trap'
+            'blacklist_action'              => $request->input('blacklist_action'),
+            'trap_shield_id'               => $request->input('blacklist_action') === 'trap'
                 ? $request->input('trap_shield_id')
                 : null,
+            'use_system_blacklist_emails'   => $request->boolean('use_system_blacklist_emails'),
+            'use_system_blacklist_cities'   => $request->boolean('use_system_blacklist_cities'),
+            'use_system_blacklist_states'   => $request->boolean('use_system_blacklist_states'),
+            'use_system_blacklist_zipcodes' => $request->boolean('use_system_blacklist_zipcodes'),
         ]);
 
         // Replace per-type blacklist entries
@@ -125,20 +135,4 @@ class BlacklistController extends Controller
         return back()->with('success', 'Blacklist saved.');
     }
 
-    /**
-     * Toggle whether this account uses the system default blacklist.
-     * PATCH /blacklist/toggle-system
-     */
-    public function toggleSystem(Request $request): JsonResponse
-    {
-        $request->validate([
-            'use_system_blacklist' => 'required|boolean',
-        ]);
-
-        auth()->user()->update([
-            'use_system_blacklist' => $request->boolean('use_system_blacklist'),
-        ]);
-
-        return response()->json(['ok' => true]);
-    }
 }

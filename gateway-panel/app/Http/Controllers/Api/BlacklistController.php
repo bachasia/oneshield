@@ -28,13 +28,19 @@ class BlacklistController extends Controller
         $states   = (clone $customerQuery)->where('type', 'state')->pluck('value')->all();
         $zipcodes = (clone $customerQuery)->where('type', 'zipcode')->pluck('value')->all();
 
-        // Merge system entries if tenant has the toggle enabled
-        if ($user->use_system_blacklist) {
-            $systemQuery = BlacklistEntry::where('is_system', true);
+        // Merge system entries per field type based on individual toggles
+        $systemQuery = BlacklistEntry::where('is_system', true);
 
-            $emails   = array_values(array_unique(array_merge($emails,   (clone $systemQuery)->where('type', 'email')->pluck('value')->all())));
-            $cities   = array_values(array_unique(array_merge($cities,   (clone $systemQuery)->where('type', 'city')->pluck('value')->all())));
-            $states   = array_values(array_unique(array_merge($states,   (clone $systemQuery)->where('type', 'state')->pluck('value')->all())));
+        if ($user->use_system_blacklist_emails) {
+            $emails = array_values(array_unique(array_merge($emails, (clone $systemQuery)->where('type', 'email')->pluck('value')->all())));
+        }
+        if ($user->use_system_blacklist_cities) {
+            $cities = array_values(array_unique(array_merge($cities, (clone $systemQuery)->where('type', 'city')->pluck('value')->all())));
+        }
+        if ($user->use_system_blacklist_states) {
+            $states = array_values(array_unique(array_merge($states, (clone $systemQuery)->where('type', 'state')->pluck('value')->all())));
+        }
+        if ($user->use_system_blacklist_zipcodes) {
             $zipcodes = array_values(array_unique(array_merge($zipcodes, (clone $systemQuery)->where('type', 'zipcode')->pluck('value')->all())));
         }
 
