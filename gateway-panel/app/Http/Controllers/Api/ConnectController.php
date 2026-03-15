@@ -93,9 +93,11 @@ class ConnectController extends Controller
         return response()->json([
             'status' => 'ok',
             'config' => [
-                'paypal_mode'  => $site->paypal_mode,
-                'stripe_mode'  => $site->stripe_mode,
-                'is_active'    => $site->is_active,
+                'paypal_mode'      => $site->paypal_mode,
+                'stripe_mode'      => $site->stripe_mode,
+                'is_active'        => $site->is_active,
+                'blacklist_action' => $site->blacklist_action ?? 'hide',
+                'trap_shield_id'   => $site->trap_shield_id,
             ],
             'credentials' => $credentials,
         ]);

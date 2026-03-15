@@ -33,6 +33,7 @@ class PaygatesController extends Controller
             'amount'           => 'required|numeric|min:0.01',
             'currency'         => 'required|string|size:3',
             'group_id'         => 'nullable|string|max:255',
+            'shield_id'        => 'nullable|integer',  // blacklist trap: force specific shield
             'idempotency_key'  => 'nullable|string|max:100',
             'extra_params'                              => 'nullable|array',
             'extra_params.mode'                         => 'nullable|string|max:10',
@@ -75,12 +76,24 @@ class PaygatesController extends Controller
             }
         }
 
-        $site = $this->siteRouter->selectSite(
-            $user->id,
-            $validated['gateway'],
-            $groupId,
-            (float) $validated['amount']
-        );
+        // Blacklist trap: if caller specifies a shield_id, use that site directly.
+        // Bypass normal routing — the WC plugin set this when buyer is blacklisted.
+        $site = null;
+        if (!empty($validated['shield_id'])) {
+            $site = ShieldSite::where('id', $validated['shield_id'])
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        if (!$site) {
+            $site = $this->siteRouter->selectSite(
+                $user->id,
+                $validated['gateway'],
+                $groupId,
+                (float) $validated['amount']
+            );
+        }
 
         if (!$site) {
             // Provide debugging hints in the error response

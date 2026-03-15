@@ -653,6 +653,54 @@
               </div>
             </div>
 
+            <!-- Blacklist Protection Section -->
+            <div class="bg-white rounded-2xl border border-gray-200 p-5">
+              <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                  <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900">Blacklist Protection</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Action when a buyer's email or address is blacklisted</p>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <!-- Action radio -->
+                <div class="flex gap-4">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" v-model="settingsForm.blacklist_action" value="hide" class="text-indigo-600" />
+                    <span class="text-sm text-gray-700">Hide payment methods</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" v-model="settingsForm.blacklist_action" value="trap" class="text-indigo-600" />
+                    <span class="text-sm text-gray-700">Route to trap shield</span>
+                  </label>
+                </div>
+
+                <!-- Trap shield dropdown — only shown when trap selected -->
+                <div v-if="settingsForm.blacklist_action === 'trap'">
+                  <label class="block text-xs font-medium text-gray-700 mb-1.5">Trap Shield Site</label>
+                  <select
+                    v-model="settingsForm.trap_shield_id"
+                    class="w-full max-w-sm px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+                  >
+                    <option :value="null">— Select a shield site —</option>
+                    <option
+                      v-for="s in otherActiveSites"
+                      :key="s.id"
+                      :value="s.id"
+                    >
+                      #{{ s.id }} — {{ s.name }}
+                    </option>
+                  </select>
+                  <p class="text-[11px] text-gray-400 mt-1.5">Blacklisted buyers will be routed to this shield site for payment processing.</p>
+                </div>
+
+                <p v-else class="text-xs text-gray-400">Blacklisted buyers will not see any OneShield payment methods at checkout.</p>
+              </div>
+            </div>
+
           </div>
           <!-- End Panel Body -->
 
@@ -736,6 +784,8 @@ const settingsForm = useForm({
   stripe_public_key: '', stripe_secret_key: '', stripe_mode: 'test', stripe_enabled: false,
   stripe_webhook_secret: '', stripe_income_limit: 0, stripe_max_per_order: 0,
   receive_cycle: 'lifetime',
+  blacklist_action: 'hide',
+  trap_shield_id: null,
 });
 
 function openSettings(site) {
@@ -757,6 +807,8 @@ function openSettings(site) {
   settingsForm.stripe_income_limit  = site.stripe_income_limit  || 0;
   settingsForm.stripe_max_per_order = site.stripe_max_per_order || 0;
   settingsForm.receive_cycle        = site.receive_cycle || 'lifetime';
+  settingsForm.blacklist_action     = site.blacklist_action || 'hide';
+  settingsForm.trap_shield_id       = site.trap_shield_id || null;
 }
 
 function closeSettings() {
@@ -791,6 +843,11 @@ function saveSettings() {
       },
   });
 }
+
+// ── Blacklist — other active sites for trap dropdown ─────────────────────
+const otherActiveSites = computed(() =>
+  (props.sites.data || []).filter(s => s.is_active && s.id !== settingsSite.value?.id)
+);
 
 // ── Check / Check all ────────────────────────────────────────────────────
 const checkingAll  = ref(false);
