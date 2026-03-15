@@ -394,6 +394,19 @@
             }
         }
 
+        // Validation failed inside iframe (e.g. empty card fields) — hide overlay
+        // and reset confirming state without showing a WC-level error notice
+        // (Stripe renders inline errors inside the iframe already).
+        if (msg.action === 'validation_error') {
+            hideOverlay();
+            isConfirming = false;
+            if (confirmTimeoutId) {
+                clearTimeout(confirmTimeoutId);
+                confirmTimeoutId = null;
+            }
+            $('#place_order').prop('disabled', false).css('opacity', '');
+        }
+
         // Hide overlay + reset state if iframe reports an error
         if (msg.action === 'payment_error') {
             hideOverlay();
