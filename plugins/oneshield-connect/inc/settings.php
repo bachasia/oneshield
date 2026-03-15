@@ -16,6 +16,23 @@ function osc_add_menu(): void {
     );
 }
 
+// ── Force Sync Blacklist (admin AJAX) ────────────────────────────────────
+add_action('wp_ajax_osc_sync_blacklist', 'osc_ajax_sync_blacklist');
+function osc_ajax_sync_blacklist(): void {
+    check_ajax_referer('osc_sync_blacklist', 'nonce');
+    if (!current_user_can('manage_options')) wp_send_json_error('Forbidden');
+
+    delete_transient('osc_blacklist');
+    delete_option('osc_blacklist_data');
+
+    // Run heartbeat to push fresh blacklist to wp_options
+    osc_run_heartbeat();
+
+    // Check if wp_options was populated after heartbeat
+    $synced = get_option('osc_blacklist_data') !== false;
+    wp_send_json_success(['synced' => $synced, 'message' => $synced ? 'Blacklist synced successfully.' : 'Cleared cache. Blacklist will sync on next heartbeat.']);
+}
+
 add_action('admin_init', 'osc_register_settings');
 function osc_register_settings(): void {
     register_setting('oneshield_connect', 'oneshield_connect_gateway_url', [
@@ -203,6 +220,32 @@ function osc_settings_page(): void {
                     </td>
                 </tr>
             </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid #ccd0d4;padding:20px;margin-top:20px;max-width:600px;">
+            <h2 style="margin-top:0;">Blacklist</h2>
+            <p style="color:#555;margin-bottom:12px;">Blacklist data is pushed automatically via heartbeat. Use this button to force a fresh sync immediately.</p>
+            <button type="button" id="osc-sync-blacklist" class="button button-secondary">Sync Blacklist Now</button>
+            <span id="osc-sync-status" style="margin-left:10px;color:#555;"></span>
+            <script>
+            document.getElementById('osc-sync-blacklist').addEventListener('click', function() {
+                var btn = this;
+                var status = document.getElementById('osc-sync-status');
+                btn.disabled = true;
+                status.textContent = 'Syncing…';
+                var fd = new FormData();
+                fd.append('action', 'osc_sync_blacklist');
+                fd.append('nonce', '<?php echo esc_js(wp_create_nonce('osc_sync_blacklist')); ?>');
+                fetch(ajaxurl, { method: 'POST', body: fd })
+                    .then(function(r){ return r.json(); })
+                    .then(function(r){
+                        status.textContent = r.data ? r.data.message : 'Done.';
+                        status.style.color = r.success ? '#00a32a' : '#d63638';
+                    })
+                    .catch(function(){ status.textContent = 'Error.'; status.style.color = '#d63638'; })
+                    .finally(function(){ btn.disabled = false; });
+            });
+            </script>
         </div>
 
         <div style="background:#fff;border:1px solid #ccd0d4;padding:20px;margin-top:20px;max-width:600px;">
