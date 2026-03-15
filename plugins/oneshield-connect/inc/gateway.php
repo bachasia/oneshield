@@ -197,7 +197,57 @@ function osc_load_gateway_classes(): void {
 // ── Blacklist Gateway Filter ──────────────────────────────────────────────
 
 /**
- * Hide or trap blacklisted buyers at checkout.
+ * Hard block at order submission time (Place Order click).
+ *
+ * Fires during WC checkout validation, before process_payment().
+ * Uses actual POST billing fields — reliable regardless of session/display state.
+ * action=hide → add WC error, abort order. action=trap → tag session only.
+ */
+add_action('woocommerce_after_checkout_validation', 'osc_blacklist_checkout_validation', 10, 2);
+
+function osc_blacklist_checkout_validation(array $data, \WP_Error $errors): void {
+    // Only intercept OneShield payment methods
+    $payment_method = sanitize_text_field($_POST['payment_method'] ?? '');
+    if (strpos($payment_method, 'oneshield') === false) {
+        return;
+    }
+
+    $action = get_option('osc_blacklist_action', 'hide');
+
+    // For trap action: tag session here so process_payment picks it up (already handled by filter)
+    if ($action !== 'hide') {
+        return;
+    }
+
+    // Check using POST billing fields directly — most reliable at submission time
+    $email   = sanitize_email($data['billing_email']    ?? '');
+    $city    = sanitize_text_field($data['billing_city']       ?? '');
+    $state   = sanitize_text_field($data['billing_state']      ?? '');
+    $zipcode = sanitize_text_field($data['billing_postcode']   ?? '');
+
+    // Normalize and check
+    $list = osc_get_blacklist();
+
+    $email   = strtolower(trim($email));
+    $city    = strtolower(trim($city));
+    $state   = strtolower(trim($state));
+    $zipcode = strtolower(trim($zipcode));
+
+    $blacklisted = ($email   && in_array($email,   $list['emails'],   true))
+                || ($city    && in_array($city,    $list['cities'],   true))
+                || ($state   && in_array($state,   $list['states'],   true))
+                || ($zipcode && in_array($zipcode, $list['zipcodes'], true));
+
+    if ($blacklisted) {
+        $errors->add(
+            'osc_blacklisted',
+            __('This payment method is not available for your billing address.', 'oneshield-connect')
+        );
+    }
+}
+
+/**
+ * Hide or trap blacklisted buyers at checkout display level.
  *
  * - action=hide  → remove all OneShield gateways from the available list
  * - action=trap  → store trap_shield_id in WC session so checkout payload uses it
