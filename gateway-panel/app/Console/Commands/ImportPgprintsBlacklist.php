@@ -43,12 +43,13 @@ class ImportPgprintsBlacklist extends Command
         foreach (array_merge($liMatches[1] ?? [], $pMatches[1] ?? []) as $raw) {
             $text = strip_tags($raw);
             $text = html_entity_decode(trim($text));
-            // Skip if it looks like an email or too short
-            if (str_contains($text, '@') || strlen($text) < 5) {
+            // Skip emails, too short, or too long (nav/menu text)
+            if (str_contains($text, '@') || strlen($text) < 5 || strlen($text) > 200) {
                 continue;
             }
-            // Keep lines that look like addresses (contain digits + alpha)
-            if (preg_match('/\d/', $text) && preg_match('/[a-zA-Z]/', $text)) {
+            // Address must start with a street number (digit at beginning)
+            // e.g. "123 Main St" — filters out nav menus, headings, etc.
+            if (preg_match('/^\d+\s+\w/', $text)) {
                 $rawAddresses[] = $text;
             }
         }
