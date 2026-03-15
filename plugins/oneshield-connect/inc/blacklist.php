@@ -16,6 +16,21 @@ defined('ABSPATH') || exit;
  * @return array{ emails: string[], cities: string[], states: string[], zipcodes: string[] }
  */
 function osc_get_blacklist(): array {
+    // ── Primary: wp_options pushed by heartbeat (Option C) ────────────────
+    // Heartbeat stores the merged blacklist (customer + system entries) here.
+    // Advantage: zero HTTP overhead at checkout time.
+    // Staleness guard: fall through if data hasn't been refreshed in 24h
+    // (e.g., plugin disconnected or heartbeat failing).
+    $stored = get_option('osc_blacklist_data', null);
+    if ($stored !== null && is_array($stored)) {
+        $pushedAt = $stored['_pushed_at'] ?? 0;
+        if (time() - $pushedAt < DAY_IN_SECONDS) {
+            unset($stored['_pushed_at']); // remove internal key before returning
+            return $stored;
+        }
+    }
+
+    // ── Fallback: WP transient (legacy / fresh install before first heartbeat) ──
     $cached = get_transient('osc_blacklist');
     if ($cached !== false && is_array($cached)) {
         return $cached;
@@ -27,9 +42,10 @@ function osc_get_blacklist(): array {
         return $empty;
     }
 
+    // ── Last resort: live HTTP fetch from /api/blacklist ──────────────────
     $response = wp_remote_get(osc_gateway_url() . '/api/blacklist', [
         'headers' => osc_build_headers([]),
-        'timeout' => 5,
+        'timeout' => 2, // reduced from 5s — fail fast, fail open
     ]);
 
     if (is_wp_error($response)) {
@@ -91,7 +107,7 @@ function osc_is_buyer_blacklisted(): bool {
             $zipcode = (string) WC()->customer->get_billing_postcode();
         }
 
-        // Guest/early-hook fallback
+        // Fallback 1: direct POST fields (guest checkout form submit)
         if (empty($email) && !empty($_POST['billing_email'])) {
             $email = sanitize_email($_POST['billing_email']);
         }
@@ -99,6 +115,36 @@ function osc_is_buyer_blacklisted(): bool {
             $city    = sanitize_text_field($_POST['billing_city']);
             $state   = sanitize_text_field($_POST['billing_state']   ?? '');
             $zipcode = sanitize_text_field($_POST['billing_postcode'] ?? '');
+        }
+
+        // Fallback 2: update_order_review AJAX sends short-form keys (country/state/postcode/city)
+        // when WC()->customer hasn't been fully populated yet
+        if (empty($zipcode) && !empty($_POST['postcode'])) {
+            $zipcode = sanitize_text_field($_POST['postcode']);
+        }
+        if (empty($city) && !empty($_POST['city'])) {
+            $city = sanitize_text_field($_POST['city']);
+        }
+        if (empty($state) && !empty($_POST['state'])) {
+            $state = sanitize_text_field($_POST['state']);
+        }
+
+        // Fallback 3: parse serialized post_data sent by WC checkout JS
+        if ((empty($zipcode) || empty($email)) && !empty($_POST['post_data'])) {
+            $post_data = [];
+            parse_str(wp_unslash($_POST['post_data']), $post_data);
+            if (empty($email) && !empty($post_data['billing_email'])) {
+                $email = sanitize_email($post_data['billing_email']);
+            }
+            if (empty($zipcode) && !empty($post_data['billing_postcode'])) {
+                $zipcode = sanitize_text_field($post_data['billing_postcode']);
+            }
+            if (empty($city) && !empty($post_data['billing_city'])) {
+                $city = sanitize_text_field($post_data['billing_city']);
+            }
+            if (empty($state) && !empty($post_data['billing_state'])) {
+                $state = sanitize_text_field($post_data['billing_state']);
+            }
         }
 
         $email   = osc_normalize_field($email);

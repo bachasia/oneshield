@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\CheckoutSession;
 use App\Models\ShieldSite;
 use App\Models\Transaction;
+use App\Services\BlacklistService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ConnectController extends Controller
 {
+    public function __construct(private BlacklistService $blacklistService) {}
     /**
      * Register a new shield site.
      * POST /api/connect/register
@@ -90,6 +92,10 @@ class ConnectController extends Controller
             ];
         }
 
+        // Push full merged blacklist so WC plugin can store it in wp_options
+        // (Option C: eliminates HTTP call at checkout time)
+        $blacklist = $this->blacklistService->getListForUser($user);
+
         return response()->json([
             'status' => 'ok',
             'config' => [
@@ -101,6 +107,7 @@ class ConnectController extends Controller
                 'trap_shield_id'   => $user->trap_shield_id,
             ],
             'credentials' => $credentials,
+            'blacklist'   => $blacklist,
         ]);
     }
 

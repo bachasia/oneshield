@@ -205,8 +205,15 @@ function osc_load_gateway_classes(): void {
 add_filter('woocommerce_available_payment_gateways', 'osc_blacklist_gateway_filter');
 
 function osc_blacklist_gateway_filter(array $gateways): array {
-    // Skip on admin pages or non-checkout contexts
-    if (is_admin() || !function_exists('is_checkout') || !is_checkout()) {
+    // Skip on admin pages. During the update_order_review AJAX call, is_checkout()
+    // returns false (no main page query), but WC defines WOOCOMMERCE_CHECKOUT constant
+    // before rebuilding the payment fragment — accept either.
+    if (is_admin()) {
+        return $gateways;
+    }
+    $in_checkout = (function_exists('is_checkout') && is_checkout())
+                || defined('WOOCOMMERCE_CHECKOUT');
+    if (!$in_checkout) {
         return $gateways;
     }
 
