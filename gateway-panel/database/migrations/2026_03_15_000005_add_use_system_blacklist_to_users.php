@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             // Per-account toggle: include system blacklist entries when checking customers
-            $table->boolean('use_system_blacklist')->default(true)->after('cors_origins');
+            $table->boolean('use_system_blacklist')->default(false)->after('cors_origins');
         });
     }
 
