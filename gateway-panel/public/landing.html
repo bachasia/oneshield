@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="favicon.ico" type="image/x-icon" />
+  <title>OneShieldX — Bulletproof Payments for WooCommerce</title>
+  <meta name="description" content="OneShieldX keeps your WooCommerce store accepting payments without interruption. Smart routing, enterprise security, and zero-downtime failover — built for high-volume merchants." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+          colors: {
+            brand: {
+              amber: '#F59E0B',
+              gold:  '#FBBF24',
+              purple:'#8B5CF6',
+              dark:  '#0F172A',
+              navy:  '#0D1526',
+            }
+          },
+          animation: {
+            'float': 'float 8s ease-in-out infinite',
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
+            'shimmer': 'shimmer 2.5s linear infinite',
+          },
+          keyframes: {
+            float: {
+              '0%,100%': { transform: 'translateY(0px) scale(1)' },
+              '50%': { transform: 'translateY(-6px) scale(1.01)' },
+            },
+            shimmer: {
+              '0%': { backgroundPosition: '-200% 0' },
+              '100%': { backgroundPosition: '200% 0' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0F172A; color: #F8FAFC; }
+
+    /* Glass card */
+    .glass {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .glass-hover:hover {
+      background: rgba(255,255,255,0.10);
+      border-color: rgba(245,158,11,0.35);
+    }
+
+    /* Gradient text */
+    .text-gradient {
+      background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 40%, #8B5CF6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .text-gradient-purple {
+      background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Glow button */
+    .btn-primary {
+      background: linear-gradient(135deg, #F59E0B, #FBBF24);
+      color: #0F172A;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 24px rgba(245,158,11,0.35);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 40px rgba(245,158,11,0.55);
+      transform: translateY(-1px);
+    }
+
+    .btn-purple {
+      background: linear-gradient(135deg, #7C3AED, #8B5CF6);
+      color: #fff;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 24px rgba(139,92,246,0.35);
+    }
+    .btn-purple:hover {
+      box-shadow: 0 0 40px rgba(139,92,246,0.55);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      border: 1px solid rgba(255,255,255,0.25);
+      color: #F8FAFC;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .btn-outline:hover {
+      border-color: rgba(245,158,11,0.6);
+      background: rgba(245,158,11,0.08);
+    }
+
+    /* Orb backgrounds */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.25;
+      pointer-events: none;
+    }
+
+    /* Pricing badge */
+    .badge-popular {
+      background: linear-gradient(135deg, #7C3AED, #8B5CF6);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Step connector line */
+    .step-line {
+      position: absolute;
+      top: 28px;
+      left: calc(50% + 28px);
+      width: calc(100% - 56px);
+      height: 1px;
+      background: linear-gradient(90deg, rgba(245,158,11,0.5), rgba(139,92,246,0.5));
+    }
+
+    /* Shimmer effect for code block */
+    .shimmer-text {
+      background: linear-gradient(90deg, #64748b 25%, #94a3b8 50%, #64748b 75%);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: shimmer 2.5s linear infinite;
+    }
+
+    /* Nav */
+    nav { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+    /* Feature icon ring */
+    .icon-ring {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(245,158,11,0.1);
+      border: 1px solid rgba(245,158,11,0.25);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0D1526; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+
+<!-- ===================== NAVBAR ===================== -->
+<nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10" style="background:rgba(15,23,42,0.85)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- Logo -->
+    <a href="#" class="flex items-center gap-2 cursor-pointer">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#8B5CF6)">
+        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <span class="font-bold text-lg tracking-tight">OneShield<span class="text-gradient-purple">X</span></span>
+    </a>
+
+    <!-- Nav links desktop -->
+    <div class="hidden md:flex items-center gap-8">
+      <a href="#features" data-i18n="nav_features" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Features</a>
+      <a href="#how-it-works" data-i18n="nav_how_it_works" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">How it works</a>
+      <a href="#pricing" data-i18n="nav_pricing" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Pricing</a>
+      <a href="#faq" data-i18n="nav_faq" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">FAQ</a>
+    </div>
+
+    <!-- CTA -->
+    <div class="flex items-center gap-3">
+      <!-- Language switcher -->
+      <div class="flex items-center gap-0.5 glass rounded-lg p-0.5 text-xs font-semibold cursor-pointer" id="langSwitcher" style="border-color:rgba(255,255,255,0.15)">
+        <button id="btnEN" onclick="setLang('en')" class="px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer" aria-label="Switch to English">EN</button>
+        <button id="btnVI" onclick="setLang('vi')" class="px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer" aria-label="Chuyển sang Tiếng Việt">VI</button>
+      </div>
+      <a href="/account/admin" data-i18n="nav_login" class="hidden sm:block text-sm btn-outline px-4 py-2 rounded-lg cursor-pointer">Log in</a>
+      <a href="contact.html" data-i18n="nav_start_free" class="text-sm btn-primary px-4 py-2 rounded-lg cursor-pointer">Start free</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== HERO ===================== -->
+<section class="relative min-h-screen flex items-center pt-16 overflow-hidden">
+  <!-- Background orbs -->
+  <div class="orb w-96 h-96 bg-amber-400" style="top:-10%;left:-8%"></div>
+  <div class="orb w-80 h-80 bg-purple-600" style="top:20%;right:-5%"></div>
+  <div class="orb w-64 h-64 bg-amber-500" style="bottom:5%;left:40%"></div>
+
+  <!-- Grid overlay -->
+  <div class="absolute inset-0 opacity-5" style="background-image: linear-gradient(#94a3b8 1px, transparent 1px), linear-gradient(90deg, #94a3b8 1px, transparent 1px); background-size: 60px 60px;"></div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+    <div class="grid lg:grid-cols-2 gap-16 items-center">
+      <!-- Left: copy -->
+      <div>
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 mb-8 cursor-default">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+          <span data-i18n="hero_badge">Built for WooCommerce merchants</span>
+        </div>
+
+        <h1 class="text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
+          <span data-i18n="hero_h1">Keep your store<br/>
+          <span class="text-gradient">always processing</span><br/>
+          payments</span>
+        </h1>
+
+        <p data-i18n="hero_desc" class="text-lg text-slate-400 leading-relaxed mb-10 max-w-lg">
+          OneShieldX is the enterprise payment middleware for WooCommerce merchants who can't afford downtime. Intelligent failover, enterprise-grade security, and seamless multi-gateway management — all from one panel.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-12">
+          <a href="contact.html" class="btn-primary px-7 py-3.5 rounded-xl text-sm inline-flex items-center justify-center gap-2 cursor-pointer">
+            <span data-i18n="hero_cta_primary">Start free — no credit card</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+            </svg>
+          </a>
+          <a href="#how-it-works" class="btn-outline px-7 py-3.5 rounded-xl text-sm inline-flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
+            </svg>
+            <span data-i18n="hero_cta_secondary">See how it works</span>
+          </a>
+        </div>
+
+        <!-- Social proof -->
+        <div class="flex items-center gap-6 text-sm text-slate-500">
+          <div class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            PayPal &amp; Stripe ready
+          </div>
+          <div class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span data-i18n="hero_proof_failover">Zero-downtime failover</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span data-i18n="hero_proof_plugin">WP plugin included</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: dashboard mockup -->
+      <div class="relative flex justify-center lg:justify-end">
+        <div class="relative w-full max-w-md">
+          <!-- Floating glow -->
+          <div class="absolute -inset-4 rounded-3xl opacity-30" style="background:linear-gradient(135deg,rgba(245,158,11,0.4),rgba(139,92,246,0.4));filter:blur(30px)"></div>
+
+          <!-- Main card -->
+          <div class="relative glass rounded-2xl p-6 animate-float">
+            <!-- Header bar -->
+            <div class="flex items-center justify-between mb-5">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500 opacity-70"></div>
+                <div class="w-3 h-3 rounded-full bg-amber-400 opacity-70"></div>
+                <div class="w-3 h-3 rounded-full bg-green-500 opacity-70"></div>
+              </div>
+              <span class="text-xs text-slate-500 font-mono">gateway.oneshieldx.com</span>
+            </div>
+
+            <!-- Stats row -->
+            <div class="grid grid-cols-3 gap-3 mb-5">
+              <div class="glass rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-amber-400">24</div>
+                <div class="text-xs text-slate-500 mt-0.5">Shields</div>
+              </div>
+              <div class="glass rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-green-400">99.9%</div>
+                <div class="text-xs text-slate-500 mt-0.5">Uptime</div>
+              </div>
+              <div class="glass rounded-xl p-3 text-center">
+                <div class="text-xl font-bold text-purple-400">$48k</div>
+                <div class="text-xs text-slate-500 mt-0.5">Processed</div>
+              </div>
+            </div>
+
+            <!-- Transaction feed -->
+            <div class="space-y-2">
+              <div class="text-xs text-slate-500 font-semibold uppercase tracking-widest mb-2">Live transactions</div>
+              <div class="flex items-center justify-between glass rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5 text-blue-400" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 4v8h12V8H6z"/></svg>
+                  </div>
+                  <span class="text-xs text-slate-300">PayPal #8821</span>
+                </div>
+                <span class="text-xs font-semibold text-green-400">+$129.00</span>
+              </div>
+              <div class="flex items-center justify-between glass rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                  </div>
+                  <span class="text-xs text-slate-300">Stripe #8820</span>
+                </div>
+                <span class="text-xs font-semibold text-green-400">+$74.99</span>
+              </div>
+              <div class="flex items-center justify-between glass rounded-lg px-3 py-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <svg class="w-3.5 h-3.5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 4v8h12V8H6z"/></svg>
+                  </div>
+                  <span class="text-xs text-slate-300">PayPal #8819</span>
+                </div>
+                <span class="text-xs font-semibold text-green-400">+$210.00</span>
+              </div>
+            </div>
+
+            <!-- Shield status -->
+            <div class="mt-4 glass rounded-xl p-3 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,rgba(34,197,94,0.2),rgba(34,197,94,0.1));border:1px solid rgba(34,197,94,0.3)">
+                <svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                </svg>
+              </div>
+              <div>
+                <div class="text-xs font-semibold text-slate-200">All connections healthy</div>
+                <div class="text-xs text-slate-500">Failover: standby</div>
+              </div>
+              <div class="ml-auto flex items-center gap-1">
+                <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-slow"></div>
+                <span class="text-xs text-green-400">Live</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== LOGOS / TRUST ===================== -->
+<section class="py-14 border-y border-white/8" style="background:rgba(255,255,255,0.02)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <p data-i18n="logos_label" class="text-center text-xs text-slate-500 uppercase tracking-widest font-semibold mb-10">Works with the payment platforms you already use</p>
+    <div class="flex flex-wrap items-center justify-center gap-12 md:gap-16">
+
+      <!-- PayPal wordmark -->
+      <div class="opacity-55 hover:opacity-90 transition-opacity duration-200 cursor-default">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="PayPal" class="h-8 w-auto brightness-0 invert" loading="lazy" />
+      </div>
+
+      <!-- Stripe wordmark -->
+      <div class="opacity-55 hover:opacity-90 transition-opacity duration-200 cursor-default">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg" alt="Stripe" class="h-7 w-auto brightness-0 invert" loading="lazy" />
+      </div>
+
+      <!-- Airwallex wordmark -->
+      <div class="opacity-55 hover:opacity-90 transition-opacity duration-200 cursor-default">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/4/47/Airwallex_logo_%282025%29.png" alt="Airwallex" class="h-7 w-auto brightness-0 invert" loading="lazy" />
+      </div>
+
+      <!-- WooCommerce wordmark -->
+      <div class="opacity-55 hover:opacity-90 transition-opacity duration-200 cursor-default">
+        <img src="woocommerce-logo.png" alt="WooCommerce" class="h-8 w-auto brightness-0 invert" loading="lazy" />
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== HOW IT WORKS ===================== -->
+<section id="how-it-works" class="py-24">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <div data-i18n="hiw_label" class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-purple-400 mb-5">How it works</div>
+      <h2 class="text-4xl font-extrabold mb-4"><span data-i18n="hiw_h2">Payment routing in <span class="text-gradient">3 steps</span></span></h2>
+      <p data-i18n="hiw_desc" class="text-slate-400 max-w-2xl mx-auto">OneShieldX sits invisibly between your WooCommerce store and payment gateways, routing transactions through clean accounts with zero buyer friction.</p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6 relative">
+      <!-- Step connector lines desktop -->
+      <div class="hidden md:block absolute top-10 left-1/3 w-1/3 h-px" style="background:linear-gradient(90deg,rgba(245,158,11,0.5),rgba(139,92,246,0.5))"></div>
+      <div class="hidden md:block absolute top-10 left-2/3 w-1/3 h-px" style="background:linear-gradient(90deg,rgba(139,92,246,0.5),rgba(245,158,11,0.3))"></div>
+
+      <!-- Step 1 -->
+      <div class="glass glass-hover rounded-2xl p-7 transition-all duration-300 cursor-default">
+        <div class="flex items-start gap-4 mb-5">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-amber-400 border border-amber-400/30" style="background:rgba(245,158,11,0.1)">01</div>
+          <div class="icon-ring flex-shrink-0">
+            <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.962-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+            </svg>
+          </div>
+        </div>
+        <h3 data-i18n="hiw_step1_title" class="text-lg font-bold mb-2">Customer checks out</h3>
+        <p data-i18n="hiw_step1_desc" class="text-slate-400 text-sm leading-relaxed">Buyer clicks Pay on your WooCommerce store. OneShieldX quietly intercepts the payment request — no changes to the customer experience.</p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="glass glass-hover rounded-2xl p-7 transition-all duration-300 cursor-default" style="border-color:rgba(139,92,246,0.3)">
+        <div class="flex items-start gap-4 mb-5">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-purple-400 border border-purple-400/30" style="background:rgba(139,92,246,0.1)">02</div>
+          <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25)">
+            <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+            </svg>
+          </div>
+        </div>
+        <h3 data-i18n="hiw_step2_title" class="text-lg font-bold mb-2">Smart routing kicks in</h3>
+        <p data-i18n="hiw_step2_desc" class="text-slate-400 text-sm leading-relaxed">Our proprietary routing engine selects the optimal payment path in milliseconds. Automatic failover and load distribution happen invisibly in the background.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="glass glass-hover rounded-2xl p-7 transition-all duration-300 cursor-default">
+        <div class="flex items-start gap-4 mb-5">
+          <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-green-400 border border-green-400/30" style="background:rgba(34,197,94,0.1)">03</div>
+          <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25)">
+            <svg class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+          </div>
+        </div>
+        <h3 data-i18n="hiw_step3_title" class="text-lg font-bold mb-2">Payment confirmed</h3>
+        <p data-i18n="hiw_step3_desc" class="text-slate-400 text-sm leading-relaxed">Stripe or PayPal processes the charge. Your WooCommerce order updates automatically. Full transaction logged to your dashboard in real time.</p>
+      </div>
+    </div>
+
+    <!-- Value metrics row instead of architecture diagram -->
+    <div class="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass rounded-xl p-5 text-center cursor-default">
+        <div class="text-3xl font-extrabold text-amber-400 mb-1">&lt;50ms</div>
+        <div data-i18n="stat1_label" class="text-xs text-slate-500">Routing decision</div>
+      </div>
+      <div class="glass rounded-xl p-5 text-center cursor-default">
+        <div class="text-3xl font-extrabold text-purple-400 mb-1">99.9%</div>
+        <div data-i18n="stat2_label" class="text-xs text-slate-500">Uptime SLA (Pro)</div>
+      </div>
+      <div class="glass rounded-xl p-5 text-center cursor-default">
+        <div class="text-3xl font-extrabold text-green-400 mb-1">0s</div>
+        <div data-i18n="stat3_label" class="text-xs text-slate-500">Manual failover time</div>
+      </div>
+      <div class="glass rounded-xl p-5 text-center cursor-default">
+        <div class="text-3xl font-extrabold text-blue-400 mb-1">AES-256</div>
+        <div data-i18n="stat4_label" class="text-xs text-slate-500">Credential encryption</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURES ===================== -->
+<section id="features" class="py-24" style="background:rgba(255,255,255,0.02)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <div data-i18n="feat_label" class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 mb-5">Features</div>
+      <h2 class="text-4xl font-extrabold mb-4"><span data-i18n="feat_h2">Everything you need to <span class="text-gradient">stay protected</span></span></h2>
+      <p data-i18n="feat_desc" class="text-slate-400 max-w-2xl mx-auto">Enterprise-grade payment infrastructure that high-volume WooCommerce merchants rely on.</p>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <!-- Feature: Load balancing -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="icon-ring mb-4">
+          <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat1_title" class="font-bold text-base mb-2">Intelligent load balancing</h3>
+        <p data-i18n="feat1_desc" class="text-slate-400 text-sm leading-relaxed">Traffic is distributed across your shield pool automatically. No single shield takes all the volume — your operation stays healthy at scale.</p>
+      </div>
+
+      <!-- Feature: Circuit breaker -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25)">
+          <svg class="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat2_title" class="font-bold text-base mb-2">Auto circuit breaker</h3>
+        <p data-i18n="feat2_desc" class="text-slate-400 text-sm leading-relaxed">Unhealthy gateway connections are detected and removed from rotation instantly. Self-healing resets happen automatically — no manual intervention needed.</p>
+      </div>
+
+      <!-- Feature: HMAC security -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25)">
+          <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat3_title" class="font-bold text-base mb-2">HMAC-SHA256 authentication</h3>
+        <p data-i18n="feat3_desc" class="text-slate-400 text-sm leading-relaxed">Every API request is signed and timestamped. Replay attack protection with 5-minute window enforcement.</p>
+      </div>
+
+      <!-- Feature: AES-256 encryption -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25)">
+          <svg class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat4_title" class="font-bold text-base mb-2">AES-256 key encryption</h3>
+        <p data-i18n="feat4_desc" class="text-slate-400 text-sm leading-relaxed">PayPal and Stripe API credentials are encrypted at rest using AES-256. Your keys are never exposed in plaintext.</p>
+      </div>
+
+      <!-- Feature: Multi-gateway -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="icon-ring mb-4" style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25)">
+          <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat5_title" class="font-bold text-base mb-2">Multi-gateway support</h3>
+        <p data-i18n="feat5_desc" class="text-slate-400 text-sm leading-relaxed">PayPal and Stripe out of the box. Airwallex coming in Phase 2. One panel to manage all gateways across all sites.</p>
+      </div>
+
+      <!-- Feature: WP plugins -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25)">
+          <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0a.64.64 0 01-.657.643 48.39 48.39 0 01-4.163-.3c.186 1.613.293 3.25.315 4.907a.656.656 0 01-.658.663v0c-.355 0-.676-.186-.959-.401a1.647 1.647 0 00-1.003-.349c-1.036 0-1.875 1.007-1.875 2.25s.84 2.25 1.875 2.25c.369 0 .713-.128 1.003-.349.283-.215.604-.401.959-.401v0c.31 0 .555.26.532.57a48.039 48.039 0 01-.642 5.056c1.518.19 3.058.309 4.616.354a.64.64 0 00.657-.643v0c0-.355-.186-.676-.401-.959a1.647 1.647 0 01-.349-1.003c0-1.035 1.008-1.875 2.25-1.875 1.243 0 2.25.84 2.25 1.875 0 .369-.128.713-.349 1.003-.215.283-.401.604-.401.959v0c0 .333.277.599.61.58a48.1 48.1 0 005.427-.63 48.05 48.05 0 00.582-4.717.532.532 0 00-.533-.57v0c-.355 0-.676.186-.959.401-.29.221-.634.349-1.003.349-1.035 0-1.875-1.007-1.875-2.25s.84-2.25 1.875-2.25c.37 0 .713.128 1.003.349.283.215.604.401.959.401v0a.656.656 0 00.658-.663 48.422 48.422 0 00-.37-5.36c-1.886.342-3.81.574-5.766.689a.578.578 0 01-.61-.58v0z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat6_title" class="font-bold text-base mb-2">WooCommerce plugins included</h3>
+        <p data-i18n="feat6_desc" class="text-slate-400 text-sm leading-relaxed">Drop-in plugins for your WooCommerce stores. Self-updating, with health heartbeat and zero config needed. Download straight from your dashboard.</p>
+      </div>
+
+      <!-- Feature: Transaction log -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25)">
+          <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat7_title" class="font-bold text-base mb-2">Full transaction audit log</h3>
+        <p data-i18n="feat7_desc" class="text-slate-400 text-sm leading-relaxed">Every payment logged with raw gateway response. Filter by gateway, status, and date. Export to CSV anytime.</p>
+      </div>
+
+      <!-- Feature: Multi-tenant -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25)">
+          <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat8_title" class="font-bold text-base mb-2">Isolated tenant workspaces</h3>
+        <p data-i18n="feat8_desc" class="text-slate-400 text-sm leading-relaxed">Every account gets a dedicated, isolated workspace — <span class="text-amber-400 font-mono text-xs">you.oneshieldx.com</span>. Your data never mixes with another merchant's.</p>
+      </div>
+
+      <!-- Feature: Rate limiting -->
+      <div class="glass glass-hover rounded-2xl p-6 transition-all duration-300 cursor-default">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center mb-4" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25)">
+          <svg class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h3 data-i18n="feat9_title" class="font-bold text-base mb-2">Rate limiting per token</h3>
+        <p data-i18n="feat9_desc" class="text-slate-400 text-sm leading-relaxed">Per-token rate limits prevent abuse. Webhook endpoints get dedicated 200 req/min limits. DDoS resilient.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===================== PRICING ===================== -->
+<section id="pricing" class="py-24 relative overflow-hidden">
+  <div class="orb w-72 h-72 bg-purple-600" style="bottom:0;right:-5%"></div>
+  <div class="orb w-64 h-64 bg-amber-500" style="top:0;left:-5%"></div>
+
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+      <div data-i18n="pricing_label" class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 mb-5">Pricing</div>
+      <h2 class="text-4xl font-extrabold mb-4"><span data-i18n="pricing_h2">Priced by <span class="text-gradient">shields</span>, not transactions</span></h2>
+      <p data-i18n="pricing_desc" class="text-slate-400 max-w-2xl mx-auto">All plans include <strong class="text-slate-200">unlimited transactions</strong>. You only pay for the number of shields you need — scale up or down anytime.</p>
+    </div>
+
+    <!-- Competitor comparison callout -->
+    <div class="glass rounded-2xl p-4 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4" style="border-color:rgba(245,158,11,0.3)">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3)">
+          <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <p data-i18n="pricing_callout" class="text-sm text-slate-300"><span class="text-amber-400 font-semibold">Why we're different:</span> Competitors charge $80–$500/mo for 1–10 shields. OneShieldX gives you more shields, at a fraction of the price.</p>
+      </div>
+      <a href="#" class="flex-shrink-0 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer whitespace-nowrap">Compare plans →</a>
+    </div>
+
+    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+      <!-- Trial -->
+      <div class="glass rounded-2xl p-6 flex flex-col transition-all duration-300 hover:border-amber-400/30 cursor-default">
+        <div class="mb-6">
+          <div class="text-sm font-semibold text-slate-400 mb-2">Trial</div>
+          <div class="flex items-end gap-1 mb-1">
+            <span class="text-4xl font-extrabold">$0</span>
+            <span class="text-slate-400 text-sm mb-1">/mo</span>
+          </div>
+          <p data-i18n="plan_trial_tagline" class="text-xs text-slate-500">Try it free. No credit card.</p>
+        </div>
+        <ul class="space-y-2.5 mb-8 flex-1">
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            <strong>1 shield</strong>
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Unlimited transactions
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            PayPal + Stripe
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Transaction log 7 days
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-400">
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            Priority routing
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-400">
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            CSV export
+          </li>
+        </ul>
+        <a href="/account/admin" data-i18n="plan_trial_cta" class="btn-outline px-4 py-2.5 rounded-xl text-sm text-center cursor-pointer block">Start for free</a>
+      </div>
+
+      <!-- Starter -->
+      <div class="glass rounded-2xl p-6 flex flex-col transition-all duration-300 hover:border-amber-400/30 cursor-default">
+        <div class="mb-6">
+          <div class="text-sm font-semibold text-amber-400 mb-2">Starter</div>
+          <div class="flex items-end gap-1 mb-1">
+            <span class="text-4xl font-extrabold">$49</span>
+            <span class="text-slate-400 text-sm mb-1">/mo</span>
+          </div>
+          <p data-i18n="plan_starter_tagline" class="text-xs text-slate-500">For independent merchants.</p>
+        </div>
+        <ul class="space-y-2.5 mb-8 flex-1">
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            <strong>5 shields</strong>
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Unlimited transactions
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            PayPal + Stripe
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Transaction log 30 days
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            CSV export
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-400">
+            <svg class="w-4 h-4 text-slate-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            Priority routing
+          </li>
+        </ul>
+        <a href="#" data-i18n="plan_starter_cta" class="btn-outline px-4 py-2.5 rounded-xl text-sm text-center cursor-pointer block">Choose Starter</a>
+      </div>
+
+      <!-- Pro — POPULAR -->
+      <div class="relative rounded-2xl p-6 flex flex-col transition-all duration-300 cursor-default" style="background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.45)">
+        <!-- Popular badge -->
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span data-i18n="plan_pro_badge" class="badge-popular px-3 py-1 rounded-full text-white">Most popular</span>
+        </div>
+
+        <div class="mb-6">
+          <div class="text-sm font-semibold text-purple-400 mb-2">Pro</div>
+          <div class="flex items-end gap-1 mb-1">
+            <span class="text-4xl font-extrabold">$99</span>
+            <span class="text-slate-400 text-sm mb-1">/mo</span>
+          </div>
+          <p data-i18n="plan_pro_tagline" class="text-xs text-slate-500">For high-volume operations.</p>
+        </div>
+        <ul class="space-y-2.5 mb-8 flex-1">
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            <strong>15 shields</strong>
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Unlimited transactions
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            PayPal + Stripe + Airwallex
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Transaction log 90 days
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Priority routing
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Priority support
+          </li>
+        </ul>
+        <a href="#" data-i18n="plan_pro_cta" class="btn-purple px-4 py-2.5 rounded-xl text-sm text-center cursor-pointer block">Choose Pro</a>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="glass rounded-2xl p-6 flex flex-col transition-all duration-300 hover:border-amber-400/30 cursor-default">
+        <div class="mb-6">
+          <div class="text-sm font-semibold text-slate-400 mb-2">Enterprise</div>
+          <div class="flex items-end gap-1 mb-1">
+            <span class="text-4xl font-extrabold">Custom</span>
+          </div>
+          <p data-i18n="plan_ent_tagline" class="text-xs text-slate-500">For agencies &amp; large teams.</p>
+        </div>
+        <ul class="space-y-2.5 mb-8 flex-1">
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            <strong>Unlimited shields</strong>
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Unlimited transactions
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            White-label option
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Custom SLA &amp; uptime
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Dedicated support
+          </li>
+          <li class="flex items-center gap-2 text-sm text-slate-300">
+            <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+            Onboarding &amp; consulting
+          </li>
+        </ul>
+        <a href="mailto:hello@oneshieldx.com" data-i18n="plan_ent_cta" class="btn-primary px-4 py-2.5 rounded-xl text-sm text-center cursor-pointer block">Contact sales</a>
+      </div>
+    </div>
+
+    <!-- Value callout row -->
+    <div class="mt-8 grid sm:grid-cols-3 gap-4">
+      <div class="glass rounded-xl p-4 flex items-center gap-3 cursor-default">
+        <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+        <span data-i18n="pricing_guarantee" class="text-sm text-slate-400">14-day money-back guarantee</span>
+      </div>
+      <div class="glass rounded-xl p-4 flex items-center gap-3 cursor-default">
+        <svg class="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+        <span data-i18n="pricing_no_fees" class="text-sm text-slate-400">No per-transaction fees ever</span>
+      </div>
+      <div class="glass rounded-xl p-4 flex items-center gap-3 cursor-default">
+        <svg class="w-5 h-5 text-purple-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
+        <span data-i18n="pricing_cancel" class="text-sm text-slate-400">Cancel or upgrade anytime</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAQ ===================== -->
+<section id="faq" class="py-24" style="background:rgba(255,255,255,0.02)">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-14">
+      <div data-i18n="faq_label" class="inline-flex items-center gap-2 glass px-3 py-1.5 rounded-full text-xs font-semibold text-amber-400 mb-5">FAQ</div>
+      <h2 class="text-4xl font-extrabold"><span data-i18n="faq_h2">Questions? <span class="text-gradient">We've got answers.</span></span></h2>
+    </div>
+
+    <div class="space-y-4">
+      <details class="glass rounded-xl group cursor-pointer" open>
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq1_q">How does OneShieldX keep my store always processing?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq1_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          OneShieldX sits as a middleware layer between your WooCommerce store and your payment gateways. Our proprietary routing engine manages your gateway connections intelligently — detecting issues before they impact sales and failing over automatically. The exact mechanism is part of our core IP and is not publicly disclosed.
+        </div>
+      </details>
+
+      <details class="glass rounded-xl group cursor-pointer">
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq2_q">Does my customer see anything different at checkout?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq2_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          No. The checkout experience is identical to what your customers already see. No redirects, no extra steps, no third-party branding. OneShieldX operates entirely in the background.
+        </div>
+      </details>
+
+      <details class="glass rounded-xl group cursor-pointer">
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq3_q">How secure are my PayPal and Stripe API keys?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq3_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          All API credentials are encrypted at rest using AES-256 (Laravel's Crypt facade). They are never stored in plaintext. Every API call between your money site and the gateway panel is signed with HMAC-SHA256 and includes replay-attack protection via timestamp validation.
+        </div>
+      </details>
+
+      <details class="glass rounded-xl group cursor-pointer">
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq4_q">What happens if a gateway connection fails?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq4_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          Our built-in circuit breaker automatically detects the issue and removes that connection from rotation in real time. Traffic shifts to healthy connections instantly. The affected connection auto-recovers after a cool-down — no manual action required.
+        </div>
+      </details>
+
+      <details class="glass rounded-xl group cursor-pointer">
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq5_q">Do I need technical skills to set it up?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq5_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          Basic WooCommerce knowledge is enough. Install the plugin on each site, paste your token, and you're done. Full step-by-step setup guide is included in your panel. Enterprise plan includes onboarding support.
+        </div>
+      </details>
+
+      <details class="glass rounded-xl group cursor-pointer">
+        <summary class="flex items-center justify-between p-5 font-semibold text-sm select-none list-none">
+          <span data-i18n="faq6_q">Is Airwallex supported?</span>
+          <svg class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </summary>
+        <div data-i18n="faq6_a" class="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+          Airwallex is on the roadmap for Phase 2 and is included in the Pro and Enterprise plans. PayPal and Stripe are fully supported today.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CTA SECTION ===================== -->
+<section class="py-24 relative overflow-hidden">
+  <div class="orb w-96 h-96 bg-purple-600 opacity-20" style="top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+
+  <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <div class="glass rounded-3xl p-12 md:p-16" style="border-color:rgba(245,158,11,0.2)">
+      <div class="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6" style="background:linear-gradient(135deg,#F59E0B,#8B5CF6)">
+        <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <h2 data-i18n="cta_h2" class="text-4xl md:text-5xl font-extrabold mb-4">Ready to shield your store?</h2>
+      <p data-i18n="cta_desc" class="text-lg text-slate-400 mb-8 max-w-xl mx-auto">Start with the free plan today. No credit card required. Set up takes under 10 minutes.</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="contact.html" class="btn-primary px-8 py-4 rounded-xl text-base inline-flex items-center justify-center gap-2 cursor-pointer">
+          <span data-i18n="cta_primary">Start for free</span>
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </a>
+        <a href="mailto:hello@oneshieldx.com" data-i18n="cta_secondary" class="btn-outline px-8 py-4 rounded-xl text-base inline-flex items-center justify-center gap-2 cursor-pointer">
+          Talk to sales
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="border-t border-white/8 py-12" style="background:rgba(13,21,38,0.8)">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="grid md:grid-cols-4 gap-8 mb-10">
+      <!-- Brand -->
+      <div class="md:col-span-2">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#F59E0B,#8B5CF6)">
+            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+          </div>
+          <span class="font-bold text-base">OneShield<span class="text-gradient-purple">X</span></span>
+        </div>
+        <p data-i18n="footer_tagline" class="text-sm text-slate-400 max-w-xs leading-relaxed">Payment gateway proxy for WooCommerce. Route safely. Scale freely. Stay protected.</p>
+      </div>
+
+      <!-- Product -->
+      <div>
+        <div data-i18n="footer_product_heading" class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Product</div>
+        <ul class="space-y-2.5">
+          <li><a href="#features" data-i18n="nav_features" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Features</a></li>
+          <li><a href="#how-it-works" data-i18n="nav_how_it_works" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">How it works</a></li>
+          <li><a href="#pricing" data-i18n="nav_pricing" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Pricing</a></li>
+          <li><a href="/account/admin" data-i18n="footer_dashboard" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Dashboard</a></li>
+        </ul>
+      </div>
+
+      <!-- Support -->
+      <div>
+        <div data-i18n="footer_support_heading" class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4">Support</div>
+        <ul class="space-y-2.5">
+          <li><a href="#faq" data-i18n="nav_faq" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">FAQ</a></li>
+          <li><a href="contact.html" data-i18n="footer_contact" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Contact</a></li>
+          <li><a href="/api/health" data-i18n="footer_status" class="text-sm text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">Status</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="border-t border-white/8 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <p class="text-xs text-slate-500">&copy; 2026 OneShieldX. All rights reserved.</p>
+      <div class="flex items-center gap-2">
+        <div class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse-slow"></div>
+        <span data-i18n="footer_status_text" class="text-xs text-slate-500">All systems operational</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Mobile nav scroll lock prevention -->
+<script>
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      var target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+</script>
+
+<!-- i18n: EN/VI language switcher -->
+<script>
+const TRANSLATIONS = {
+  en: {
+    // Navbar
+    nav_features: 'Features',
+    nav_how_it_works: 'How it works',
+    nav_pricing: 'Pricing',
+    nav_faq: 'FAQ',
+    nav_login: 'Log in',
+    nav_start_free: 'Start free',
+    // Hero
+    hero_badge: 'Built for WooCommerce merchants',
+    hero_h1: 'Keep your store<br/><span class="text-gradient">always processing</span><br/>payments',
+    hero_desc: "OneShieldX is the enterprise payment middleware for WooCommerce merchants who can't afford downtime. Intelligent failover, enterprise-grade security, and seamless multi-gateway management — all from one panel.",
+    hero_cta_primary: 'Start free — no credit card',
+    hero_cta_secondary: 'See how it works',
+    hero_proof_failover: 'Zero-downtime failover',
+    hero_proof_plugin: 'WP plugin included',
+    // Logos
+    logos_label: 'Works with the payment platforms you already use',
+    // How it works
+    hiw_label: 'How it works',
+    hiw_h2: 'Payment routing in <span class="text-gradient">3 steps</span>',
+    hiw_desc: 'OneShieldX sits invisibly between your WooCommerce store and payment gateways, routing transactions through clean accounts with zero buyer friction.',
+    hiw_step1_title: 'Customer checks out',
+    hiw_step1_desc: 'Buyer clicks Pay on your WooCommerce store. OneShieldX quietly intercepts the payment request — no changes to the customer experience.',
+    hiw_step2_title: 'Smart routing kicks in',
+    hiw_step2_desc: 'Our proprietary routing engine selects the optimal payment path in milliseconds. Automatic failover and load distribution happen invisibly in the background.',
+    hiw_step3_title: 'Payment confirmed',
+    hiw_step3_desc: 'Stripe or PayPal processes the charge. Your WooCommerce order updates automatically. Full transaction logged to your dashboard in real time.',
+    // Stats
+    stat1_label: 'Routing decision',
+    stat2_label: 'Uptime SLA (Pro)',
+    stat3_label: 'Manual failover time',
+    stat4_label: 'Credential encryption',
+    // Features
+    feat_label: 'Features',
+    feat_h2: 'Everything you need to <span class="text-gradient">stay protected</span>',
+    feat_desc: 'Enterprise-grade payment infrastructure that high-volume WooCommerce merchants rely on.',
+    feat1_title: 'Intelligent load balancing',
+    feat1_desc: 'Traffic is distributed across your shield pool automatically. No single shield takes all the volume — your operation stays healthy at scale.',
+    feat2_title: 'Auto circuit breaker',
+    feat2_desc: 'Unhealthy gateway connections are detected and removed from rotation instantly. Self-healing resets happen automatically — no manual intervention needed.',
+    feat3_title: 'HMAC-SHA256 authentication',
+    feat3_desc: 'Every API request is signed and timestamped. Replay attack protection with 5-minute window enforcement.',
+    feat4_title: 'AES-256 key encryption',
+    feat4_desc: 'PayPal and Stripe API credentials are encrypted at rest using AES-256. Your keys are never exposed in plaintext.',
+    feat5_title: 'Multi-gateway support',
+    feat5_desc: 'PayPal and Stripe out of the box. Airwallex coming in Phase 2. One panel to manage all gateways across all sites.',
+    feat6_title: 'WooCommerce plugins included',
+    feat6_desc: 'Drop-in plugins for your WooCommerce stores. Self-updating, with health heartbeat and zero config needed. Download straight from your dashboard.',
+    feat7_title: 'Full transaction audit log',
+    feat7_desc: 'Every payment logged with raw gateway response. Filter by gateway, status, and date. Export to CSV anytime.',
+    feat8_title: 'Isolated tenant workspaces',
+    feat8_desc: 'Every account gets a dedicated, isolated workspace — <span class="text-amber-400 font-mono text-xs">you.oneshieldx.com</span>. Your data never mixes with another merchant\'s.',
+    feat9_title: 'Rate limiting per token',
+    feat9_desc: 'Per-token rate limits prevent abuse. Webhook endpoints get dedicated 200 req/min limits. DDoS resilient.',
+    // Pricing
+    pricing_label: 'Pricing',
+    pricing_h2: 'Priced by <span class="text-gradient">shields</span>, not transactions',
+    pricing_desc: 'All plans include <strong class="text-slate-200">unlimited transactions</strong>. You only pay for the number of shields you need — scale up or down anytime.',
+    pricing_callout: '<span class="text-amber-400 font-semibold">Why we\'re different:</span> Competitors charge $80–$500/mo for 1–10 shields. OneShieldX gives you more shields, at a fraction of the price.',
+    plan_trial_tagline: 'Try it free. No credit card.',
+    plan_trial_cta: 'Start for free',
+    plan_starter_tagline: 'For independent merchants.',
+    plan_starter_cta: 'Choose Starter',
+    plan_pro_badge: 'Most popular',
+    plan_pro_tagline: 'For high-volume operations.',
+    plan_pro_cta: 'Choose Pro',
+    plan_ent_tagline: 'For agencies & large teams.',
+    plan_ent_cta: 'Contact sales',
+    pricing_guarantee: '14-day money-back guarantee',
+    pricing_no_fees: 'No per-transaction fees ever',
+    pricing_cancel: 'Cancel or upgrade anytime',
+    // FAQ
+    faq_label: 'FAQ',
+    faq_h2: 'Questions? <span class="text-gradient">We\'ve got answers.</span>',
+    faq1_q: 'How does OneShieldX keep my store always processing?',
+    faq1_a: "OneShieldX sits as a middleware layer between your WooCommerce store and your payment gateways. Our proprietary routing engine manages your gateway connections intelligently — detecting issues before they impact sales and failing over automatically. The exact mechanism is part of our core IP and is not publicly disclosed.",
+    faq2_q: 'Does my customer see anything different at checkout?',
+    faq2_a: 'No. The checkout experience is identical to what your customers already see. No redirects, no extra steps, no third-party branding. OneShieldX operates entirely in the background.',
+    faq3_q: 'How secure are my PayPal and Stripe API keys?',
+    faq3_a: "All API credentials are encrypted at rest using AES-256 (Laravel's Crypt facade). They are never stored in plaintext. Every API call between your money site and the gateway panel is signed with HMAC-SHA256 and includes replay-attack protection via timestamp validation.",
+    faq4_q: 'What happens if a gateway connection fails?',
+    faq4_a: 'Our built-in circuit breaker automatically detects the issue and removes that connection from rotation in real time. Traffic shifts to healthy connections instantly. The affected connection auto-recovers after a cool-down — no manual action required.',
+    faq5_q: 'Do I need technical skills to set it up?',
+    faq5_a: "Basic WooCommerce knowledge is enough. Install the plugin on each site, paste your token, and you're done. Full step-by-step setup guide is included in your panel. Enterprise plan includes onboarding support.",
+    faq6_q: 'Is Airwallex supported?',
+    faq6_a: 'Airwallex is on the roadmap for Phase 2 and is included in the Pro and Enterprise plans. PayPal and Stripe are fully supported today.',
+    // CTA
+    cta_h2: 'Ready to shield your store?',
+    cta_desc: 'Start with the free plan today. No credit card required. Set up takes under 10 minutes.',
+    cta_primary: 'Start for free',
+    cta_secondary: 'Talk to sales',
+    // Footer
+    footer_tagline: 'Payment gateway proxy for WooCommerce. Route safely. Scale freely. Stay protected.',
+    footer_product_heading: 'Product',
+    footer_dashboard: 'Dashboard',
+    footer_support_heading: 'Support',
+    footer_contact: 'Contact',
+    footer_status: 'Status',
+    footer_status_text: 'All systems operational',
+  },
+  vi: {
+    // Navbar
+    nav_features: 'Tính năng',
+    nav_how_it_works: 'Cách hoạt động',
+    nav_pricing: 'Bảng giá',
+    nav_faq: 'Câu hỏi thường gặp',
+    nav_login: 'Đăng nhập',
+    nav_start_free: 'Dùng miễn phí',
+    // Hero
+    hero_badge: 'Được xây dựng cho nhà bán hàng WooCommerce',
+    hero_h1: 'Giữ cửa hàng của bạn<br/><span class="text-gradient">luôn xử lý được</span><br/>thanh toán',
+    hero_desc: 'OneShieldX là middleware thanh toán doanh nghiệp dành cho nhà bán hàng WooCommerce không thể chấp nhận gián đoạn. Chuyển đổi thông minh, bảo mật cấp doanh nghiệp và quản lý đa gateway liền mạch — tất cả trong một bảng điều khiển.',
+    hero_cta_primary: 'Dùng miễn phí — không cần thẻ tín dụng',
+    hero_cta_secondary: 'Xem cách hoạt động',
+    hero_proof_failover: 'Dự phòng không gián đoạn',
+    hero_proof_plugin: 'Bao gồm plugin WP',
+    // Logos
+    logos_label: 'Tích hợp với các nền tảng thanh toán bạn đang dùng',
+    // How it works
+    hiw_label: 'Cách hoạt động',
+    hiw_h2: 'Định tuyến thanh toán trong <span class="text-gradient">3 bước</span>',
+    hiw_desc: 'OneShieldX hoạt động ẩn giữa cửa hàng WooCommerce và các gateway thanh toán của bạn, định tuyến giao dịch qua các tài khoản sạch mà không gây ma sát cho người mua.',
+    hiw_step1_title: 'Khách hàng thanh toán',
+    hiw_step1_desc: 'Người mua nhấn Thanh toán trên cửa hàng WooCommerce của bạn. OneShieldX âm thầm tiếp nhận yêu cầu — trải nghiệm mua sắm không thay đổi.',
+    hiw_step2_title: 'Định tuyến thông minh kích hoạt',
+    hiw_step2_desc: 'Công cụ định tuyến độc quyền chọn đường thanh toán tối ưu trong vài mili-giây. Tự động dự phòng và phân phối tải diễn ra ngầm trong nền.',
+    hiw_step3_title: 'Thanh toán được xác nhận',
+    hiw_step3_desc: 'Stripe hoặc PayPal xử lý giao dịch. Đơn hàng WooCommerce của bạn cập nhật tự động. Toàn bộ giao dịch được ghi nhật ký lên bảng điều khiển theo thời gian thực.',
+    // Stats
+    stat1_label: 'Thời gian định tuyến',
+    stat2_label: 'SLA uptime (Pro)',
+    stat3_label: 'Thời gian dự phòng',
+    stat4_label: 'Mã hóa thông tin xác thực',
+    // Features
+    feat_label: 'Tính năng',
+    feat_h2: 'Mọi thứ bạn cần để <span class="text-gradient">luôn được bảo vệ</span>',
+    feat_desc: 'Hạ tầng thanh toán cấp doanh nghiệp mà các nhà bán hàng WooCommerce lớn tin dùng.',
+    feat1_title: 'Cân bằng tải thông minh',
+    feat1_desc: 'Lưu lượng được phân phối tự động qua nhóm shield của bạn. Không shield nào nhận toàn bộ khối lượng — hoạt động kinh doanh của bạn luôn ổn định ở quy mô lớn.',
+    feat2_title: 'Ngắt mạch tự động',
+    feat2_desc: 'Kết nối gateway không lành mạnh được phát hiện và loại khỏi vòng xoay ngay lập tức. Reset tự phục hồi xảy ra tự động — không cần can thiệp thủ công.',
+    feat3_title: 'Xác thực HMAC-SHA256',
+    feat3_desc: 'Mọi yêu cầu API đều được ký và đánh dấu thời gian. Bảo vệ chống tấn công replay với cửa sổ 5 phút.',
+    feat4_title: 'Mã hóa khóa AES-256',
+    feat4_desc: 'Thông tin xác thực API của PayPal và Stripe được mã hóa lúc lưu trữ bằng AES-256. Khóa của bạn không bao giờ bị lộ dưới dạng văn bản thuần.',
+    feat5_title: 'Hỗ trợ đa gateway',
+    feat5_desc: 'PayPal và Stripe có sẵn ngay. Airwallex sẽ ra mắt ở Giai đoạn 2. Một bảng điều khiển quản lý tất cả gateway trên mọi trang web.',
+    feat6_title: 'Bao gồm plugin WooCommerce',
+    feat6_desc: 'Plugin drop-in cho cửa hàng WooCommerce của bạn. Tự cập nhật, có heartbeat kiểm tra sức khỏe và không cần cấu hình. Tải xuống trực tiếp từ bảng điều khiển.',
+    feat7_title: 'Nhật ký kiểm toán giao dịch đầy đủ',
+    feat7_desc: 'Mọi thanh toán được ghi với phản hồi thô từ gateway. Lọc theo gateway, trạng thái và ngày. Xuất CSV bất cứ lúc nào.',
+    feat8_title: 'Không gian làm việc tenant độc lập',
+    feat8_desc: 'Mỗi tài khoản có một không gian làm việc riêng biệt — <span class="text-amber-400 font-mono text-xs">you.oneshieldx.com</span>. Dữ liệu của bạn không bao giờ trộn lẫn với merchant khác.',
+    feat9_title: 'Giới hạn tốc độ theo token',
+    feat9_desc: 'Giới hạn tốc độ theo token ngăn chặn lạm dụng. Endpoint webhook có giới hạn riêng 200 yêu cầu/phút. Chống DDoS hiệu quả.',
+    // Pricing
+    pricing_label: 'Bảng giá',
+    pricing_h2: 'Tính phí theo <span class="text-gradient">shield</span>, không theo giao dịch',
+    pricing_desc: 'Tất cả gói đều bao gồm <strong class="text-slate-200">giao dịch không giới hạn</strong>. Bạn chỉ trả cho số lượng shield cần dùng — tăng hoặc giảm bất cứ lúc nào.',
+    pricing_callout: '<span class="text-amber-400 font-semibold">Điểm khác biệt của chúng tôi:</span> Đối thủ tính $80–$500/tháng cho 1–10 shield. OneShieldX cung cấp nhiều shield hơn với giá chỉ bằng một phần.',
+    plan_trial_tagline: 'Dùng thử miễn phí. Không cần thẻ tín dụng.',
+    plan_trial_cta: 'Bắt đầu miễn phí',
+    plan_starter_tagline: 'Dành cho nhà bán hàng độc lập.',
+    plan_starter_cta: 'Chọn Starter',
+    plan_pro_badge: 'Phổ biến nhất',
+    plan_pro_tagline: 'Dành cho hoạt động khối lượng lớn.',
+    plan_pro_cta: 'Chọn Pro',
+    plan_ent_tagline: 'Dành cho agency và nhóm lớn.',
+    plan_ent_cta: 'Liên hệ kinh doanh',
+    pricing_guarantee: 'Hoàn tiền trong 14 ngày',
+    pricing_no_fees: 'Không tính phí theo từng giao dịch',
+    pricing_cancel: 'Hủy hoặc nâng cấp bất cứ lúc nào',
+    // FAQ
+    faq_label: 'Câu hỏi thường gặp',
+    faq_h2: 'Có thắc mắc? <span class="text-gradient">Chúng tôi có câu trả lời.</span>',
+    faq1_q: 'OneShieldX giúp cửa hàng tôi luôn xử lý thanh toán như thế nào?',
+    faq1_a: 'OneShieldX hoạt động như một lớp middleware giữa cửa hàng WooCommerce và các gateway thanh toán của bạn. Công cụ định tuyến độc quyền quản lý kết nối gateway một cách thông minh — phát hiện sự cố trước khi ảnh hưởng đến doanh thu và tự động dự phòng. Cơ chế cụ thể là IP cốt lõi và không được công bố công khai.',
+    faq2_q: 'Khách hàng có thấy gì khác lúc thanh toán không?',
+    faq2_a: 'Không. Trải nghiệm thanh toán hoàn toàn giống với những gì khách hàng đã quen. Không có chuyển hướng, không bước thêm, không thương hiệu bên thứ ba. OneShieldX hoạt động hoàn toàn trong nền.',
+    faq3_q: 'Khóa API PayPal và Stripe của tôi có an toàn không?',
+    faq3_a: 'Toàn bộ thông tin xác thực API được mã hóa lúc lưu trữ bằng AES-256 (facade Crypt của Laravel). Chúng không bao giờ được lưu dưới dạng văn bản thuần. Mọi lệnh gọi API giữa trang money site và bảng gateway đều được ký bằng HMAC-SHA256 và có bảo vệ chống tấn công replay qua xác thực timestamp.',
+    faq4_q: 'Điều gì xảy ra nếu một kết nối gateway bị lỗi?',
+    faq4_a: 'Ngắt mạch tích hợp tự động phát hiện sự cố và loại kết nối đó khỏi vòng xoay theo thời gian thực. Lưu lượng chuyển ngay sang kết nối lành mạnh. Kết nối bị ảnh hưởng tự phục hồi sau thời gian chờ — không cần thao tác thủ công.',
+    faq5_q: 'Tôi có cần kỹ năng kỹ thuật để cài đặt không?',
+    faq5_a: 'Kiến thức WooCommerce cơ bản là đủ. Cài plugin trên mỗi trang web, dán token của bạn và xong. Hướng dẫn cài đặt từng bước đầy đủ có trong bảng điều khiển. Gói Enterprise bao gồm hỗ trợ onboarding.',
+    faq6_q: 'Airwallex có được hỗ trợ không?',
+    faq6_a: 'Airwallex nằm trong lộ trình Giai đoạn 2 và được bao gồm trong gói Pro và Enterprise. PayPal và Stripe được hỗ trợ đầy đủ hiện tại.',
+    // CTA
+    cta_h2: 'Sẵn sàng bảo vệ cửa hàng của bạn?',
+    cta_desc: 'Bắt đầu với gói miễn phí hôm nay. Không cần thẻ tín dụng. Cài đặt trong vòng 10 phút.',
+    cta_primary: 'Bắt đầu miễn phí',
+    cta_secondary: 'Tư vấn bán hàng',
+    // Footer
+    footer_tagline: 'Proxy gateway thanh toán cho WooCommerce. Định tuyến an toàn. Mở rộng tự do. Luôn được bảo vệ.',
+    footer_product_heading: 'Sản phẩm',
+    footer_dashboard: 'Bảng điều khiển',
+    footer_support_heading: 'Hỗ trợ',
+    footer_contact: 'Liên hệ',
+    footer_status: 'Trạng thái hệ thống',
+    footer_status_text: 'Tất cả hệ thống hoạt động bình thường',
+  }
+};
+
+function setLang(lang) {
+  localStorage.setItem('osx-lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    var t = TRANSLATIONS[lang];
+    if (!t || !t[key]) return;
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.placeholder = t[key];
+    } else {
+      el.innerHTML = t[key];
+    }
+  });
+  // Active button style
+  var activeClass = 'px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer text-brand-dark bg-gradient-to-r from-brand-amber to-brand-gold';
+  var inactiveClass = 'px-2.5 py-1 rounded-md transition-all duration-150 cursor-pointer text-slate-400';
+  document.getElementById('btnEN').className = lang === 'en' ? activeClass : inactiveClass;
+  document.getElementById('btnVI').className = lang === 'vi' ? activeClass : inactiveClass;
+  // Update html lang attribute
+  document.documentElement.lang = lang === 'vi' ? 'vi' : 'en';
+}
+
+// Init on load
+(function() {
+  var saved = localStorage.getItem('osx-lang') || 'en';
+  setLang(saved);
+})();
+</script>
+
+</body>
+</html>
