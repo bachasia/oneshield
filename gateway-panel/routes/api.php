@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\BlacklistController;
 use App\Http\Controllers\Api\CheckoutSessionController;
 use App\Http\Controllers\Api\ConnectController;
 use App\Http\Controllers\Api\PaygatesController;
@@ -64,6 +65,15 @@ Route::middleware(ApiCors::class)->group(function () {
     });
 
 });
+
+/*
+|--------------------------------------------------------------------------
+| Blacklist API (WC plugin -> gateway panel)
+| Authentication: HMAC-SHA256 + per-token rate limiting
+|--------------------------------------------------------------------------
+*/
+Route::middleware([ApiCors::class, HmacAuthentication::class, ThrottlePerToken::class])
+    ->get('blacklist', [BlacklistController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
