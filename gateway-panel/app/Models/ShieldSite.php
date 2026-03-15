@@ -39,8 +39,6 @@ class ShieldSite extends Model
         'failure_count',
         'last_heartbeat_at',
         'sort_order',
-        'blacklist_action',
-        'trap_shield_id',
     ];
 
     protected $casts = [

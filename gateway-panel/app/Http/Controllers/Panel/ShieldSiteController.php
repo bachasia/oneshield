@@ -122,25 +122,7 @@ class ShieldSiteController extends Controller
             'receive_cycle'         => 'nullable|in:lifetime,monthly,weekly,daily',
             // Status
             'is_active'             => 'sometimes|boolean',
-            // Blacklist protection
-            'blacklist_action'      => 'nullable|in:hide,trap',
-            'trap_shield_id'        => 'nullable|integer|exists:shield_sites,id',
         ]);
-
-        // Blacklist validation: trap action requires a valid trap_shield_id (not self)
-        if (($validated['blacklist_action'] ?? null) === 'trap') {
-            if (empty($validated['trap_shield_id'])) {
-                return back()->withErrors(['trap_shield_id' => 'Please select a trap shield site.']);
-            }
-            if ((int) $validated['trap_shield_id'] === $site->id) {
-                return back()->withErrors(['trap_shield_id' => 'A shield site cannot trap to itself.']);
-            }
-            // Ensure trap site belongs to this user
-            abort_unless(
-                ShieldSite::where('id', $validated['trap_shield_id'])->where('user_id', $request->user()->id)->exists(),
-                403
-            );
-        }
 
         // Don't overwrite encrypted fields with empty strings
         foreach (['paypal_client_id', 'paypal_secret', 'stripe_public_key', 'stripe_secret_key', 'stripe_webhook_secret'] as $field) {

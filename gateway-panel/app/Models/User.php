@@ -23,6 +23,8 @@ class User extends Authenticatable
         'cors_origins',
         'is_super_admin',
         'use_system_blacklist',
+        'blacklist_action',
+        'trap_shield_id',
     ];
 
     protected $hidden = [
@@ -39,11 +41,12 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'is_super_admin'        => 'boolean',
-            'cors_origins'          => 'array',
-            'use_system_blacklist'  => 'boolean',
+            'email_verified_at'    => 'datetime',
+            'password'             => 'hashed',
+            'is_super_admin'       => 'boolean',
+            'cors_origins'         => 'array',
+            'use_system_blacklist' => 'boolean',
+            'trap_shield_id'       => 'integer',
         ];
     }
 

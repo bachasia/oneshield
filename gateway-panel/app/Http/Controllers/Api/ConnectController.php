@@ -96,8 +96,9 @@ class ConnectController extends Controller
                 'paypal_mode'      => $site->paypal_mode,
                 'stripe_mode'      => $site->stripe_mode,
                 'is_active'        => $site->is_active,
-                'blacklist_action' => $site->blacklist_action ?? 'hide',
-                'trap_shield_id'   => $site->trap_shield_id,
+                // Global account-level blacklist protection (not per-site)
+                'blacklist_action' => $user->blacklist_action ?? 'hide',
+                'trap_shield_id'   => $user->trap_shield_id,
             ],
             'credentials' => $credentials,
         ]);

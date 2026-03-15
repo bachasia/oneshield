@@ -31,6 +31,51 @@
 
     <form @submit.prevent="submit">
 
+      <!-- Blacklist Protection Section -->
+      <div class="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-gray-700">Blacklist Protection</p>
+            <p class="text-xs text-gray-400 mt-0.5">Action when a buyer's email or address is blacklisted — applies to all your shield sites</p>
+          </div>
+        </div>
+
+        <!-- Action radios -->
+        <div class="flex gap-6 mb-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" v-model="form.blacklist_action" value="hide" class="text-indigo-600" />
+            <span class="text-sm text-gray-700">Hide payment methods</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" v-model="form.blacklist_action" value="trap" class="text-indigo-600" />
+            <span class="text-sm text-gray-700">Route to trap shield</span>
+          </label>
+        </div>
+
+        <!-- Trap shield dropdown -->
+        <div v-if="form.blacklist_action === 'trap'">
+          <label class="block text-xs font-medium text-gray-600 mb-1.5">Trap Shield Site</label>
+          <select
+            v-model="form.trap_shield_id"
+            class="w-full max-w-sm px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
+          >
+            <option :value="null">— Select a shield site —</option>
+            <option v-for="s in shields" :key="s.id" :value="s.id">
+              #{{ s.id }} — {{ s.name }}
+            </option>
+          </select>
+          <p v-if="form.errors.trap_shield_id" class="text-xs text-red-500 mt-1">{{ form.errors.trap_shield_id }}</p>
+          <p class="text-[11px] text-gray-400 mt-1.5">Blacklisted buyers will be routed to this shield site for payment processing.</p>
+        </div>
+
+        <p v-else class="text-xs text-gray-400">Blacklisted buyers will not see any OneShield payment methods at checkout.</p>
+      </div>
+
       <!-- Customer Information -->
       <div class="bg-white rounded-xl border border-gray-200 p-6 mb-4">
         <h2 class="text-sm font-semibold text-gray-700 mb-4">Customer information</h2>
@@ -128,18 +173,23 @@ import { useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 
 const props = defineProps({
-  emails:               { type: String, default: '' },
-  cities:               { type: String, default: '' },
-  states:               { type: String, default: '' },
-  zipcodes:             { type: String, default: '' },
+  emails:               { type: String,  default: '' },
+  cities:               { type: String,  default: '' },
+  states:               { type: String,  default: '' },
+  zipcodes:             { type: String,  default: '' },
   use_system_blacklist: { type: Boolean, default: true },
+  blacklist_action:     { type: String,  default: 'hide' },
+  trap_shield_id:       { type: Number,  default: null },
+  shields:              { type: Array,   default: () => [] },
 });
 
 const form = useForm({
-  emails:   props.emails,
-  cities:   props.cities,
-  states:   props.states,
-  zipcodes: props.zipcodes,
+  emails:           props.emails,
+  cities:           props.cities,
+  states:           props.states,
+  zipcodes:         props.zipcodes,
+  blacklist_action: props.blacklist_action,
+  trap_shield_id:   props.trap_shield_id,
 });
 
 const useSystemBlacklist = ref(props.use_system_blacklist);
