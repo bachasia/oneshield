@@ -17,6 +17,11 @@ define('OSP_VERSION', '1.0.1');
 define('OSP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('OSP_PLUGIN_URL', plugin_dir_url(__FILE__));
 
+// Admin settings page — load early (only needs WP core, not WC)
+add_action('plugins_loaded', function () {
+    require_once OSP_PLUGIN_DIR . 'includes/admin-settings.php';
+}, 5); // priority 5: before WC (10) and osp_init_gateways (default 10)
+
 // WooCommerce HPOS compatibility
 add_action('before_woocommerce_init', function () {
     if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
